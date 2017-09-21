@@ -20,19 +20,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //
 // quakeasm.h: general asm header file
 //
-#if 0
-#ifdef _WIN32
+
+//#define GLQUAKE	1
+
+#if defined(_WIN32) && !defined(WINDED)
+
+#if defined(_M_IX86)
 #define __i386__	1
 #endif
 
-#ifdef	__i386__
+#endif
+
+#ifdef __i386__
 #define id386	1
 #else
-
-#endif
-#endif
-// don't want to use asm right now
 #define id386	0
+#endif
+
 // !!! must be kept the same as in d_iface.h !!!
 #define TRANSPARENT_COLOR	255
 

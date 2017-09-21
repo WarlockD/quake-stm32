@@ -55,8 +55,6 @@ byte		*r_stack_start;
 
 qboolean	r_fov_greater_than_90;
 
-entity_t	r_worldentity;
-
 //
 // view origin
 //
@@ -94,6 +92,10 @@ int		r_polycount;
 int		r_drawnpolycount;
 int		r_wholepolycount;
 
+#define		VIEWMODNAME_LENGTH	256
+char		viewmodname[VIEWMODNAME_LENGTH+1];
+int			modcount;
+
 int			*pfrustum_indexes[4];
 int			r_frustum_indexes[4*6];
 
@@ -116,9 +118,7 @@ void R_MarkLeaves (void);
 cvar_t	r_draworder = {"r_draworder","0"};
 cvar_t	r_speeds = {"r_speeds","0"};
 cvar_t	r_timegraph = {"r_timegraph","0"};
-cvar_t	r_netgraph = {"r_netgraph","0"};
-cvar_t	r_zgraph = {"r_zgraph","0"};
-cvar_t	r_graphheight = {"r_graphheight","15"};
+cvar_t	r_graphheight = {"r_graphheight","10"};
 cvar_t	r_clearcolor = {"r_clearcolor","2"};
 cvar_t	r_waterwarp = {"r_waterwarp","1"};
 cvar_t	r_fullbright = {"r_fullbright","0"};
@@ -141,9 +141,6 @@ extern cvar_t	scr_fov;
 
 void CreatePassages (void);
 void SetVisibilityByPassages (void);
-
-void R_NetGraph (void);
-void R_ZGraph (void);
 
 /*
 ==================
@@ -198,8 +195,6 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_draworder);
 	Cvar_RegisterVariable (&r_speeds);
 	Cvar_RegisterVariable (&r_timegraph);
-	Cvar_RegisterVariable (&r_netgraph);
-	Cvar_RegisterVariable (&r_zgraph);
 	Cvar_RegisterVariable (&r_graphheight);
 	Cvar_RegisterVariable (&r_drawflat);
 	Cvar_RegisterVariable (&r_ambient);
@@ -252,9 +247,6 @@ void R_NewMap (void)
 {
 	int		i;
 	
-	memset (&r_worldentity, 0, sizeof(r_worldentity));
-	r_worldentity.model = cl.worldmodel;
-
 // clear out efrags in case the level hasn't been reloaded
 // FIXME: is this one short?
 	for (i=0 ; i<cl.worldmodel->numleafs ; i++)
@@ -304,6 +296,9 @@ void R_NewMap (void)
 
 	r_dowarpold = false;
 	r_viewchanged = false;
+#ifdef PASSAGES
+CreatePassages ();
+#endif
 }
 
 
@@ -316,33 +311,17 @@ void R_SetVrect (vrect_t *pvrectin, vrect_t *pvrect, int lineadj)
 {
 	int		h;
 	float	size;
-	qboolean full = false;
 
-	if (scr_viewsize.value >= 100.0) {
-		size = 100.0;
-		full = true;
-	} else
-		size = scr_viewsize.value;
-
+	size = scr_viewsize.value > 100 ? 100 : scr_viewsize.value;
 	if (cl.intermission)
 	{
-		full = true;
-		size = 100.0;
+		size = 100;
 		lineadj = 0;
 	}
-	size /= 100.0;
+	size /= 100;
 
-	if (!cl_sbar.value && full)
-		h = pvrectin->height;
-	else
-		h = pvrectin->height - lineadj;
-
-//	h = (!cl_sbar.value && size==1.0) ? pvrectin->height : (pvrectin->height - lineadj);
-//	h = pvrectin->height - lineadj;
-	if (full)
-		pvrect->width = pvrectin->width;
-	else
-		pvrect->width = pvrectin->width * size;
+	h = pvrectin->height - lineadj;
+	pvrect->width = pvrectin->width * size;
 	if (pvrect->width < 96)
 	{
 		size = 96.0 / pvrectin->width;
@@ -350,20 +329,21 @@ void R_SetVrect (vrect_t *pvrectin, vrect_t *pvrect, int lineadj)
 	}
 	pvrect->width &= ~7;
 	pvrect->height = pvrectin->height * size;
-	if (cl_sbar.value || !full) {
-		if (pvrect->height > pvrectin->height - lineadj)
-			pvrect->height = pvrectin->height - lineadj;
-	} else
-		if (pvrect->height > pvrectin->height)
-			pvrect->height = pvrectin->height;
+	if (pvrect->height > pvrectin->height - lineadj)
+		pvrect->height = pvrectin->height - lineadj;
 
 	pvrect->height &= ~1;
 
 	pvrect->x = (pvrectin->width - pvrect->width)/2;
-	if (full)
-		pvrect->y = 0;
-	else
-		pvrect->y = (h - pvrect->height)/2;
+	pvrect->y = (h - pvrect->height)/2;
+
+	{
+		if (lcd_x.value)
+		{
+			pvrect->y >>= 1;
+			pvrect->height >>= 1;
+		}
+	}
 }
 
 
@@ -482,7 +462,7 @@ void R_ViewChanged (vrect_t *pvrect, int lineadj, float aspect)
 		r_fov_greater_than_90 = true;
 
 // TODO: collect 386-specific code in one place
-#if id386
+#if	id386
 	if (r_pixbytes == 1)
 	{
 		Sys_MakeCodeWriteable ((long)R_Surf8Start,
@@ -559,7 +539,10 @@ void R_DrawEntitiesOnList (void)
 
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
-		currententity = &cl_visedicts[i];
+		currententity = cl_visedicts[i];
+
+		if (currententity == &cl_entities[cl.viewentity])
+			continue;	// don't draw the player
 
 		switch (currententity->model->type)
 		{
@@ -630,10 +613,10 @@ void R_DrawViewModel (void)
 	float		add;
 	dlight_t	*dl;
 	
-	if (!r_drawviewmodel.value || r_fov_greater_than_90 || !Cam_DrawViewModel())
+	if (!r_drawviewmodel.value || r_fov_greater_than_90)
 		return;
 
-	if (cl.stats[STAT_ITEMS] & IT_INVISIBILITY)
+	if (cl.items & IT_INVISIBILITY)
 		return;
 
 	if (cl.stats[STAT_HEALTH] <= 0)
@@ -680,6 +663,10 @@ void R_DrawViewModel (void)
 		r_viewlighting.shadelight = 192 - r_viewlighting.ambientlight;
 
 	r_viewlighting.plightvec = lightvec;
+
+#ifdef QUAKE2
+	cl.light_level = r_viewlighting.ambientlight;
+#endif
 
 	R_AliasDrawModel (&r_viewlighting);
 }
@@ -770,7 +757,7 @@ void R_DrawBEntitiesOnList (void)
 
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
-		currententity = &cl_visedicts[i];
+		currententity = cl_visedicts[i];
 
 		switch (currententity->model->type)
 		{
@@ -918,7 +905,7 @@ void R_EdgeDrawing (void)
 
 	if (r_dspeeds.value)
 	{
-		rw_time1 = Sys_DoubleTime ();
+		rw_time1 = Sys_FloatTime ();
 	}
 
 	R_RenderWorld ();
@@ -932,7 +919,7 @@ void R_EdgeDrawing (void)
 
 	if (r_dspeeds.value)
 	{
-		rw_time2 = Sys_DoubleTime ();
+		rw_time2 = Sys_FloatTime ();
 		db_time1 = rw_time2;
 	}
 
@@ -940,7 +927,7 @@ void R_EdgeDrawing (void)
 
 	if (r_dspeeds.value)
 	{
-		db_time2 = Sys_DoubleTime ();
+		db_time2 = Sys_FloatTime ();
 		se_time1 = db_time2;
 	}
 
@@ -970,7 +957,7 @@ void R_RenderView_ (void)
 	r_warpbuffer = warpbuffer;
 
 	if (r_timegraph.value || r_speeds.value || r_dspeeds.value)
-		r_time1 = Sys_DoubleTime ();
+		r_time1 = Sys_FloatTime ();
 
 	R_SetupFrame ();
 
@@ -986,7 +973,7 @@ SetVisibilityByPassages ();
 // done in screen.c
 	Sys_LowFPPrecision ();
 
-	if (!r_worldentity.model || !cl.worldmodel)
+	if (!cl_entities[0].model || !cl.worldmodel)
 		Sys_Error ("R_RenderView: NULL worldmodel");
 		
 	if (!r_dspeeds.value)
@@ -1007,7 +994,7 @@ SetVisibilityByPassages ();
 	
 	if (r_dspeeds.value)
 	{
-		se_time2 = Sys_DoubleTime ();
+		se_time2 = Sys_FloatTime ();
 		de_time1 = se_time2;
 	}
 
@@ -1015,7 +1002,7 @@ SetVisibilityByPassages ();
 
 	if (r_dspeeds.value)
 	{
-		de_time2 = Sys_DoubleTime ();
+		de_time2 = Sys_FloatTime ();
 		dv_time1 = de_time2;
 	}
 
@@ -1023,14 +1010,14 @@ SetVisibilityByPassages ();
 
 	if (r_dspeeds.value)
 	{
-		dv_time2 = Sys_DoubleTime ();
-		dp_time1 = Sys_DoubleTime ();
+		dv_time2 = Sys_FloatTime ();
+		dp_time1 = Sys_FloatTime ();
 	}
 
 	R_DrawParticles ();
 
 	if (r_dspeeds.value)
-		dp_time2 = Sys_DoubleTime ();
+		dp_time2 = Sys_FloatTime ();
 
 	if (r_dowarp)
 		D_WarpScreen ();
@@ -1039,12 +1026,6 @@ SetVisibilityByPassages ();
 
 	if (r_timegraph.value)
 		R_TimeGraph ();
-
-	if (r_netgraph.value)
-		R_NetGraph ();
-
-	if (r_zgraph.value)
-		R_ZGraph ();
 
 	if (r_aliasstats.value)
 		R_PrintAliasStats ();
@@ -1095,7 +1076,7 @@ void R_InitTurb (void)
 {
 	int		i;
 	
-	for (i=0 ; i<1280 ; i++)
+	for (i=0 ; i<(SIN_BUFFER_SIZE) ; i++)
 	{
 		sintable[i] = AMP + sin(i*3.14159*2/CYCLE)*AMP;
 		intsintable[i] = AMP2 + sin(i*3.14159*2/CYCLE)*AMP2;	// AMP2, not 20

@@ -607,21 +607,6 @@ void R_AliasSetupSkin (void)
 	r_affinetridesc.skinwidth = a_skinwidth;
 	r_affinetridesc.seamfixupX16 =  (a_skinwidth >> 1) << 16;
 	r_affinetridesc.skinheight = pmdl->skinheight;
-
-	if (currententity->scoreboard)
-	{
-		byte	*base;
-
-		if (!currententity->scoreboard->skin)
-			Skin_Find (currententity->scoreboard);
-		base = Skin_Cache (currententity->scoreboard->skin);
-		if (base)
-		{
-			r_affinetridesc.pskin = base;
-			r_affinetridesc.skinwidth = 320;
-			r_affinetridesc.skinheight = 200;
-		}
-	}
 }
 
 /*
@@ -748,7 +733,7 @@ void R_AliasDrawModel (alight_t *plighting)
 	}
 	else
 	{
-#if id386
+#if	id386
 		D_Aff8Patch (currententity->colormap);
 #endif
 	}

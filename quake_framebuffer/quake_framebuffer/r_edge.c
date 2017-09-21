@@ -86,7 +86,7 @@ void R_DrawCulledPolys (void)
 	surf_t			*s;
 	msurface_t		*pface;
 
-	currententity = &r_worldentity;
+	currententity = &cl_entities[0];
 
 	if (r_worldpolysbacktofront)
 	{
@@ -722,16 +722,20 @@ void R_ScanEdges (void)
 
 	// flush the span list if we can't be sure we have enough spans left for
 	// the next scan
-		if (span_p > max_span_p)
+		if (span_p >= max_span_p)
 		{
 			VID_UnlockBuffer ();
 			S_ExtraUpdate ();	// don't let sound get messed up if going slow
 			VID_LockBuffer ();
 		
 			if (r_drawculledpolys)
+			{
 				R_DrawCulledPolys ();
+			}
 			else
+			{
 				D_DrawSurfaces ();
+			}
 
 		// clear the surface span pointers
 			for (s = &surfaces[1] ; s<surface_p ; s++)

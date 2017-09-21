@@ -84,9 +84,8 @@ void PerpendicularVector( vec3_t dst, const vec3_t src )
 	*/
 	VectorNormalize( dst );
 }
-// optimize? huh?
 
-#if 0
+#ifdef _WIN32
 #pragma optimize( "", off )
 #endif
 
@@ -146,11 +145,12 @@ void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, 
 	}
 }
 
-#if 0
+#ifdef _WIN32
 #pragma optimize( "", on )
 #endif
 
 /*-----------------------------------------------------------------*/
+
 
 float	anglemod(float a)
 {
@@ -176,7 +176,8 @@ void BOPS_Error (void)
 	Sys_Error ("BoxOnPlaneSide:  Bad signbits");
 }
 
-#if !id386
+
+#if	!id386
 
 /*
 ==================
@@ -418,7 +419,7 @@ void VectorScale (vec3_t in, vec_t scale, vec3_t out)
 int Q_log2(int val)
 {
 	int answer=0;
-	while ((val>>=1) != 0)
+	while (val>>=1)
 		answer++;
 	return answer;
 }
@@ -560,7 +561,7 @@ int GreatestCommonDivisor (int i1, int i2)
 }
 
 
-#if !id386
+#if	!id386
 
 // TODO: move to nonintel.c
 

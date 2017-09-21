@@ -17,8 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#ifndef _KEYS_H_
-#define _KEYS_H_
 
 //
 // these are the key numbers that should be passed to Key_Event
@@ -127,14 +125,9 @@ extern	int		key_repeats[256];
 extern	int		key_count;			// incremented every key event
 extern	int		key_lastpress;
 
-extern char chat_buffer[];
-extern	int chat_bufferlen;
-extern	qboolean	chat_team;
-
 void Key_Event (int key, qboolean down);
 void Key_Init (void);
 void Key_WriteBindings (FILE *f);
 void Key_SetBinding (int keynum, char *binding);
 void Key_ClearStates (void);
 
-#endif

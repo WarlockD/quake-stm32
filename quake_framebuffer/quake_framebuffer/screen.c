@@ -22,56 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 
-#include <time.h>
-
-/*
-
-background clear
-rendering
-turtle/net/ram icons
-sbar
-centerprint / slow centerprint
-notify lines
-intermission / finale overlay
-loading plaque
-console
-menu
-
-required background clears
-required update regions
-
-
-syncronous draw mode or async
-One off screen buffer, with updates either copied or xblited
-Need to double buffer?
-
-
-async draw will require the refresh area to be cleared, because it will be
-xblited, but sync draw can just ignore it.
-
-sync
-draw
-
-CenterPrint ()
-SlowPrint ()
-Screen_Update ();
-Con_Printf ();
-
-net 
-turn off messages option
-
-the refresh is allways rendered, unless the console is full screen
-
-
-console is:
-	notify lines
-	half
-	full
-	
-
-*/
-
-
 // only the refresh window will be updated unless these variables are flagged 
 int			scr_copytop;
 int			scr_copyeverything;
@@ -80,7 +30,6 @@ float		scr_con_current;
 float		scr_conlines;		// lines of console to display
 
 float		oldscreensize, oldfov;
-float		oldsbar;
 cvar_t		scr_viewsize = {"viewsize","100", true};
 cvar_t		scr_fov = {"fov","90"};	// 10 - 170
 cvar_t		scr_conspeed = {"scr_conspeed","300"};
@@ -89,7 +38,6 @@ cvar_t		scr_showram = {"showram","1"};
 cvar_t		scr_showturtle = {"showturtle","0"};
 cvar_t		scr_showpause = {"showpause","1"};
 cvar_t		scr_printspeed = {"scr_printspeed","8"};
-cvar_t		scr_allowsnap = {"scr_allowsnap", "1"};
 
 qboolean	scr_initialized;		// ready to draw
 
@@ -102,21 +50,19 @@ int			scr_fullupdate;
 int			clearconsole;
 int			clearnotify;
 
-int			sb_lines;
-
 viddef_t	vid;				// global video state
 
 vrect_t		*pconupdate;
 vrect_t		scr_vrect;
 
 qboolean	scr_disabled_for_loading;
-
+qboolean	scr_drawloading;
+float		scr_disabled_time;
 qboolean	scr_skipupdate;
 
 qboolean	block_drawing;
 
 void SCR_ScreenShot_f (void);
-void SCR_RSShot_f (void);
 
 /*
 ===============================================================================
@@ -173,7 +119,7 @@ void SCR_EraseCenterString (void)
 		y = 48;
 
 	scr_copytop = 1;
-	Draw_TileClear (0, y, vid.width, min(8*scr_erase_lines, vid.height - y - 1));
+	Draw_TileClear (0, y,vid.width, 8*scr_erase_lines);
 }
 
 void SCR_DrawCenterString (void)
@@ -340,10 +286,8 @@ Keybinding command
 */
 void SCR_SizeUp_f (void)
 {
-	if (scr_viewsize.value < 120) {
 	Cvar_SetValue ("viewsize",scr_viewsize.value+10);
 	vid.recalc_refdef = 1;
-	}
 }
 
 
@@ -377,19 +321,17 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_showpause);
 	Cvar_RegisterVariable (&scr_centertime);
 	Cvar_RegisterVariable (&scr_printspeed);
-	Cvar_RegisterVariable (&scr_allowsnap);
 
 //
 // register our commands
 //
 	Cmd_AddCommand ("screenshot",SCR_ScreenShot_f);
-	Cmd_AddCommand ("snap",SCR_RSShot_f);
 	Cmd_AddCommand ("sizeup",SCR_SizeUp_f);
 	Cmd_AddCommand ("sizedown",SCR_SizeDown_f);
 
-	scr_ram = W_GetLumpName ("ram");
-	scr_net = W_GetLumpName ("net");
-	scr_turtle = W_GetLumpName ("turtle");
+	scr_ram = Draw_PicFromWad ("ram");
+	scr_net = Draw_PicFromWad ("net");
+	scr_turtle = Draw_PicFromWad ("turtle");
 
 	scr_initialized = true;
 }
@@ -444,39 +386,12 @@ SCR_DrawNet
 */
 void SCR_DrawNet (void)
 {
-	if (cls.netchan.outgoing_sequence - cls.netchan.incoming_acknowledged < UPDATE_BACKUP-1)
+	if (realtime - cl.last_received_message < 0.3)
 		return;
 	if (cls.demoplayback)
 		return;
 
 	Draw_Pic (scr_vrect.x+64, scr_vrect.y, scr_net);
-}
-
-void SCR_DrawFPS (void)
-{
-	extern cvar_t show_fps;
-	static double lastframetime;
-	double t;
-	extern int fps_count;
-	static lastfps;
-	int x, y;
-	char st[80];
-
-	if (!show_fps.value)
-		return;
-
-	t = Sys_DoubleTime();
-	if ((t - lastframetime) >= 1.0) {
-		lastfps = fps_count;
-		fps_count = 0;
-		lastframetime = t;
-	}
-
-	sprintf(st, "%3d FPS", lastfps);
-	x = vid.width - strlen(st) * 8 - 8;
-	y = vid.height - sb_lines - 8;
-//	Draw_TileClear(x, y, strlen(st) * 8, 8);
-	Draw_String(x, y, st);
 }
 
 /*
@@ -500,6 +415,26 @@ void SCR_DrawPause (void)
 }
 
 
+
+/*
+==============
+SCR_DrawLoading
+==============
+*/
+void SCR_DrawLoading (void)
+{
+	qpic_t	*pic;
+
+	if (!scr_drawloading)
+		return;
+		
+	pic = Draw_CachePic ("gfx/loading.lmp");
+	Draw_Pic ( (vid.width - pic->width)/2, 
+		(vid.height - 48 - pic->height)/2, pic);
+}
+
+
+
 //=============================================================================
 
 
@@ -512,8 +447,13 @@ void SCR_SetUpToDrawConsole (void)
 {
 	Con_CheckResize ();
 	
+	if (scr_drawloading)
+		return;		// never a console with loading plaque
+		
 // decide on the height of the console
-	if (cls.state != ca_active)
+	con_forcedup = !cl.worldmodel || cls.signon != SIGNONS;
+
+	if (con_forcedup)
 	{
 		scr_conlines = vid.height;		// full screen
 		scr_con_current = scr_conlines;
@@ -562,7 +502,7 @@ void SCR_DrawConsole (void)
 	if (scr_con_current)
 	{
 		scr_copyeverything = 1;
-		Con_DrawConsole (scr_con_current);
+		Con_DrawConsole (scr_con_current, true);
 		clearconsole = 0;
 	}
 	else
@@ -580,7 +520,24 @@ void SCR_DrawConsole (void)
  
 ============================================================================== 
 */ 
+ 
 
+typedef struct
+{
+    char	manufacturer;
+    char	version;
+    char	encoding;
+    char	bits_per_pixel;
+    unsigned short	xmin,ymin,xmax,ymax;
+    unsigned short	hres,vres;
+    unsigned char	palette[48];
+    char	reserved;
+    char	color_planes;
+    unsigned short	bytes_per_line;
+    unsigned short	palette_type;
+    char	filler[58];
+    unsigned char	data;			// unbounded
+} pcx_t;
 
 /* 
 ============== 
@@ -588,7 +545,7 @@ WritePCXfile
 ============== 
 */ 
 void WritePCXfile (char *filename, byte *data, int width, int height,
-	int rowbytes, byte *palette, qboolean upload) 
+	int rowbytes, byte *palette) 
 {
 	int		i, j, length;
 	pcx_t	*pcx;
@@ -643,10 +600,7 @@ void WritePCXfile (char *filename, byte *data, int width, int height,
 		
 // write output file 
 	length = pack - (byte *)pcx;
-	if (upload)
-		CL_StartUpload((void *)pcx, length);
-	else
-		COM_WriteFile (filename, pcx, length);
+	COM_WriteFile (filename, pcx, length);
 } 
  
 
@@ -677,10 +631,10 @@ void SCR_ScreenShot_f (void)
 	} 
 	if (i==100) 
 	{
-		Con_Printf ("SCR_ScreenShot_f: Couldn't create a PCX"); 
+		Con_Printf ("SCR_ScreenShot_f: Couldn't create a PCX file\n"); 
 		return;
-	}
- 
+ 	}
+
 // 
 // save the pcx file 
 // 
@@ -688,7 +642,7 @@ void SCR_ScreenShot_f (void)
 									//  buffer
 
 	WritePCXfile (pcxname, vid.buffer, vid.width, vid.height, vid.rowbytes,
-				  host_basepal, false);
+				  host_basepal);
 
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
 									//  for linear writes all the time
@@ -696,209 +650,53 @@ void SCR_ScreenShot_f (void)
 	Con_Printf ("Wrote %s\n", pcxname);
 } 
 
+
+//=============================================================================
+
+
 /*
-Find closest color in the palette for named color
+===============
+SCR_BeginLoadingPlaque
+
+================
 */
-int MipColor(int r, int g, int b)
+void SCR_BeginLoadingPlaque (void)
 {
-	int i;
-	float dist;
-	int best;
-	float bestdist;
-	int r1, g1, b1;
-	static int lr = -1, lg = -1, lb = -1;
-	static int lastbest;
+	S_StopAllSounds (true);
 
-	if (r == lr && g == lg && b == lb)
-		return lastbest;
-
-	bestdist = 256*256*3;
-
-	for (i = 0; i < 256; i++) {
-		r1 = host_basepal[i*3] - r;
-		g1 = host_basepal[i*3+1] - g;
-		b1 = host_basepal[i*3+2] - b;
-		dist = r1*r1 + g1*g1 + b1*b1;
-		if (dist < bestdist) {
-			bestdist = dist;
-			best = i;
-		}
-	}
-	lr = r; lg = g; lb = b;
-	lastbest = best;
-	return best;
-}
-
-// in draw.c
-extern byte		*draw_chars;				// 8*8 graphic characters
-
-void SCR_DrawCharToSnap (int num, byte *dest, int width)
-{
-	int		row, col;
-	byte	*source;
-	int		drawline;
-	int		x;
-
-	row = num>>4;
-	col = num&15;
-	source = draw_chars + (row<<10) + (col<<3);
-
-	drawline = 8;
-
-	while (drawline--)
-	{
-		for (x=0 ; x<8 ; x++)
-			if (source[x])
-				dest[x] = source[x];
-			else
-				dest[x] = 98;
-		source += 128;
-		dest += width;
-	}
-
-}
-
-void SCR_DrawStringToSnap (const char *s, byte *buf, int x, int y, int width)
-{
-	byte *dest;
-	const unsigned char *p;
-
-	dest = buf + ((y * width) + x);
-
-	p = (const unsigned char *)s;
-	while (*p) {
-		SCR_DrawCharToSnap(*p++, dest, width);
-		dest += 8;
-	}
-}
-
-
-/* 
-================== 
-SCR_RSShot_f
-================== 
-*/  
-void SCR_RSShot_f (void) 
-{ 
-	int     i, x, y;
-	unsigned char		*src, *dest;
-	char		pcxname[80]; 
-	char		checkname[MAX_OSPATH];
-	unsigned char		*newbuf, *srcbuf;
-	int srcrowbytes;
-	int w, h;
-	int dx, dy, dex, dey, nx;
-	int r, b, g;
-	int count;
-	float fracw, frach;
-	char st[80];
-	time_t now;
-
-	if (CL_IsUploading())
-		return; // already one pending
-
-	if (cls.state < ca_onserver)
-		return; // gotta be connected
-
-	if (!scr_allowsnap.value) {
-		MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
-		SZ_Print (&cls.netchan.message, "snap\n");
-		Con_Printf("Refusing remote screen shot request.\n");
+	if (cls.state != ca_connected)
 		return;
-	}
-
-	Con_Printf("Remote screen shot requested.\n");
-
-#if 0
-// 
-// find a file name to save it to 
-// 
-	strcpy(pcxname,"mquake00.pcx");
-		
-	for (i=0 ; i<=99 ; i++) 
-	{ 
-		pcxname[6] = i/10 + '0'; 
-		pcxname[7] = i%10 + '0'; 
-		sprintf (checkname, "%s/%s", com_gamedir, pcxname);
-		if (Sys_FileTime(checkname) == -1)
-			break;	// file doesn't exist
-	} 
-	if (i==100) 
-	{
-		Con_Printf ("SCR_ScreenShot_f: Couldn't create a PCX"); 
+	if (cls.signon != SIGNONS)
 		return;
-	}
-#endif
- 
-// 
-// save the pcx file 
-// 
-	D_EnableBackBufferAccess ();	// enable direct drawing of console to back
-									//  buffer
+	
+// redraw with no console and the loading plaque
+	Con_ClearNotify ();
+	scr_centertime_off = 0;
+	scr_con_current = 0;
 
-	w = (vid.width < RSSHOT_WIDTH) ? vid.width : RSSHOT_WIDTH;
-	h = (vid.height < RSSHOT_HEIGHT) ? vid.height : RSSHOT_HEIGHT;
+	scr_drawloading = true;
+	scr_fullupdate = 0;
+	Sbar_Changed ();
+	SCR_UpdateScreen ();
+	scr_drawloading = false;
 
-	fracw = (float)vid.width / (float)w;
-	frach = (float)vid.height / (float)h;
+	scr_disabled_for_loading = true;
+	scr_disabled_time = realtime;
+	scr_fullupdate = 0;
+}
 
-	newbuf = malloc(w*h);
+/*
+===============
+SCR_EndLoadingPlaque
 
-	for (y = 0; y < h; y++) {
-		dest = newbuf + (w * y);
-
-		for (x = 0; x < w; x++) {
-			r = g = b = 0;
-
-			dx = x * fracw;
-			dex = (x + 1) * fracw;
-			if (dex == dx) dex++; // at least one
-			dy = y * frach;
-			dey = (y + 1) * frach;
-			if (dey == dy) dey++; // at least one
-
-			count = 0;
-			for (/* */; dy < dey; dy++) {
-				src = vid.buffer + (vid.rowbytes * dy) + dx;
-				for (nx = dx; nx < dex; nx++) {
-					r += host_basepal[*src * 3];
-					g += host_basepal[*src * 3+1];
-					b += host_basepal[*src * 3+2];
-					src++;
-					count++;
-				}
-			}
-			r /= count;
-			g /= count;
-			b /= count;
-			*dest++ = MipColor(r, g, b);
-		}
-	}
-
-	time(&now);
-	strcpy(st, ctime(&now));
-	st[strlen(st) - 1] = 0;
-	SCR_DrawStringToSnap (st, newbuf, w - strlen(st)*8, 0, w);
-
-	strncpy(st, cls.servername, sizeof(st));
-	st[sizeof(st) - 1] = 0;
-	SCR_DrawStringToSnap (st, newbuf, w - strlen(st)*8, 10, w);
-
-	strncpy(st, name.string, sizeof(st));
-	st[sizeof(st) - 1] = 0;
-	SCR_DrawStringToSnap (st, newbuf, w - strlen(st)*8, 20, w);
-
-	WritePCXfile (pcxname, newbuf, w, h, w, host_basepal, true);
-
-	free(newbuf);
-
-	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
-									//  for linear writes all the time
-
-//	Con_Printf ("Wrote %s\n", pcxname);
-	Con_Printf ("Sending shot to server...\n");
-} 
-
+================
+*/
+void SCR_EndLoadingPlaque (void)
+{
+	scr_disabled_for_loading = false;
+	scr_fullupdate = 0;
+	Con_ClearNotify ();
+}
 
 //=============================================================================
 
@@ -947,6 +745,9 @@ keypress.
 */
 int SCR_ModalMessage (char *text)
 {
+	if (cls.state == ca_dedicated)
+		return true;
+
 	scr_notifystring = text;
  
 // draw a fresh screen
@@ -1007,25 +808,28 @@ needs almost the entire 256k of stack space!
 void SCR_UpdateScreen (void)
 {
 	static float	oldscr_viewsize;
+	static float	oldlcd_x;
 	vrect_t		vrect;
-
+	
 	if (scr_skipupdate || block_drawing)
 		return;
 
-	if (scr_disabled_for_loading)
-		return;
-
-#ifdef _WIN32
-	{	// don't suck up any cpu if minimized
-		extern int Minimized;
-
-		if (Minimized)
-			return;
-	}
-#endif
-
 	scr_copytop = 0;
 	scr_copyeverything = 0;
+
+	if (scr_disabled_for_loading)
+	{
+		if (realtime - scr_disabled_time > 60)
+		{
+			scr_disabled_for_loading = false;
+			Con_Printf ("load failed.\n");
+		}
+		else
+			return;
+	}
+
+	if (cls.state == ca_dedicated)
+		return;				// stdout only
 
 	if (!scr_initialized || !con_initialized)
 		return;				// not initialized yet
@@ -1045,21 +849,21 @@ void SCR_UpdateScreen (void)
 		vid.recalc_refdef = true;
 	}
 	
+	if (oldlcd_x != lcd_x.value)
+	{
+		oldlcd_x = lcd_x.value;
+		vid.recalc_refdef = true;
+	}
+	
 	if (oldscreensize != scr_viewsize.value)
 	{
 		oldscreensize = scr_viewsize.value;
 		vid.recalc_refdef = true;
 	}
-
-	if (oldsbar != cl_sbar.value)
-	{
-		oldsbar = cl_sbar.value;
-		vid.recalc_refdef = true;
-	}
 	
 	if (vid.recalc_refdef)
 	{
-		// something changed, so reorder the screen
+	// something changed, so reorder the screen
 		SCR_CalcRefdef ();
 	}
 
@@ -1080,12 +884,14 @@ void SCR_UpdateScreen (void)
 
 	SCR_SetUpToDrawConsole ();
 	SCR_EraseCenterString ();
-	
+
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
 									//  for linear writes all the time
 
 	VID_LockBuffer ();
+
 	V_RenderView ();
+
 	VID_UnlockBuffer ();
 
 	D_EnableBackBufferAccess ();	// of all overlay stuff if drawing directly
@@ -1097,6 +903,11 @@ void SCR_UpdateScreen (void)
 		SCR_DrawNotifyString ();
 		scr_copyeverything = true;
 	}
+	else if (scr_drawloading)
+	{
+		SCR_DrawLoading ();
+		Sbar_Draw ();
+	}
 	else if (cl.intermission == 1 && key_dest == key_game)
 	{
 		Sbar_IntermissionOverlay ();
@@ -1106,19 +917,21 @@ void SCR_UpdateScreen (void)
 		Sbar_FinaleOverlay ();
 		SCR_CheckDrawCenterString ();
 	}
+	else if (cl.intermission == 3 && key_dest == key_game)
+	{
+		SCR_CheckDrawCenterString ();
+	}
 	else
 	{
 		SCR_DrawRam ();
 		SCR_DrawNet ();
 		SCR_DrawTurtle ();
 		SCR_DrawPause ();
-		SCR_DrawFPS ();
 		SCR_CheckDrawCenterString ();
 		Sbar_Draw ();
-		SCR_DrawConsole ();	
+		SCR_DrawConsole ();
 		M_Draw ();
 	}
-
 
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
 									//  for linear writes all the time
@@ -1132,6 +945,7 @@ void SCR_UpdateScreen (void)
 //
 // update one of three areas
 //
+
 	if (scr_copyeverything)
 	{
 		vrect.x = 0;
@@ -1161,8 +975,9 @@ void SCR_UpdateScreen (void)
 		vrect.pnext = 0;
 	
 		VID_Update (&vrect);
-	}	
+	}
 }
+
 
 /*
 ==================

@@ -39,6 +39,11 @@ byte	mod_novis[MAX_MAP_LEAFS/8];
 model_t	mod_known[MAX_MOD_KNOWN];
 int		mod_numknown;
 
+// values for model_t's needload
+#define NL_PRESENT		0
+#define NL_NEEDS_LOADED	1
+#define NL_UNREFERENCED	2
+
 /*
 ===============
 Mod_Init
@@ -51,7 +56,7 @@ void Mod_Init (void)
 
 /*
 ===============
-Mod_Init
+Mod_Extradata
 
 Caches the data if needed
 ===============
@@ -117,9 +122,6 @@ byte *Mod_DecompressVis (byte *in, model_t *model)
 	row = (model->numleafs+7)>>3;	
 	out = decompressed;
 
-#if 0
-	memcpy (out, in, row);
-#else
 	if (!in)
 	{	// no vis info, so make all visible
 		while (row)
@@ -146,7 +148,6 @@ byte *Mod_DecompressVis (byte *in, model_t *model)
 			c--;
 		}
 	} while (out - decompressed < row);
-#endif
 	
 	return decompressed;
 }
@@ -167,10 +168,13 @@ void Mod_ClearAll (void)
 {
 	int		i;
 	model_t	*mod;
-	
-	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
-		if (mod->type != mod_alias)
-			mod->needload = true;
+
+
+	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++) {
+		mod->needload = NL_UNREFERENCED;
+//FIX FOR CACHE_ALLOC ERRORS:
+		if (mod->type == mod_sprite) mod->cache.data = NULL;
+	}
 }
 
 /*
@@ -183,7 +187,8 @@ model_t *Mod_FindName (char *name)
 {
 	int		i;
 	model_t	*mod;
-	
+	model_t	*avail = NULL;
+
 	if (!name[0])
 		Sys_Error ("Mod_ForName: NULL name");
 		
@@ -191,16 +196,32 @@ model_t *Mod_FindName (char *name)
 // search the currently loaded models
 //
 	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
+	{
 		if (!strcmp (mod->name, name) )
 			break;
+		if (mod->needload == NL_UNREFERENCED)
+			if (!avail || mod->type != mod_alias)
+				avail = mod;
+	}
 			
 	if (i == mod_numknown)
 	{
 		if (mod_numknown == MAX_MOD_KNOWN)
-			Sys_Error ("mod_numknown == MAX_MOD_KNOWN");
+		{
+			if (avail)
+			{
+				mod = avail;
+				if (mod->type == mod_alias)
+					if (Cache_Check (&mod->cache))
+						Cache_Free (&mod->cache);
+			}
+			else
+				Sys_Error ("mod_numknown == MAX_MOD_KNOWN");
+		}
+		else
+			mod_numknown++;
 		strcpy (mod->name, name);
-		mod->needload = true;
-		mod_numknown++;
+		mod->needload = NL_NEEDS_LOADED;
 	}
 
 	return mod;
@@ -218,7 +239,7 @@ void Mod_TouchModel (char *name)
 	
 	mod = Mod_FindName (name);
 	
-	if (!mod->needload)
+	if (mod->needload == NL_PRESENT)
 	{
 		if (mod->type == mod_alias)
 			Cache_Check (&mod->cache);
@@ -234,29 +255,26 @@ Loads a model into the cache
 */
 model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 {
-	void	*d;
 	unsigned *buf;
 	byte	stackbuf[1024];		// avoid dirtying the cache heap
 
-	if (!mod->needload)
+	if (mod->type == mod_alias)
 	{
-		if (mod->type == mod_alias)
+		if (Cache_Check (&mod->cache))
 		{
-			d = Cache_Check (&mod->cache);
-			if (d)
-				return mod;
+			mod->needload = NL_PRESENT;
+			return mod;
 		}
-		else
-			return mod;		// not cached at all
+	}
+	else
+	{
+		if (mod->needload == NL_PRESENT)
+			return mod;
 	}
 
 //
 // because the world is so huge, load it one piece at a time
 //
-	if (!crash)
-	{
-	
-	}
 	
 //
 // load the file
@@ -281,8 +299,8 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 
 // call the apropriate loader
-	mod->needload = false;
-	
+	mod->needload = NL_PRESENT;
+
 	switch (LittleLong(*(unsigned *)buf))
 	{
 	case IDPOLYHEADER:
@@ -311,9 +329,9 @@ Loads in a model for the given name
 model_t *Mod_ForName (char *name, qboolean crash)
 {
 	model_t	*mod;
-	
+
 	mod = Mod_FindName (name);
-	
+
 	return Mod_LoadModel (mod, crash);
 }
 
@@ -1142,24 +1160,8 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 	for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
 		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
 
-	mod->checksum = 0;
-	mod->checksum2 = 0;
-
-// checksum all of the map, except for entities
-	for (i = 0; i < HEADER_LUMPS; i++) {
-		if (i == LUMP_ENTITIES)
-			continue;
-		mod->checksum ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, 
-			header->lumps[i].filelen);
-
-		if (i == LUMP_VISIBILITY || i == LUMP_LEAFS || i == LUMP_NODES)
-			continue;
-		mod->checksum2 ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, 
-			header->lumps[i].filelen);
-	}
-	
 // load into heap
-
+	
 	Mod_LoadVertexes (&header->lumps[LUMP_VERTEXES]);
 	Mod_LoadEdges (&header->lumps[LUMP_EDGES]);
 	Mod_LoadSurfedges (&header->lumps[LUMP_SURFEDGES]);
@@ -1179,6 +1181,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 	Mod_MakeHull0 ();
 	
 	mod->numframes = 2;		// regular and alternate animation
+	mod->flags = 0;
 	
 //
 // set up the submodels (FIXME: this is confusing)
@@ -1196,11 +1199,11 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 		
 		mod->firstmodelsurface = bm->firstface;
 		mod->nummodelsurfaces = bm->numfaces;
-		mod->radius = RadiusFromBounds (mod->mins, mod->maxs);
 		
 		VectorCopy (bm->maxs, mod->maxs);
 		VectorCopy (bm->mins, mod->mins);
-	
+		mod->radius = RadiusFromBounds (mod->mins, mod->maxs);
+		
 		mod->numleafs = bm->visleafs;
 
 		if (i < mod->numsubmodels-1)
@@ -1452,31 +1455,6 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	int					skinsize;
 	int					start, end, total;
 	
-	if (!strcmp(loadmodel->name, "progs/player.mdl") ||
-		!strcmp(loadmodel->name, "progs/eyes.mdl")) {
-		unsigned short crc;
-		byte *p;
-		int len;
-		char st[40];
-
-		CRC_Init(&crc);
-		for (len = com_filesize, p = buffer; len; len--, p++)
-			CRC_ProcessByte(&crc, *p);
-	
-		sprintf(st, "%d", (int) crc);
-		Info_SetValueForKey (cls.userinfo, 
-			!strcmp(loadmodel->name, "progs/player.mdl") ? pmodel_name : emodel_name,
-			st, MAX_INFO_STRING);
-
-		if (cls.state >= ca_connected) {
-			MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
-			sprintf(st, "setinfo %s %d", 
-				!strcmp(loadmodel->name, "progs/player.mdl") ? pmodel_name : emodel_name,
-				(int)crc);
-			SZ_Print (&cls.netchan.message, st);
-		}
-	}
-
 	start = Hunk_LowMark ();
 
 	pinmodel = (mdl_t *)buffer;
@@ -1638,7 +1616,6 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 
 		frametype = LittleLong (pframetype->type);
 		pheader->frames[i].type = frametype;
-
 
 		if (frametype == ALIAS_SINGLE)
 		{
@@ -1842,6 +1819,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 		Sys_Error ("Mod_LoadSpriteModel: Invalid # of frames: %d\n", numframes);
 
 	mod->numframes = numframes;
+	mod->flags = 0;
 
 	pframetype = (dspriteframetype_t *)(pin + 1);
 
@@ -1884,7 +1862,12 @@ void Mod_Print (void)
 	Con_Printf ("Cached models:\n");
 	for (i=0, mod=mod_known ; i < mod_numknown ; i++, mod++)
 	{
-		Con_Printf ("%8p : %s\n",mod->cache.data, mod->name);
+		Con_Printf ("%8p : %s",mod->cache.data, mod->name);
+		if (mod->needload & NL_UNREFERENCED)
+			Con_Printf (" (!R)");
+		if (mod->needload & NL_NEEDS_LOADED)
+			Con_Printf (" (!P)");
+		Con_Printf ("\n");
 	}
 }
 

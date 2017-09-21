@@ -30,7 +30,6 @@ R_CheckVariables
 */
 void R_CheckVariables (void)
 {
-#if 0
 	static float	oldbright;
 
 	if (r_fullbright.value != oldbright)
@@ -38,7 +37,6 @@ void R_CheckVariables (void)
 		oldbright = r_fullbright.value;
 		D_FlushCaches ();	// so all lighting changes
 	}
-#endif
 }
 
 
@@ -60,6 +58,7 @@ void Show (void)
 	VID_Update (&vr);
 }
 
+
 /*
 ====================
 R_TimeRefresh_f
@@ -76,7 +75,7 @@ void R_TimeRefresh_f (void)
 
 	startangle = r_refdef.viewangles[1];
 	
-	start = Sys_DoubleTime ();
+	start = Sys_FloatTime ();
 	for (i=0 ; i<128 ; i++)
 	{
 		r_refdef.viewangles[1] = i/128.0*360.0;
@@ -94,12 +93,13 @@ void R_TimeRefresh_f (void)
 		vr.pnext = NULL;
 		VID_Update (&vr);
 	}
-	stop = Sys_DoubleTime ();
+	stop = Sys_FloatTime ();
 	time = stop-start;
 	Con_Printf ("%f seconds (%f fps)\n", time, 128/time);
 	
 	r_refdef.viewangles[1] = startangle;
 }
+
 
 /*
 ================
@@ -113,41 +113,29 @@ void R_LineGraph (int x, int y, int h)
 	int		i;
 	byte	*dest;
 	int		s;
-	int		color;
 
 // FIXME: should be disabled on no-buffer adapters, or should be in the driver
 	
-//	x += r_refdef.vrect.x;
-//	y += r_refdef.vrect.y;
+	x += r_refdef.vrect.x;
+	y += r_refdef.vrect.y;
 	
 	dest = vid.buffer + vid.rowbytes*y + x;
 	
 	s = r_graphheight.value;
-
-	if (h == 10000)
-		color = 0x6f;	// yellow
-	else if (h == 9999)
-		color = 0x4f;	// red
-	else if (h == 9998)
-		color = 0xd0;	// blue
-	else
-		color = 0xff;	// pink
-
+	
 	if (h>s)
 		h = s;
-	
+		
 	for (i=0 ; i<h ; i++, dest -= vid.rowbytes*2)
 	{
-		dest[0] = color;
-//		*(dest-vid.rowbytes) = 0x30;
+		dest[0] = 0xff;
+		*(dest-vid.rowbytes) = 0x30;
 	}
-#if 0
 	for ( ; i<s ; i++, dest -= vid.rowbytes*2)
 	{
 		dest[0] = 0x30;
 		*(dest-vid.rowbytes) = 0x30;
 	}
-#endif
 }
 
 /*
@@ -159,7 +147,6 @@ Performance monitoring tool
 */
 #define	MAX_TIMINGS		100
 extern float mouse_x, mouse_y;
-int		graphval;
 void R_TimeGraph (void)
 {
 	static	int		timex;
@@ -168,18 +155,14 @@ void R_TimeGraph (void)
 	static byte	r_timings[MAX_TIMINGS];
 	int		x;
 	
-	r_time2 = Sys_DoubleTime ();
+	r_time2 = Sys_FloatTime ();
 
 	a = (r_time2-r_time1)/0.01;
 //a = fabs(mouse_y * 0.05);
 //a = (int)((r_refdef.vieworg[2] + 1024)/1)%(int)r_graphheight.value;
-//a = (int)((pmove.velocity[2] + 500)/10);
 //a = fabs(velocity[0])/20;
 //a = ((int)fabs(origin[0])/8)%20;
 //a = (cl.idealpitch + 30)/5;
-//a = (int)(cl.simangles[YAW] * 64/360) & 63;
-a = graphval;
-
 	r_timings[timex] = a;
 	a = timex;
 
@@ -202,65 +185,6 @@ a = graphval;
 	timex = (timex+1)%MAX_TIMINGS;
 }
 
-/*
-==============
-R_NetGraph
-==============
-*/
-void R_NetGraph (void)
-{
-	int		a, x, y, y2, w, i;
-	frame_t	*frame;
-	int lost;
-	char st[80];
-
-	if (vid.width - 16 <= NET_TIMINGS)
-		w = vid.width - 16;
-	else
-		w = NET_TIMINGS;
-
-	x =	-((vid.width - 320)>>1);
-	y = vid.height - sb_lines - 24 - (int)r_graphheight.value*2 - 2;
-
-	M_DrawTextBox (x, y, (w+7)/8, ((int)r_graphheight.value*2+7)/8 + 1);
-	y2 = y + 8;
-	y = vid.height - sb_lines - 8 - 2;
-
-	x = 8;
-	lost = CL_CalcNet();
-	for (a=NET_TIMINGS-w ; a<w ; a++)
-	{
-		i = (cls.netchan.outgoing_sequence-a) & NET_TIMINGSMASK;
-		R_LineGraph (x+w-1-a, y, packet_latency[i]);
-	}
-	sprintf(st, "%3i%% packet loss", lost);
-	Draw_String(8, y2, st);
-}
-
-/*
-==============
-R_ZGraph
-==============
-*/
-void R_ZGraph (void)
-{
-	int		a, x, w, i;
-	static	int	height[256];
-
-	if (r_refdef.vrect.width <= 256)
-		w = r_refdef.vrect.width;
-	else
-		w = 256;
-
-	height[r_framecount&255] = ((int)r_origin[2]) & 31;
-
-	x = 0;
-	for (a=0 ; a<w ; a++)
-	{
-		i = (r_framecount-a) & 255;
-		R_LineGraph (x+w-1-a, r_refdef.vrect.height-2, height[i]);
-	}
-}
 
 /*
 =============
@@ -272,7 +196,7 @@ void R_PrintTimes (void)
 	float	r_time2;
 	float		ms;
 
-	r_time2 = Sys_DoubleTime ();
+	r_time2 = Sys_FloatTime ();
 
 	ms = 1000* (r_time2 - r_time1);
 	
@@ -291,7 +215,7 @@ void R_PrintDSpeeds (void)
 {
 	float	ms, dp_time, r_time2, rw_time, db_time, se_time, de_time, dv_time;
 
-	r_time2 = Sys_DoubleTime ();
+	r_time2 = Sys_FloatTime ();
 
 	dp_time = (dp_time2 - dp_time1) * 1000;
 	rw_time = (rw_time2 - rw_time1) * 1000;
@@ -368,7 +292,7 @@ void R_TransformFrustum (void)
 }
 
 
-#if !id386
+#if	!id386
 
 /*
 ================
@@ -447,10 +371,13 @@ void R_SetupFrame (void)
 	float			w, h;
 
 // don't allow cheats in multiplayer
-r_draworder.value = 0;
-r_fullbright.value = 0;
-r_ambient.value = 0;
-r_drawflat.value = 0;
+	if (cl.maxclients > 1)
+	{
+		Cvar_Set ("r_draworder", "0");
+		Cvar_Set ("r_fullbright", "0");
+		Cvar_Set ("r_ambient", "0");
+		Cvar_Set ("r_drawflat", "0");
+	}
 
 	if (r_numsurfs.value)
 	{
@@ -477,7 +404,7 @@ r_drawflat.value = 0;
 	if (r_refdef.ambientlight < 0)
 		r_refdef.ambientlight = 0;
 
-//	if (!sv.active)
+	if (!sv.active)
 		r_draworder.value = 0;	// don't let cheaters look behind walls
 		
 	R_CheckVariables ();
@@ -511,7 +438,7 @@ r_refdef.viewangles[2]=    0;
 	r_dowarpold = r_dowarp;
 	r_dowarp = r_waterwarp.value && (r_viewleaf->contents <= CONTENTS_WATER);
 
-	if ((r_dowarp != r_dowarpold) || r_viewchanged)
+	if ((r_dowarp != r_dowarpold) || r_viewchanged || lcd_x.value)
 	{
 		if (r_dowarp)
 		{

@@ -179,7 +179,7 @@ void D_DrawSurfaces (void)
 	vec3_t			world_transformed_modelorg;
 	vec3_t			local_modelorg;
 
-	currententity = &r_worldentity;
+	currententity = &cl_entities[0];
 	TransformVector (modelorg, transformed_modelorg);
 	VectorCopy (transformed_modelorg, world_transformed_modelorg);
 
@@ -195,11 +195,7 @@ void D_DrawSurfaces (void)
 			d_zistepv = s->d_zistepv;
 			d_ziorigin = s->d_ziorigin;
 
-#ifdef __alpha__
-			D_DrawSolidSurface (s, (int)((long)s->data & 0xFF));
-#else
 			D_DrawSolidSurface (s, (int)s->data & 0xFF);
-#endif
 			D_DrawZSpans (s->spans);
 		}
 	}
@@ -261,7 +257,6 @@ void D_DrawSurfaces (void)
 				}
 
 				D_CalcGradients (pface);
-
 				Turbulent8 (s->spans);
 				D_DrawZSpans (s->spans);
 
@@ -272,7 +267,7 @@ void D_DrawSurfaces (void)
 				// FIXME: we don't want to do this every time!
 				// TODO: speed up
 				//
-					currententity = &r_worldentity;
+					currententity = &cl_entities[0];
 					VectorCopy (world_transformed_modelorg,
 								transformed_modelorg);
 					VectorCopy (base_vpn, vpn);
@@ -320,6 +315,7 @@ void D_DrawSurfaces (void)
 				// FIXME: we don't want to do this every time!
 				// TODO: speed up
 				//
+					currententity = &cl_entities[0];
 					VectorCopy (world_transformed_modelorg,
 								transformed_modelorg);
 					VectorCopy (base_vpn, vpn);
@@ -327,7 +323,6 @@ void D_DrawSurfaces (void)
 					VectorCopy (base_vright, vright);
 					VectorCopy (base_modelorg, modelorg);
 					R_TransformFrustum ();
-					currententity = &r_worldentity;
 				}
 			}
 		}

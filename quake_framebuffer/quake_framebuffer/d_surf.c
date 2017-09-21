@@ -82,8 +82,9 @@ D_InitCaches
 */
 void D_InitCaches (void *buffer, int size)
 {
-//	if (!msg_suppress_1)
-//		Con_Printf ("%ik surface cache\n", size/1024);
+
+	if (!msg_suppress_1)
+		Con_Printf ("%ik surface cache\n", size/1024);
 
 	sc_size = size - GUARDSIZE;
 	sc_base = (surfcache_t *)buffer;
@@ -137,11 +138,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 	if ((size <= 0) || (size > 0x10000))
 		Sys_Error ("D_SCAlloc: bad cache size %d\n", size);
 	
-#ifdef __alpha__
-	size = (int)((long)&((surfcache_t *)0)->data[size]);
-#else
 	size = (int)&((surfcache_t *)0)->data[size];
-#endif
 	size = (size + 3) & ~3;
 	if (size > sc_size)
 		Sys_Error ("D_SCAlloc: %i > cache size",size);
