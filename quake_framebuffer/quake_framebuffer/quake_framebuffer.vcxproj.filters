@@ -341,9 +341,6 @@
     <ClInclude Include="wad.h">
       <Filter>quake</Filter>
     </ClInclude>
-    <ClInclude Include="winquake.h">
-      <Filter>quake</Filter>
-    </ClInclude>
     <ClInclude Include="zone.h">
       <Filter>quake</Filter>
     </ClInclude>
