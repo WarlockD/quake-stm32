@@ -14,48 +14,49 @@ struct ref_equalto {
 	std::equal_to<std::remove_cv_t<T>> _equal_to;
 	bool operator()(const std::reference_wrapper<std::remove_cv_t<T>>& l, const std::reference_wrapper<std::remove_cv_t<T>>& r) const { return _equal_to(l, r); }
 };
+class StringTable {
+	class StringContainer {
+		StringContainer() = default;
+		StringContainer(const StringContainer& copy) = delete;
+		StringContainer(StringContainer&& move) = delete;
+		size_t size;
+		char str[1];
+	public:
+		operator Symbol::string_type() const { return Symbol::string_type(str, size); }
 
-template<typename KEY>
-class intern_table {
-	using HASH = ref_hasher<KEY>;
-	using EQUALTO = ref_equalto<KEY>;
-	using unique_ptr = std::unique_ptr<KEY>;
-	using key_type = std::reference_wrapper<KEY>;
-	std::unordered_map<key_type, unique_ptr, HASH, EQUALTO> table;
-	const KEY& _empty;
+		static std::unique_ptr<StringContainer> Create(const char* str, size_t size) {
+			char* raw = new char[sizeof(StringContainer) + size];
+			StringContainer* s = new(raw) StringContainer;
+			s->size = size;
+			::memcpy(s->str, str, size);
+			s->str[s->size] = 0;
+			return std::unique_ptr<StringContainer>(s);
+		}
+	};
+	std::unordered_map<Symbol::string_type, std::unique_ptr<StringContainer>> table;
 	std::mutex mutex;
+	StringTable() {}
 public:
-	friend  KEY;
-
-	intern_table() : _empty(Lookup(KEY())) {    }
-	const KEY& EmptyKey() { return _empty; }
-	KEY& Lookup(const KEY& key) {
-
-		auto it = table.find(std::ref(const_cast<KEY&>(key)));
+	Symbol::string_type Lookup(const Symbol::string_type& str) {
+		auto it = table.find(str);
 		if (it != table.end()) return *it->second.get();
 		else {
 			std::lock_guard<std::mutex> lock(mutex);
-			KEY* nkey = new KEY(key);
-			table.emplace(std::ref(*nkey), unique_ptr(nkey));
-			return *nkey;
+			auto nstr = StringContainer::Create(str.data(), str.size());
+			table.emplace(nstr, nstr);
+			return *nstr;
 		}
-
-	}
-	KEY& Lookup(KEY&& key) {
-		std::lock_guard<std::mutex> lock(mutex);
-		auto it = table.find(std::ref(key));
-		if (it != table.end()) return *it->second.get();
-		KEY* nkey = new KEY(std::move(key));
-		table.emplace(std::ref(*nkey), unique_ptr(nkey));
-		return *nkey;
 	}
 };
+StringTable string_table;
 
-static intern_table<std::string> symbol_table;
-Symbol::Symbol() : _str(symbol_table.EmptyKey()) {}
+Symbol::Symbol() : _str("") {}
 
-Symbol(const string_type& s) : _str(s) {}
-Symbol(const char* s) : _str(s) {}
-Symbol Symbol::Lookup(const std::string& str) { return Symbol(symbol_table.Lookup(str)); }
+Symbol::Symbol(const string_type& s) : _str(string_table.Lookup(s)) {}
+Symbol::Symbol(const char* s) : _str(string_table.Lookup(s)) {}
+Symbol::Symbol(const char* s, size_t size) : _str(string_table.Lookup(std::string_view(s, size))) {}
+Symbol::Symbol(const std::string& s) : _str(string_table.Lookup(s)) {}
+
+
 
 

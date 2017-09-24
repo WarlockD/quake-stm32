@@ -11,7 +11,7 @@ void Scanner::Tokenize(TokenSequence& ts) {
       if (ts.Empty() || (ts.Back()->tag_ != Token::NEW_LINE)) {
         auto t = Token::New(*tok);
         t->tag_ = Token::NEW_LINE;
-        t->str_ = "\n";
+        t->value_ = "\n";
         ts.InsertBack(t);
       }
       break;

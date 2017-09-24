@@ -373,7 +373,7 @@ public:
   void AddMember(Object* member);
   void AddBitField(Object* member, int offset);
   bool IsStruct() const { return isStruct_; }
-  Object* GetMember(const std::string& member);
+  Object* GetMember(const Symbol& member);
   Scope* MemberMap() { return memberMap_; }
   MemberList& Members() { return members_; }
   int Offset() const { return offset_; }

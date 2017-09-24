@@ -443,7 +443,7 @@ public:
   virtual bool IsLVal() { return false; }
   ArgList* Args() { return &args_; }
   Expr* Designator() { return designator_; }
-  const std::string& Name() const { return tok_->str_; }
+  const Symbol& Name() const { return tok_->value_; }
   ::FuncType* FuncType() { return designator_->Type()->ToFunc(); }
   virtual void TypeChecking();
 
@@ -551,7 +551,7 @@ public:
       return nullptr;
     return this;
   }
-  virtual const std::string Name() const { return tok_->str_; }
+  virtual const Symbol& Name() const { return tok_->value_; }
   enum Linkage Linkage() const { return linkage_; }
   void SetLinkage(enum Linkage linkage) { linkage_ = linkage; }
   virtual void TypeChecking() {}
@@ -643,14 +643,15 @@ public:
 
   bool HasInit() const { return decl_ && decl_->Inits().size(); }
   bool Anonymous() const { return anonymous_; }
-  virtual const std::string Name() const { return Identifier::Name(); }
+  virtual const Symbol& Name() const { return Identifier::Name(); }
   std::string Repr() const {
-    assert(IsStatic() || anonymous_);
-    if (anonymous_)
-      return "anonymous." + std::to_string(id_);
-    if (linkage_ == L_NONE)
-      return Name() + "." + std::to_string(id_);
-    return Name();
+	  assert(IsStatic() || anonymous_);
+	  if (anonymous_)
+		  return "anonymous." + std::to_string(id_);
+	  if (linkage_ == L_NONE) {
+		  return  static_cast<std::string_view>(Name()) + "." + std::to_string(id_);
+	  }
+	  return std::string();
   }
 
 protected:

@@ -24,11 +24,12 @@ typedef std::list<const Token*> TokenList;
 
 
 struct SourceLocation {
-  File& filename_;
+  File filename_;
   size_t line_start_;
   size_t line_;
   size_t column_;
-  SourceLocation(File& filename, size_t line_start, size_t line, size_t column_) :
+  SourceLocation() : filename_(nullptr), line_start_(0), line_(0), column_(0) {}
+  SourceLocation(File filename, size_t line_start, size_t line, size_t column_) :
 	  filename_(filename), line_start_(line_start), line_(line), column_(column_) {}
   const char* Begin() const {
     return (const char*)(filename_.data() + line_start_ + column_ - 1);
@@ -256,10 +257,8 @@ public:
 
 private:
   explicit Token(int tag): tag_(tag) {}
-  Token(int tag, const SourceLocation& loc,
-        const std::string& str, bool ws=false)
-      : tag_(tag), ws_(ws), loc_(loc), str_(str) {}
-
+  Token(int tag, const SourceLocation& loc, Symbol value=Symbol(), bool ws = false)
+	  : tag_(tag), ws_(ws), loc_(loc), value_(value) {}
   Token(const Token& other) {
     *this = other;
   }

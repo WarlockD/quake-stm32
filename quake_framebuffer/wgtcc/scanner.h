@@ -13,17 +13,13 @@
 class Scanner {
 public:
   explicit Scanner(const Token* tok)
-      : Scanner(&tok->str_, tok->loc_) {}
-  Scanner(const std::string* text, const SourceLocation& loc)
+      : Scanner(tok->value_, tok->loc_) {}
+  Scanner(const std::string_view& text, const SourceLocation& loc)
       : Scanner(text, loc.filename_, loc.line_, loc.column_) {}
-  explicit Scanner(const std::string* text,
-					File file = File(),
-                   unsigned line=1, unsigned column=1)
-      : text_(text), tok_(Token::END) {
-    // TODO(wgtdkp): initialization
-    p_ = &(*text_)[0];
-    loc_ = {filename, p_, line, 1};
-  }
+  explicit Scanner(const std::string_view& text,
+	  File file = File(),
+	  unsigned line = 1, unsigned column = 1)
+	  : text_(text), tok_(Token::END), p_(text.data()), loc_(file, 0, line, 1) {}
 
   virtual ~Scanner() {}
   Scanner(const Scanner& other) = delete;
@@ -72,7 +68,7 @@ private:
     return false;
   };
   void Mark() { tok_.loc_ = loc_; };
-  std::unique_ptr<std::string> text_;
+  std::string_view text_;
   SourceLocation loc_;
   Token tok_;
   const char* p_;

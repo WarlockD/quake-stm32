@@ -6,7 +6,7 @@
 
 static MemPoolImp<Token> TokenPool;
 
-const std::unordered_map<std::string, int> Token::kwTypeMap_ {
+const std::unordered_map<Symbol, int> Token::kwTypeMap_ {
   { "auto", Token::AUTO },
   { "break", Token::BREAK },
   { "case", Token::CASE },

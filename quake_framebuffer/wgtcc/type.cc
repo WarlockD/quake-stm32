@@ -341,7 +341,7 @@ StructType::StructType(MemPool* pool,
       bitFieldAlign_(1) {}
 
 
-Object* StructType::GetMember(const std::string& member) {
+Object* StructType::GetMember(const Symbol& member) {
   auto ident = memberMap_->FindInCurScope(member);
   if (ident == nullptr)
     return nullptr;

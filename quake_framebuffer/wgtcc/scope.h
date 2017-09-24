@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 #include <vector>
-
+#include "symbol.h"
 
 class Identifier;
 class Token;
@@ -22,7 +22,7 @@ enum ScopeType {
 class Scope {
   friend class StructType;
   typedef std::vector<Identifier*> TagList;
-  typedef std::map<std::string, Identifier*> IdentMap;
+  typedef std::map<Symbol, Identifier*> IdentMap;
 
 public:
   explicit Scope(Scope* parent, enum ScopeType type)
@@ -39,7 +39,7 @@ public:
   TagList AllTagsInCurScope() const;
 
   void Insert(Identifier* ident);
-  void Insert(const std::string& name, Identifier* ident);  
+  void Insert(const Symbol& name, Identifier* ident);
   void InsertTag(Identifier* ident);
   void Print();
   bool operator==(const Scope& other) const { return type_ == other.type_; }
@@ -48,14 +48,16 @@ public:
   size_t size() const { return identMap_.size(); }
 
 private:
-  Identifier* Find(const std::string& name);
-  Identifier* FindInCurScope(const std::string& name);
-  Identifier* FindTag(const std::string& name);
-  Identifier* FindTagInCurScope(const std::string& name);
-  std::string TagName(const std::string& name) {
-    return name + "@:tag";
+  Identifier* Find(const Symbol& name);
+  Identifier* FindInCurScope(const Symbol& name);
+  Identifier* FindTag(const Symbol& name);
+  Identifier* FindTagInCurScope(const Symbol& name);
+  std::string TagName(const Symbol& name) {
+	  std::string ret(name);
+	  ret.append("@:tag");
+	  return std::move(ret);
   }
-  static bool IsTagName(const std::string& name) {
+  static bool IsTagName(const Symbol& name) {
     return name.size() > 5 && name[name.size() - 5] == '@';
   }
   const Scope& operator=(const Scope& other);
