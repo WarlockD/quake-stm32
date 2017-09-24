@@ -1,6 +1,7 @@
 #ifndef _WGTCC_TOKEN_H_
 #define _WGTCC_TOKEN_H_
 
+#include "common.h"
 #include "error.h"
 
 #include <cassert>
@@ -23,13 +24,14 @@ typedef std::list<const Token*> TokenList;
 
 
 struct SourceLocation {
-  const std::string* filename_;
-  const char* lineBegin_;
-  unsigned line_;
-  unsigned column_;
-
+  File& filename_;
+  size_t line_start_;
+  size_t line_;
+  size_t column_;
+  SourceLocation(File& filename, size_t line_start, size_t line, size_t column_) :
+	  filename_(filename), line_start_(line_start), line_(line), column_(column_) {}
   const char* Begin() const {
-    return lineBegin_ + column_ - 1; 
+    return (const char*)(filename_.data() + line_start_ + column_ - 1);
   }
 };
 
@@ -204,7 +206,8 @@ public:
     tag_ = other.tag_;
     ws_ = other.ws_;
     loc_ = other.loc_;
-    str_ = other.str_;
+   // str_ = other.str_;
+	value_ = other.value_;
     hs_ = other.hs_ ? new HideSet(*other.hs_): nullptr;
     return *this;
   }
@@ -217,7 +220,7 @@ public:
       return Token::NOTOK;	//not a key word type
     return kwIter->second;
   }
-  static bool IsKeyWord(const std::string& name);
+  static bool IsKeyWord(Symbol name);
   static bool IsKeyWord(int tag) { return CONST <= tag && tag < IDENTIFIER; }
   bool IsKeyWord() const { return IsKeyWord(tag_); }
   bool IsPunctuator() const { return 0 <= tag_ && tag_ <= ELLIPSIS; }
@@ -227,10 +230,10 @@ public:
   bool IsEOF() const { return tag_ == Token::END; }
   bool IsTypeSpecQual() const { return CONST <= tag_ && tag_ <= ENUM; }
   bool IsDecl() const { return CONST <= tag_ && tag_ <= REGISTER; }
-  static const char* Lexeme(int tag) {
+  static Symbol Lexeme(int tag) {
     auto iter = TagLexemeMap_.find(tag);
     if (iter == TagLexemeMap_.end())
-      return nullptr;
+      return Symbol();
       
     return iter->second;
   }
@@ -247,7 +250,8 @@ public:
 
   // ws_ standards for weither there is preceding white space
   // This is to simplify the '#' operator(stringize) in macro expansion
-  std::string str_;
+ // std::string str_;
+  Symbol value_;
   HideSet* hs_ { nullptr };
 
 private:
@@ -260,8 +264,8 @@ private:
     *this = other;
   }
 
-  static const std::unordered_map<std::string, int> kwTypeMap_;
-  static const std::unordered_map<int, const char*> TagLexemeMap_;
+  static const std::unordered_map<Symbol, int> kwTypeMap_;
+  static const std::unordered_map<int, Symbol> TagLexemeMap_;
 };
 
 

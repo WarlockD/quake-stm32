@@ -30,10 +30,11 @@ public:
 	Symbol();
 	Symbol(const Symbol& copy) = default;
 	Symbol(Symbol&& move) = default;
-	Symbol& operator=(const Symbol& copy) = default;
-	Symbol& operator=(Symbol&& move) = default;
+	Symbol& operator=(const Symbol& copy) { *this = Symbol(copy._str); return *this; }
+	Symbol& operator=(Symbol&& move) { *this = Symbol(move._str); return *this; }
 	~Symbol() = default;
-
+	Symbol(const string_type& s);
+	Symbol(const char* s);
 	
 	const string_type& str() const { return _str; }
 
@@ -47,7 +48,8 @@ public:
 	auto rbegin() const { return _str.rbegin(); }
 	auto rend() const { return _str.rend(); }
 	bool empty() const { return _str.empty(); }
-
+	auto front() const { return _str.front(); }
+	auto back() const { return _str.back(); }
 	// just cheap forwards to std::string so I don't have to rebuild std::string from scrach
 	// I REALLY wish it was an interface:(
 	template<typename ... Args> auto compare(Args&& ... args) const { return _str.compare(std::forward<Args>(args)...); }
@@ -64,7 +66,7 @@ public:
 	bool operator!=(const std::string& r) const { return _str != r; }
 	bool operator<(const Symbol& r) const { return _str < r._str; } // for sets
 private:
-	Symbol(const string_type& s) : _str(s) {}
+	
 	const string_type& _str;
 };
 

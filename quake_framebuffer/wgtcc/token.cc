@@ -214,10 +214,14 @@ const Token* TokenSequence::Peek() const {
     eof->tag_ = Token::END;
     return eof;
   } else if (parser_ && (*begin_)->tag_ == Token::IDENTIFIER &&
-             (*begin_)->str_ == "__func__") {
+             (*begin_)->value_ == "__func__") {
     auto filename = Token::New(*(*begin_));
     filename->tag_ = Token::LITERAL;
-    filename->str_ = "\"" + parser_->CurFunc()->Name() + "\"";
+	std::string value;
+	value.push_back('\"');
+	value.append(parser_->CurFunc()->Name());
+	value.push_back('\"');
+	filename->value_ = Symbol::Lookup(value);
     *begin_ = filename;
   }
   return *begin_;
@@ -228,7 +232,7 @@ const Token* TokenSequence::Expect(int expect) {
   auto tok = Peek();
   if (!Try(expect)) {
     Error(tok, "'%s' expected, but got '%s'",
-        Token::Lexeme(expect), tok->str_.c_str());
+        Token::Lexeme(expect), tok->value_.c_str());
   }
   return tok;
 }
@@ -246,7 +250,7 @@ void TokenSequence::Print(std::ostream& os) const {
     } else if (tok->ws_) {
 		os << ' ';
     }
-	os << tok->str_.c_str();
+	os << tok->value_;
     lastLine = tok->loc_.line_;
   }
   os << std::endl;

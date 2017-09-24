@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <string_view>
+
 
 #include "symbol.h"
 
@@ -31,24 +33,25 @@ public:
 	static constexpr inline bool isPathSep(int c) { return c == '/' || c == '\\'; }
 	static FileAttributes ReadFileAttribute(const std::string& filename);
 	static std::shared_ptr<vector_type> ReadFile(Symbol filename);
+	static void FixPath(std::string& filename);
 	static std::string GetExtension(const std::string& filename);
 	static std::string GetFileName(const std::string& path);
 	static std::string GetDirectory(const std::string& filename);
 	Symbol path() const { return _path; }
 
-	bool isDirectory() const { return _attributes == Type::Directory; }
-	bool isFile() const { return _attributes == Type::File; }
-	bool exists() const { return _attributes != Type::NotValid; }
+	bool isDirectory() const { return _attributes.type == Type::Directory; }
+	bool isFile() const { return _attributes.type == Type::File; }
+	bool exists() const { return _attributes.type != Type::NotValid; }
 
-	Symbol getExtension() const;
+	std::string_view getExtension() const;
 	Symbol getPath() const; // path to directoy the file is in or the current directory
 	std::vector<File> getPathComponents() const; // the path in seperate components
-	Symbol getFileName() const; // just get the filename part
+	std::string_view getFileName() const; // just get the filename part
 	File getUpDirectory() const; // get the directory before this one
 	// return file list of current directory or if this is a directory, the list in that
-	std::vector<Symbol> filelist() const; 
-	File(const std::string& filename);
-
+	std::vector<File> filelist() const;
+	File(Symbol filename);
+	File() =  default;
 	bool empty() const { return _data && _data->size(); }
 	size_t size() const { return _attributes.size; }
 	// interface
@@ -64,8 +67,6 @@ public:
 	auto rend() { return _data->rend(); }
 	auto rbegin() const { return _data->rbegin(); }
 	auto rend() const { return _data->rend(); }
-	bool empty() const { return _data.get() != nullptr && _data->empty(); }
-	size_t size() const { return  _data->size(); }
 	auto data() { return _data->data(); }
 	auto data() const { return _data->data(); }
 	void open(); // open and read the file

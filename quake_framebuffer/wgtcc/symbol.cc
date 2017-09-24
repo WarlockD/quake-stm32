@@ -30,12 +30,16 @@ public:
 	intern_table() : _empty(Lookup(KEY())) {    }
 	const KEY& EmptyKey() { return _empty; }
 	KEY& Lookup(const KEY& key) {
-		std::lock_guard<std::mutex> lock(mutex);
+
 		auto it = table.find(std::ref(const_cast<KEY&>(key)));
 		if (it != table.end()) return *it->second.get();
-		KEY* nkey = new KEY(key);
-		table.emplace(std::ref(*nkey), unique_ptr(nkey));
-		return *nkey;
+		else {
+			std::lock_guard<std::mutex> lock(mutex);
+			KEY* nkey = new KEY(key);
+			table.emplace(std::ref(*nkey), unique_ptr(nkey));
+			return *nkey;
+		}
+
 	}
 	KEY& Lookup(KEY&& key) {
 		std::lock_guard<std::mutex> lock(mutex);
@@ -50,7 +54,8 @@ public:
 static intern_table<std::string> symbol_table;
 Symbol::Symbol() : _str(symbol_table.EmptyKey()) {}
 
-
+Symbol(const string_type& s) : _str(s) {}
+Symbol(const char* s) : _str(s) {}
 Symbol Symbol::Lookup(const std::string& str) { return Symbol(symbol_table.Lookup(str)); }
 
 

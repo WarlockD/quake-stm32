@@ -138,11 +138,12 @@ Token* Scanner::Scan(bool ws) {
   case '\0': return MakeToken(Token::END);
   default: 
 	  // cause visual studio dosn't support  case ranges:(
-	  if (is_between<'0', '9'>(c)) return SkipNumber();
-	  else if (is_between<'a', 't'>(c) || is_between<'v', 'z'>(c) || is_between<'A', 'K'>(c) ||
+	  if (is_between<'0', '9'>(c)) 
+		  return SkipNumber();
+	   else if (is_between<'a', 't'>(c) || is_between<'v', 'z'>(c) || is_between<'A', 'K'>(c) ||
 			   is_between<'M', 'T'>(c) || is_between<'V', 'Z'>(c) || c == '_' || c == '$' || is_between<0x80, 0xfd>(c))
 		  return SkipIdentifier();
-	  )else 
+	  else 
 	  return MakeToken(Token::INVALID);
   }
 }
