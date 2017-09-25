@@ -149,7 +149,7 @@ void Evaluator<Addr>::VisitBinaryOp(BinaryOp* binary) {
   case '.': {
     addr_.label_ = l.label_;
     auto type = binary->lhs_->Type()->ToStruct();
-    auto offset = type->GetMember(binary->rhs_->tok_->str_)->Offset();
+    auto offset = type->GetMember(binary->rhs_->tok_->value_)->Offset();
     addr_.offset_ = l.offset_ + offset;
     break;
   }

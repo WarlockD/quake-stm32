@@ -1,5 +1,6 @@
 #ifndef _WGTCC_EVALUATOR_H_
 #define _WGTCC_EVALUATOR_H_
+#include "common.h"
 
 #include "ast.h"
 #include "error.h"

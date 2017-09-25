@@ -1,5 +1,6 @@
 #ifndef _WGTCC_SCOPE_H_
 #define _WGTCC_SCOPE_H_
+#include "common.h"
 
 #include <iostream>
 #include <map>

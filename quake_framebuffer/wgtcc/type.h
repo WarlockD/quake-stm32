@@ -1,5 +1,6 @@
 #ifndef _WGTCC_TYPE_H_
 #define _WGTCC_TYPE_H_
+#include "common.h"
 
 #include "mem_pool.h"
 #include "scope.h"
@@ -129,7 +130,7 @@ public:
 
   // For Debugging
   virtual std::string Str() const = 0; 
-  virtual int Width() const = 0;
+  virtual size_t Width() const = 0;
   virtual int Align() const { return Width(); }
   static int MakeAlign(int offset, int align) {
     if ((offset % align) == 0)
@@ -209,7 +210,7 @@ public:
     return this == &other;
   }
 
-  virtual int Width() const;
+  virtual size_t Width() const;
   virtual std::string Str() const;
   virtual bool IsScalar() const { return true; }
   virtual bool IsInteger() const { return !IsFloat() && !IsComplex(); }

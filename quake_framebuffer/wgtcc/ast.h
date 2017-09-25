@@ -1,6 +1,8 @@
 #ifndef _WGTCC_AST_H_
 #define _WGTCC_AST_H_
 
+#include "common.h"
+
 #include "error.h"
 #include "token.h"
 #include "type.h"
@@ -649,7 +651,8 @@ public:
 	  if (anonymous_)
 		  return "anonymous." + std::to_string(id_);
 	  if (linkage_ == L_NONE) {
-		  return  static_cast<std::string_view>(Name()) + "." + std::to_string(id_);
+		  std::string ret = static_cast<std::stringview>(Name());
+		  return  ret + "." + std::to_string(id_);
 	  }
 	  return std::string();
   }

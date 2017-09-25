@@ -335,7 +335,7 @@ void BinaryOp::AdditiveOpTypeChecking() {
     std::swap(lhs_, rhs_); // To simplify code gen
   } else {
     if (!lhs_->Type()->ToArithm() || !rhs_->Type()->ToArithm()) {
-      Error(this, "invalid operands to binary %s", tok_->str_.c_str());
+      Error(this, "invalid operands to binary %s", tok_->value_.c_str());
     }
     type_ = Convert();
   }
@@ -371,7 +371,7 @@ void BinaryOp::EqualityOpTypeChecking() {
     EnsureCompatibleOrVoidPointer(lhs_->Type(), rhs_->Type());
   } else {
     if (!lhs_->Type()->ToArithm() || !rhs_->Type()->ToArithm())
-      Error(this, "invalid operands to binary %s", tok_->str_.c_str());
+      Error(this, "invalid operands to binary %s", tok_->value_.c_str());
     Convert();
   }
 

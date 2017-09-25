@@ -1,5 +1,6 @@
 #ifndef _WGTCC_SCANNER_H_
 #define _WGTCC_SCANNER_H_
+#include "common.h"
 
 #include "common.h"
 #include "error.h"

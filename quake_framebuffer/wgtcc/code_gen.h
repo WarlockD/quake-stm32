@@ -1,5 +1,6 @@
 #ifndef _WGTCC_CODE_GEN_H_
 #define _WGTCC_CODE_GEN_H_
+#include "common.h"
 
 #include "ast.h"
 #include "visitor.h"

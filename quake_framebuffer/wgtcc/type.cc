@@ -119,7 +119,7 @@ StructType* StructType::New(bool isStruct,
 }
 
 
-int ArithmType::Width() const {
+size_t ArithmType::Width() const {
   switch (tag_) {
   case T_BOOL: case T_CHAR: case T_UNSIGNED | T_CHAR:
     return 1;
