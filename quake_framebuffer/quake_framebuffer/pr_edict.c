@@ -50,13 +50,7 @@ cvar_t	saved2 = {"saved2", "0", true};
 cvar_t	saved3 = {"saved3", "0", true};
 cvar_t	saved4 = {"saved4", "0", true};
 
-#define	MAX_FIELD_LEN	64
-#define GEFV_CACHESIZE	2
 
-typedef struct {
-	ddef_t	*pcache;
-	char	field[MAX_FIELD_LEN];
-} gefv_cache;
 
 static gefv_cache	gefvCache[GEFV_CACHESIZE] = {{NULL, ""}, {NULL, ""}};
 

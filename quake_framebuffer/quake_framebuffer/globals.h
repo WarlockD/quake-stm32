@@ -2,6 +2,10 @@
 #define _QUAKE_GLOBALS_H_
 
 // used cproto to cheat and get these all created
+#include "quakedef.h"
+#include "r_shared.h"
+#include "d_local.h"
+#include "zone.h"
 
 // zone.c
 typedef struct memblock_s
@@ -20,10 +24,120 @@ typedef struct
 	memblock_t	*rover;
 } memzone_t;
 
+// cmd.c private
+#define	MAX_ALIAS_NAME	32
+
+typedef struct cmdalias_s
+{
+	struct cmdalias_s	*next;
+	char	name[MAX_ALIAS_NAME];
+	char	*value;
+} cmdalias_t;
+typedef struct cmd_function_s
+{
+	struct cmd_function_s	*next;
+	char					*name;
+	xcommand_t				function;
+} cmd_function_t;
+
+
+#define	MAX_ARGS		80
+
+// common.c private
+
+#define NUM_SAFE_ARGVS  7
+typedef struct {
+	void* temp;
+} global_constants_t;
+// pr_exec.c privates
+typedef struct
+{
+	int				s;
+	dfunction_t		*f;
+} prstack_t;
+
+#define	PR_MAX_STACK_DEPTH		32
+#define	PR_LOCALSTACK_SIZE		2048
+
+
+global_constants_t quake_constants;
+// d_init.c defines
+#define NUM_MIPS	4
+
+
+// draw.c defines
+
+#define	MAX_CACHED_PICS		128
+typedef struct {
+	vrect_t	rect;
+	int		width;
+	int		height;
+	byte	*ptexbytes;
+	int		rowbytes;
+} rectdesc_t;
+typedef struct cachepic_s
+{
+	char		name[MAX_QPATH];
+	cache_user_t	cache;
+} cachepic_t;
+// dpolyse.c
+// TODO: put in span spilling to shrink list size
+// !!! if this is changed, it must be changed in d_polysa.s too !!!
+#define DPS_MAXSPANS			MAXHEIGHT+1	
+// 1 extra for spanpackage that marks end
+
+// !!! if this is changed, it must be changed in asm_draw.h too !!!
+typedef struct {
+	void			*pdest;
+	short			*pz;
+	int				count;
+	byte			*ptex;
+	int				sfrac, tfrac, light, zi;
+} spanpackage_t;
+
+typedef struct {
+	int		isflattop;
+	int		numleftedges;
+	int		*pleftedgevert0;
+	int		*pleftedgevert1;
+	int		*pleftedgevert2;
+	int		numrightedges;
+	int		*prightedgevert0;
+	int		*prightedgevert1;
+	int		*prightedgevert2;
+} edgetable;
+
+typedef struct {
+	int		quotient;
+	int		remainder;
+} adivtab_t;
+
+typedef struct {
+	int	index0;
+	int	index1;
+} aedge_t;
+
+// pr_edict 
+#define	MAX_FIELD_LEN	64
+#define GEFV_CACHESIZE	2
+
+typedef struct {
+	ddef_t	*pcache;
+	char	field[MAX_FIELD_LEN];
+} gefv_cache;
+
+// model.c
+
+#define	MAX_MOD_KNOWN	256
+
+
+// r_poart.c
+#define NUMVERTEXNORMALS	162
 
 typedef struct 
 {
-
+	void* filler;
+#if 0
 	// All private and static vars
 	/* cd_null.c */
 	/* chase.c */
@@ -35,7 +149,7 @@ typedef struct
 	/* cmd.c */
 	 int cmd_argc;
 	 char *cmd_argv[MAX_ARGS];
-	 char *cmd_null_string;
+	 char *cmd_null_string; // = ""; 
 	 char *cmd_args;
 	 cmd_function_t *cmd_functions;
 	/* common.c */
@@ -69,61 +183,7 @@ typedef struct
 	/* d_zpoint.c */
 	/* draw.c */
 	 rectdesc_t r_rectdesc;
-	/* gl_draw.c */
-	/* gl_mesh.c */
-	/* gl_model.c */
-	/* gl_refrag.c */
-	/* gl_rlight.c */
-	/* gl_rmain.c */
-	/* gl_rmisc.c */
-	/* gl_rsurf.c */
-	/* gl_screen.c */
-	 void SCR_CalcRefdef(void);
-	/* gl_test.c */
-	/* gl_vidlinux.c */
-	 unsigned char scantokey[128];
-	 float vid_gamma;
-	 int resolutions[NUM_RESOLUTIONS][3];
-
-	/* gl_vidlinuxglx.c */
-	 int scrnum;
-	 qboolean mouse_avail;
-	 qboolean mouse_active;
-	 int mx;
-	 int my;
-	 int old_mouse_x;
-	 int old_mouse_y;
-	 cvar_t in_mouse;
-	 cvar_t in_dgamouse;
-	 cvar_t m_filter;
-	 int win_x;
-	 int win_y;
-	 int scr_width;
-	 int scr_height;
-	 int default_dotclock_vidmode;
-	 int num_vidmodes;
-	 qboolean vidmode_active;
-	 float vid_gamma;
-
-	/* gl_vidnt.c */
-	 vmode_t modelist[MAX_MODE_LIST];
-	 int nummodes;
-	 vmode_t *pcurrentmode;
-	 vmode_t badmode;
-	 qboolean vid_initialized;
-	 qboolean windowed;
-	 qboolean leavecurrentmode;
-	 qboolean vid_canalttab;
-	 qboolean vid_wassuspended;
-	 int windowed_mouse;
-	 int windowed_default;
-	 qboolean fullsbardraw;
-	 float vid_gamma;
-
-	 int vid_line;
-	 int vid_wmodes;
-	 modedesc_t modedescs[MAX_MODEDESCS];
-	/* gl_warp.c */
+	
 	/* host.c */
 	/* host_cmd.c */
 	/* in_null.c */
@@ -131,11 +191,10 @@ typedef struct
 	/* keys.c */
 	/* mathlib.c */
 	/* menu.c */
-	 int ISA_uarts[];
-	 int ISA_IRQs[];
+	 int* ISA_uarts;
+	 int* ISA_IRQs;
 	/* model.c */
 	/* net_loop.c */
-	 int IntAlign(int value);
 	/* net_main.c */
 	 qboolean listening;
 	 double slistStartTime;
@@ -144,7 +203,6 @@ typedef struct
 	 PollProcedure *pollProcedureList;
 	/* net_none.c */
 	/* net_vcr.c */
-	 struct {} next;
 	/* nonintel.c */
 	/* pr_cmds.c */
 	/* pr_edict.c */
@@ -209,7 +267,7 @@ typedef struct
 	hull_t box_hull;
 	dclipnode_t box_clipnodes[6];
 	mplane_t box_planes[6];
-	areanode_t sv_areanodes[AREA_NODES];
+//	areanode_t sv_areanodes[AREA_NODES];
 	int sv_numareanodes;
 	/* zone.c */
 
@@ -506,325 +564,7 @@ typedef struct
 	qpic_t *draw_backtile;
 	cachepic_t menu_cachepics[MAX_CACHED_PICS];
 	int menu_numcachepics;
-	/* gl_draw.c */
-	cvar_t gl_nobind;
-	cvar_t gl_max_size;
-	cvar_t gl_picmip;
-	byte *draw_chars;
-	qpic_t *draw_disc;
-	qpic_t *draw_backtile;
-	int translate_texture;
-	int char_texture;
-	byte conback_buffer[sizeof(qpic_t) + sizeof(glpic_t)];
-	qpic_t *conback;
-	int gl_lightmap_format;
-	int gl_solid_format;
-	int gl_alpha_format;
-	int gl_filter_min;
-	int gl_filter_max;
-	int texels;
-	gltexture_t gltextures[MAX_GLTEXTURES];
-	int numgltextures;
-	int scrap_allocated[MAX_SCRAPS][BLOCK_WIDTH];
-	byte scrap_texels[MAX_SCRAPS][BLOCK_WIDTH*BLOCK_HEIGHT * 4];
-	qboolean scrap_dirty;
-	int scrap_texnum;
-	int scrap_uploads;
-	cachepic_t menu_cachepics[MAX_CACHED_PICS];
-	int menu_numcachepics;
-	byte menuplyr_pixels[4096];
-	int pic_texels;
-	int pic_count;
-	glmode_t modes[];
-	/* gl_mesh.c */
-	model_t *aliasmodel;
-	aliashdr_t *paliashdr;
-	qboolean used[8192];
-	int commands[8192];
-	int numcommands;
-	int vertexorder[8192];
-	int numorder;
-	int allverts;
-	int alltris;
-	int stripverts[128];
-	int striptris[128];
-	int stripcount;
-	/* gl_model.c */
-	model_t *loadmodel;
-	char loadname[32];
-	byte mod_novis[MAX_MAP_LEAFS / 8];
-	model_t mod_known[MAX_MOD_KNOWN];
-	int mod_numknown;
-	cvar_t gl_subdivide_size;
-	byte *mod_base;
-	aliashdr_t *pheader;
-	stvert_t stverts[MAXALIASVERTS];
-	mtriangle_t triangles[MAXALIASTRIS];
-	trivertx_t *poseverts[MAXALIASFRAMES];
-	int posenum;
-	byte **player_8bit_texels_tbl;
-	byte *player_8bit_texels;
-	/* gl_refrag.c */
-	mnode_t *r_pefragtopnode;
-	efrag_t **lastlink;
-	vec3_t r_emins;
-	vec3_t r_emaxs;
-	entity_t *r_addent;
-	/* gl_rlight.c */
-	int r_dlightframecount;
-	mplane_t *lightplane;
-	vec3_t lightspot;
-	/* gl_rmain.c */
-	entity_t r_worldentity;
-	qboolean r_cache_thrash;
-	vec3_t modelorg;
-	vec3_t r_entorigin;
-	entity_t *currententity;
-	int r_visframecount;
-	int r_framecount;
-	mplane_t frustum[4];
-	int c_brush_polys;
-	int c_alias_polys;
-	qboolean envmap;
-	int currenttexture;
-	int cnttextures[2];
-	int particletexture;
-	int playertextures;
-	int mirrortexturenum;
-	qboolean mirror;
-	mplane_t *mirror_plane;
-	vec3_t vup;
-	vec3_t vpn;
-	vec3_t vright;
-	vec3_t r_origin;
-	float r_world_matrix[16];
-	float r_base_world_matrix[16];
-	refdef_t r_refdef;
-	mleaf_t *r_viewleaf;
-	mleaf_t *r_oldviewleaf;
-	texture_t *r_notexture_mip;
-	int d_lightstylevalue[256];
-	cvar_t r_norefresh;
-	cvar_t r_drawentities;
-	cvar_t r_drawviewmodel;
-	cvar_t r_speeds;
-	cvar_t r_fullbright;
-	cvar_t r_lightmap;
-	cvar_t r_shadows;
-	cvar_t r_mirroralpha;
-	cvar_t r_wateralpha;
-	cvar_t r_dynamic;
-	cvar_t r_novis;
-	cvar_t gl_finish;
-	cvar_t gl_clear;
-	cvar_t gl_cull;
-	cvar_t gl_texsort;
-	cvar_t gl_smoothmodels;
-	cvar_t gl_affinemodels;
-	cvar_t gl_polyblend;
-	cvar_t gl_flashblend;
-	cvar_t gl_playermip;
-	cvar_t gl_nocolors;
-	cvar_t gl_keeptjunctions;
-	cvar_t gl_reporttjunctions;
-	cvar_t gl_doubleeyes;
-	float r_avertexnormals[NUMVERTEXNORMALS][3];
-	vec3_t shadevector;
-	float shadelight;
-	float ambientlight;
-	float r_avertexnormal_dots[SHADEDOT_QUANT][256];
-	float *shadedots;
-	int lastposenum;
-	/* gl_rmisc.c */
-	byte dottexture[8][8];
-	/* gl_rsurf.c */
-	int skytexturenum;
-	int lightmap_bytes;
-	int lightmap_textures;
-	unsigned blocklights[18 * 18];
-	int active_lightmaps;
-	glpoly_t *lightmap_polys[MAX_LIGHTMAPS];
-	qboolean lightmap_modified[MAX_LIGHTMAPS];
-	glRect_t lightmap_rectchange[MAX_LIGHTMAPS];
-	int allocated[MAX_LIGHTMAPS][BLOCK_WIDTH];
-	byte lightmaps[4 * MAX_LIGHTMAPS*BLOCK_WIDTH*BLOCK_HEIGHT];
-	msurface_t *skychain;
-	msurface_t *waterchain;
-	qboolean mtexenabled;
-	mvertex_t *r_pcurrentvertbase;
-	model_t *currentmodel;
-	int nColinElim;
-	/* gl_screen.c */
-	int glx;
-	int gly;
-	int glwidth;
-	int glheight;
-	int scr_copytop;
-	int scr_copyeverything;
-	float scr_con_current;
-	float scr_conlines;
-	float oldscreensize;
-	float oldfov;
-	cvar_t scr_viewsize;
-	cvar_t scr_fov;
-	cvar_t scr_conspeed;
-	cvar_t scr_centertime;
-	cvar_t scr_showram;
-	cvar_t scr_showturtle;
-	cvar_t scr_showpause;
-	cvar_t scr_printspeed;
-	cvar_t gl_triplebuffer;
-	qboolean scr_initialized;
-	qpic_t *scr_ram;
-	qpic_t *scr_net;
-	qpic_t *scr_turtle;
-	int scr_fullupdate;
-	int clearconsole;
-	int clearnotify;
-	int sb_lines;
-	viddef_t vid;
-	vrect_t scr_vrect;
-	qboolean scr_disabled_for_loading;
-	qboolean scr_drawloading;
-	float scr_disabled_time;
-	qboolean block_drawing;
-	char scr_centerstring[1024];
-	float scr_centertime_start;
-	float scr_centertime_off;
-	int scr_center_lines;
-	int scr_erase_lines;
-	int scr_erase_center;
-	char *scr_notifystring;
-	qboolean scr_drawdialog;
-	/* gl_test.c */
-	puff_t puffs[MAX_PUFFS];
-	plane_t junk;
-	/* gl_vidlinux.c */
-	unsigned short d_8to16table[256];
-	unsigned d_8to24table[256];
-	unsigned char d_15to8table[65536];
-	int num_shades;
-	struct {} mice[];
-	int num_mice;
-	int d_con_indirect;
-	int svgalib_inited;
-	int UseMouse;
-	int UseKeyboard;
-	int mouserate;
-	cvar_t vid_mode;
-	cvar_t vid_redrawfull;
-	cvar_t vid_waitforrefresh;
-	char *framebuffer_ptr;
-	cvar_t mouse_button_commands[3];
-	int mouse_buttons;
-	int mouse_buttonstate;
-	int mouse_oldbuttonstate;
-	float mouse_x;
-	float mouse_y;
-	float old_mouse_x;
-	float old_mouse_y;
-	int mx;
-	int my;
-	cvar_t m_filter;
-	int scr_width;
-	int scr_height;
-	int texture_mode;
-	int texture_extension_number;
-	float gldepthmin;
-	float gldepthmax;
-	cvar_t gl_ztrick;
-	const char *gl_vendor;
-	const char *gl_renderer;
-	const char *gl_version;
-	const char *gl_extensions;
-	void(*qglColorTableEXT)(int, int, int, int, int, const void *);
-	qboolean is8bit;
-	qboolean isPermedia;
-	qboolean gl_mtexable;
-	/* gl_vidlinuxglx.c */
-	unsigned short d_8to16table[256];
-	unsigned d_8to24table[256];
-	unsigned char d_15to8table[65536];
-	cvar_t vid_mode;
-	qboolean dgamouse;
-	qboolean vidmode_ext;
-	int texture_mode;
-	int texture_extension_number;
-	float gldepthmin;
-	float gldepthmax;
-	cvar_t gl_ztrick;
-	const char *gl_vendor;
-	const char *gl_renderer;
-	const char *gl_version;
-	const char *gl_extensions;
-	void(*qglColorTableEXT)(int, int, int, int, int, const void *);
-	qboolean is8bit;
-	qboolean isPermedia;
-	qboolean gl_mtexable;
-	/* gl_vidnt.c */
-	lmode_t lowresmodes[];
-	const char *gl_vendor;
-	const char *gl_renderer;
-	const char *gl_version;
-	const char *gl_extensions;
-	qboolean DDActive;
-	qboolean scr_skipupdate;
-	int DIBWidth;
-	int DIBHeight;
-	int vid_modenum;
-	int vid_realmode;
-	int vid_default;
-	unsigned char vid_curpal[256 * 3];
-	glvert_t glv;
-	cvar_t gl_ztrick;
-	viddef_t vid;
-	unsigned short d_8to16table[256];
-	unsigned d_8to24table[256];
-	unsigned char d_15to8table[65536];
-	float gldepthmin;
-	float gldepthmax;
-	modestate_t modestate;
-	qboolean is8bit;
-	qboolean isPermedia;
-	qboolean gl_mtexable;
-	cvar_t vid_mode;
-	cvar_t _vid_default_mode;
-	cvar_t _vid_default_mode_win;
-	cvar_t vid_wait;
-	cvar_t vid_nopageflip;
-	cvar_t _vid_wait_override;
-	cvar_t vid_config_x;
-	cvar_t vid_config_y;
-	cvar_t vid_stretch_by_2;
-	cvar_t _windowed_mouse;
-	int window_center_x;
-	int window_center_y;
-	int window_x;
-	int window_y;
-	int window_width;
-	int window_height;
-	int texture_mode;
-	int texture_extension_number;
-	byte scantokey[128];
-	byte shiftscantokey[128];
-	/* gl_warp.c */
-	int skytexturenum;
-	int solidskytexture;
-	int alphaskytexture;
-	float speedscale;
-	msurface_t *warpface;
-	float turbsin[];
-	byte *pcx_rgb;
-	TargaHeader targa_header;
-	byte *targa_rgba;
-	char *suf[6];
-	vec3_t skyclip[6];
-	int c_sky;
-	int st_to_vec[6][3];
-	int vec_to_st[6][3];
-	float skymins[2][6];
-	float skymaxs[2][6];
-	int skytexorder[6];
+	
 	/* host.c */
 	quakeparms_t host_parms;
 	qboolean host_initialized;
@@ -859,6 +599,7 @@ typedef struct
 	qboolean noclip_anglehack;
 	/* in_null.c */
 	/* keys.c */
+#if 0
 	char key_lines[32][MAXCMDLINE];
 	int key_linepos;
 	int shift_down;
@@ -908,31 +649,31 @@ typedef struct
 	int m_net_cursor;
 	int m_net_items;
 	int m_net_saveHeight;
-	char *net_helpMessage[];
+	char **net_helpMessage;
 	int options_cursor;
-	char *bindnames[][2];
+	char **bindnames[2];
 	int keys_cursor;
 	int bind_grab;
 	int help_page;
 	int msgNumber;
 	int m_quit_prevstate;
 	qboolean wasInMenus;
-	char *quitMessage[];
+	char **quitMessage;
 	int serialConfig_cursor;
-	int serialConfig_cursor_table[];
-	int serialConfig_baudrate[];
+	int *serialConfig_cursor_table;
+	int *serialConfig_baudrate;
 	int serialConfig_comport;
 	int serialConfig_irq;
 	int serialConfig_baud;
 	char serialConfig_phone[16];
 	int modemConfig_cursor;
-	int modemConfig_cursor_table[];
+	int *modemConfig_cursor_table;
 	char modemConfig_dialing;
 	char modemConfig_clear[16];
 	char modemConfig_init[32];
 	char modemConfig_hangup[16];
 	int lanConfig_cursor;
-	int lanConfig_cursor_table[];
+	int *lanConfig_cursor_table;
 	int lanConfig_port;
 	char lanConfig_portname[6];
 	char lanConfig_joinname[22];
@@ -947,12 +688,13 @@ typedef struct
 	int maxplayers;
 	qboolean m_serverInfoMessage;
 	double m_serverInfoMessageTime;
-	int gameoptions_cursor_table[];
+	int *gameoptions_cursor_table;
 	int gameoptions_cursor;
 	qboolean searchComplete;
 	double searchCompleteTime;
 	int slist_cursor;
 	qboolean slist_sorted;
+#endif
 	/* model.c */
 	model_t *loadmodel;
 	char loadname[32];
@@ -1050,17 +792,16 @@ typedef struct
 	cvar_t saved3;
 	cvar_t saved4;
 	/* pr_exec.c */
-	prstack_t pr_stack[MAX_STACK_DEPTH];
+	prstack_t pr_stack[PR_MAX_STACK_DEPTH];
 	int pr_depth;
-	int localstack[LOCALSTACK_SIZE];
+	int localstack[PR_LOCALSTACK_SIZE];
 	int localstack_used;
 	qboolean pr_trace;
 	dfunction_t *pr_xfunction;
 	int pr_xstatement;
 	int pr_argc;
-	char *pr_opnames[];
+	char **pr_opnames;
 	/* r_aclip.c */
-	int R_AliasClip(finalvert_t *in, finalvert_t *out, int flag, int count, void(*clip)(finalvert_t *pfv0, finalvert_t *pfv1, finalvert_t *out));
 	/* r_alias.c */
 	mtriangle_t *ptriangles;
 	affinetridesc_t r_affinetridesc;
@@ -1141,6 +882,7 @@ typedef struct
 	/* r_light.c */
 	int r_dlightframecount;
 	/* r_main.c */
+#if 0
 	void *colormap;
 	vec3_t viewlightvec;
 	alight_t r_viewlighting;
@@ -1246,6 +988,7 @@ typedef struct
 	cvar_t r_numedges;
 	cvar_t r_aliastransbase;
 	cvar_t r_aliastransadj;
+#endif
 	/* r_misc.c */
 	/* r_part.c */
 	int ramp1[8];
@@ -1383,12 +1126,12 @@ typedef struct
 	byte *iff_data;
 	int iff_chunk_len;
 	/* snd_mix.c */
-	portable_samplepair_t paintbuffer[PAINTBUFFER_SIZE];
-	int snd_scaletable[32][256];
-	int *snd_p;
-	int snd_linear_count;
-	int snd_vol;
-	short *snd_out;
+	//portable_samplepair_t paintbuffer[PAINTBUFFER_SIZE];
+	//int snd_scaletable[32][256];
+	//int *snd_p;
+	//int snd_linear_count;
+	//int snd_vol;
+	//short *snd_out;
 	/* snd_next.c */
 	/* snd_null.c */
 	cvar_t bgmvolume;
@@ -1479,8 +1222,9 @@ typedef struct
 	qboolean hunk_tempactive;
 	int hunk_tempmark;
 	cache_system_t cache_head;
+#endif
 } quake_state_t;
 
-extern quake_state_t* G;
+extern quake_state_t* quake_state;
 
 #endif

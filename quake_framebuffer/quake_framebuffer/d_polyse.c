@@ -24,31 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "d_local.h"
 
-// TODO: put in span spilling to shrink list size
-// !!! if this is changed, it must be changed in d_polysa.s too !!!
-#define DPS_MAXSPANS			MAXHEIGHT+1	
-									// 1 extra for spanpackage that marks end
 
-// !!! if this is changed, it must be changed in asm_draw.h too !!!
-typedef struct {
-	void			*pdest;
-	short			*pz;
-	int				count;
-	byte			*ptex;
-	int				sfrac, tfrac, light, zi;
-} spanpackage_t;
-
-typedef struct {
-	int		isflattop;
-	int		numleftedges;
-	int		*pleftedgevert0;
-	int		*pleftedgevert1;
-	int		*pleftedgevert2;
-	int		numrightedges;
-	int		*prightedgevert0;
-	int		*prightedgevert1;
-	int		*prightedgevert2;
-} edgetable;
 
 int	r_p0[6], r_p1[6], r_p2[6];
 
@@ -93,10 +69,7 @@ int						d_sfracbasestep, d_tfracbasestep;
 int						d_ziextrastep, d_zibasestep;
 int						d_pzextrastep, d_pzbasestep;
 
-typedef struct {
-	int		quotient;
-	int		remainder;
-} adivtab_t;
+
 
 static adivtab_t	adivtab[32*32] = {
 #include "adivtab.h"

@@ -23,13 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
-typedef struct {
-	vrect_t	rect;
-	int		width;
-	int		height;
-	byte	*ptexbytes;
-	int		rowbytes;
-} rectdesc_t;
 
 static rectdesc_t	r_rectdesc;
 
@@ -40,13 +33,9 @@ qpic_t		*draw_backtile;
 //=============================================================================
 /* Support Routines */
 
-typedef struct cachepic_s
-{
-	char		name[MAX_QPATH];
-	cache_user_t	cache;
-} cachepic_t;
 
-#define	MAX_CACHED_PICS		128
+
+
 cachepic_t	menu_cachepics[MAX_CACHED_PICS];
 int			menu_numcachepics;
 

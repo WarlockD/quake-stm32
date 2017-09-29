@@ -23,14 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 void Cmd_ForwardToServer (void);
 
-#define	MAX_ALIAS_NAME	32
 
-typedef struct cmdalias_s
-{
-	struct cmdalias_s	*next;
-	char	name[MAX_ALIAS_NAME];
-	char	*value;
-} cmdalias_t;
 
 cmdalias_t	*cmd_alias;
 
@@ -400,12 +393,6 @@ void Cmd_Alias_f (void)
 =============================================================================
 */
 
-typedef struct cmd_function_s
-{
-	struct cmd_function_s	*next;
-	char					*name;
-	xcommand_t				function;
-} cmd_function_t;
 
 
 #define	MAX_ARGS		80

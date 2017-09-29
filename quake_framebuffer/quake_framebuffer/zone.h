@@ -82,6 +82,8 @@ Zone block
 
 
 */
+#ifndef _QUAKE_ZONE_H_
+#define _QUAKE_ZONE_H_
 
 void Memory_Init (void *buf, int size);
 
@@ -129,3 +131,4 @@ void Cache_Report (void);
 
 
 
+#endif

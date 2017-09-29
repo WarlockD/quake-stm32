@@ -55,10 +55,6 @@ int				r_anumverts;
 
 float	aliastransform[3][4];
 
-typedef struct {
-	int	index0;
-	int	index1;
-} aedge_t;
 
 static aedge_t	aedges[12] = {
 {0, 1}, {1, 2}, {2, 3}, {3, 0},

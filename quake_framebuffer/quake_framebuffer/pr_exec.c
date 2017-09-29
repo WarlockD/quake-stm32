@@ -25,18 +25,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-typedef struct
-{
-	int				s;
-	dfunction_t		*f;
-} prstack_t;
 
-#define	MAX_STACK_DEPTH		32
-prstack_t	pr_stack[MAX_STACK_DEPTH];
+
+prstack_t	pr_stack[PR_MAX_STACK_DEPTH];
 int			pr_depth;
 
-#define	LOCALSTACK_SIZE		2048
-int			localstack[LOCALSTACK_SIZE];
+
+int			localstack[PR_LOCALSTACK_SIZE];
 int			localstack_used;
 
 
@@ -298,12 +293,12 @@ int PR_EnterFunction (dfunction_t *f)
 	pr_stack[pr_depth].s = pr_xstatement;
 	pr_stack[pr_depth].f = pr_xfunction;	
 	pr_depth++;
-	if (pr_depth >= MAX_STACK_DEPTH)
+	if (pr_depth >= PR_MAX_STACK_DEPTH)
 		PR_RunError ("stack overflow");
 
 // save off any locals that the new function steps on
 	c = f->locals;
-	if (localstack_used + c > LOCALSTACK_SIZE)
+	if (localstack_used + c > PR_LOCALSTACK_SIZE)
 		PR_RunError ("PR_ExecuteProgram: locals stack overflow\n");
 
 	for (i=0 ; i < c ; i++)
