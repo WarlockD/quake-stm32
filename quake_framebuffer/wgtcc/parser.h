@@ -1,6 +1,5 @@
 #ifndef _PARSER_H_
 #define _PARSER_H_
-#include "common.h"
 
 #include "ast.h"
 #include "encoding.h"

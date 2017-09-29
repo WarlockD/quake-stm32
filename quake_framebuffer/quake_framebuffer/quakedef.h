@@ -18,7 +18,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // quakedef.h -- primary header for client
-
+#ifndef _QUAKE_DEF_H_
+#define _QUAKE_DEF_H_
 //#define	GLTEST			// experimental stuff
 
 #define	QUAKE_GAME			// as opposed to utilities
@@ -48,7 +49,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if defined(_WIN32) && !defined(WINDED)
 
 #if defined(_M_IX86)
-#define __i386__	1
+#define __i386__	0
 #endif
 
 void	VID_LockBuffer (void);
@@ -61,17 +62,8 @@ void	VID_UnlockBuffer (void);
 
 #endif
 
-#if defined __i386__ // && !defined __sun__
-#define id386	1
-#else
 #define id386	0
-#endif
-
-#if id386
 #define UNALIGNED_OK	1	// set to 0 if unaligned accesses are not supported
-#else
-#define UNALIGNED_OK	0
-#endif
 
 // !!! if this is changed, it must be changed in d_ifacea.h too !!!
 #define CACHE_SIZE	32		// used to align key data structures
@@ -333,3 +325,7 @@ extern	cvar_t	chase_active;
 void Chase_Init (void);
 void Chase_Reset (void);
 void Chase_Update (void);
+
+#include "globals.h"
+
+#endif

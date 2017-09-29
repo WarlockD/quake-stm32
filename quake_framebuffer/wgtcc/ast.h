@@ -1,8 +1,6 @@
 #ifndef _WGTCC_AST_H_
 #define _WGTCC_AST_H_
 
-#include "common.h"
-
 #include "error.h"
 #include "token.h"
 #include "type.h"
@@ -11,7 +9,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <sstream>
 
 
 class Visitor;
@@ -445,7 +442,7 @@ public:
   virtual bool IsLVal() { return false; }
   ArgList* Args() { return &args_; }
   Expr* Designator() { return designator_; }
-  const Symbol& Name() const { return tok_->value_; }
+  const std::string& Name() const { return tok_->str_; }
   ::FuncType* FuncType() { return designator_->Type()->ToFunc(); }
   virtual void TypeChecking();
 
@@ -553,7 +550,7 @@ public:
       return nullptr;
     return this;
   }
-  virtual const Symbol& Name() const { return tok_->value_; }
+  virtual const std::string Name() const { return tok_->str_; }
   enum Linkage Linkage() const { return linkage_; }
   void SetLinkage(enum Linkage linkage) { linkage_ = linkage; }
   virtual void TypeChecking() {}
@@ -645,16 +642,14 @@ public:
 
   bool HasInit() const { return decl_ && decl_->Inits().size(); }
   bool Anonymous() const { return anonymous_; }
-  virtual const Symbol& Name() const { return Identifier::Name(); }
+  virtual const std::string Name() const { return Identifier::Name(); }
   std::string Repr() const {
-	  assert(IsStatic() || anonymous_);
-	  if (anonymous_)
-		  return "anonymous." + std::to_string(id_);
-	  if (linkage_ == L_NONE) {
-		  std::string ret = static_cast<std::stringview>(Name());
-		  return  ret + "." + std::to_string(id_);
-	  }
-	  return std::string();
+    assert(IsStatic() || anonymous_);
+    if (anonymous_)
+      return "anonymous." + std::to_string(id_);
+    if (linkage_ == L_NONE)
+      return Name() + "." + std::to_string(id_);
+    return Name();
   }
 
 protected:

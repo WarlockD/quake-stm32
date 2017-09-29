@@ -1,7 +1,6 @@
 #ifndef _WGTCC_VISITOR_H_
 #define _WGTCC_VISITOR_H_
 
-#include "common.h"
 
 class BinaryOp;
 class UnaryOp;

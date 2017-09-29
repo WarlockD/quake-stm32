@@ -7,6 +7,8 @@
 #include "parser.h"
 #include "token.h"
 
+#include <sstream>
+#include <iomanip>
 
 static MemPoolImp<BinaryOp>         binaryOpPool;
 static MemPoolImp<ConditionalOp>    conditionalOpPool;
@@ -335,7 +337,7 @@ void BinaryOp::AdditiveOpTypeChecking() {
     std::swap(lhs_, rhs_); // To simplify code gen
   } else {
     if (!lhs_->Type()->ToArithm() || !rhs_->Type()->ToArithm()) {
-      Error(this, "invalid operands to binary %s", tok_->value_.c_str());
+      Error(this, "invalid operands to binary %s", tok_->str_.c_str());
     }
     type_ = Convert();
   }
@@ -371,7 +373,7 @@ void BinaryOp::EqualityOpTypeChecking() {
     EnsureCompatibleOrVoidPointer(lhs_->Type(), rhs_->Type());
   } else {
     if (!lhs_->Type()->ToArithm() || !rhs_->Type()->ToArithm())
-      Error(this, "invalid operands to binary %s", tok_->value_.c_str());
+      Error(this, "invalid operands to binary %s", tok_->str_.c_str());
     Convert();
   }
 
@@ -745,13 +747,12 @@ Constant* Constant::New(const Token* tok, int tag, const std::string* val) {
 
 std::string Constant::SValRepr() const {
 	std::stringstream ss;
-	ss.flags(std::ios::hex);
-	ss.width(2);
-	ss.fill('0');
-	for (char c : *sval_) {
-		ss << "\\x" << (int)c;
-	}
-	return ss.str();
+  std::vector<char> buf(4 * sval_->size() + 1);
+  for (size_t i = 0; i < sval_->size(); ++i) {
+    int c = (*sval_)[i];
+	ss << std::hex << std::setw(2) << std::setfill('0') << (c & 0xFF);
+  }
+  return ss.str();
 }
 
 

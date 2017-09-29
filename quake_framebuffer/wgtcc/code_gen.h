@@ -1,6 +1,5 @@
 #ifndef _WGTCC_CODE_GEN_H_
 #define _WGTCC_CODE_GEN_H_
-#include "common.h"
 
 #include "ast.h"
 #include "visitor.h"
@@ -116,18 +115,12 @@ public:
   virtual void VisitFuncDef(FuncDef* funcDef);
   virtual void VisitTranslationUnit(TranslationUnit* unit);
 
-#if 0
+
   static void SetInOut(Parser* parser, FILE* outFile) {
     parser_ = parser;
     outFile_ = outFile;
   }
-#else
-  static void SetInOut(Parser* parser, std::ostream& os) {
-	  parser_ = parser;
-	  outFile_ = &os;
-  }
 
-#endif
   void Gen();
   
 protected:
@@ -173,7 +166,7 @@ protected:
 
   //void Emit(const char* format, ...);
   void Emit(const std::string& str) {
-	  out() << '\t' << str << std::endl;
+    fprintf(outFile_, "\t%s\n", str.c_str());
   }
 
   void Emit(const std::string& inst,
@@ -239,12 +232,10 @@ protected:
 
   void Exchange(bool flt);
 
-  
 protected:
-	std::ostream& out() { return *outFile_;  }
   static const std::string* last_file;
   static Parser* parser_;
-  static std::ostream* outFile_;
+  static FILE* outFile_;
   static RODataList rodatas_;
   static int offset_;
 

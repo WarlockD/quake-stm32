@@ -1,6 +1,5 @@
 #ifndef _WGTCC_TYPE_H_
 #define _WGTCC_TYPE_H_
-#include "common.h"
 
 #include "mem_pool.h"
 #include "scope.h"
@@ -130,7 +129,7 @@ public:
 
   // For Debugging
   virtual std::string Str() const = 0; 
-  virtual size_t Width() const = 0;
+  virtual int Width() const = 0;
   virtual int Align() const { return Width(); }
   static int MakeAlign(int offset, int align) {
     if ((offset % align) == 0)
@@ -210,7 +209,7 @@ public:
     return this == &other;
   }
 
-  virtual size_t Width() const;
+  virtual int Width() const;
   virtual std::string Str() const;
   virtual bool IsScalar() const { return true; }
   virtual bool IsInteger() const { return !IsFloat() && !IsComplex(); }
@@ -374,7 +373,7 @@ public:
   void AddMember(Object* member);
   void AddBitField(Object* member, int offset);
   bool IsStruct() const { return isStruct_; }
-  Object* GetMember(const Symbol& member);
+  Object* GetMember(const std::string& member);
   Scope* MemberMap() { return memberMap_; }
   MemberList& Members() { return members_; }
   int Offset() const { return offset_; }

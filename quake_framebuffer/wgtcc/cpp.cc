@@ -1,13 +1,16 @@
 #include "cpp.h"
+#include "common.h"
 
 #include "evaluator.h"
 #include "parser.h"
 
 #include <ctime>
 #include <fcntl.h>
-#ifndef _WIN32
-#include <unistd.h>
+//#include <unistd.h>
+#ifdef _WIN32
+#include <io.h>
 #endif
+
 #include <unordered_map>
 
 
@@ -748,55 +751,56 @@ void Preprocessor::IncludeFile(TokenSequence& is,
 
 
 static std::string GetDir(const std::string& path) {
-  auto pos = path.rfind('/');
-  if (pos == std::string::npos)
-    return "./";
-  return path.substr(0, pos + 1);
+	std::string ret = path;
+	File::UpDirectory(ret);
+	return ret;
 }
 
 
 std::string* Preprocessor::SearchFile(const std::string& name,
-                                      const bool libHeader,
-                                      bool next,
-                                      const std::string& curPath) {
-  if (libHeader && !next) {
-    searchPaths_.push_back(GetDir(curPath));
-  } else {
-    searchPaths_.push_front(GetDir(curPath));
-  }
+	const bool libHeader,
+	bool next,
+	const std::string& curPath) {
+	if (libHeader && !next) {
+		searchPaths_.push_back(GetDir(curPath));
+	}
+	else {
+		searchPaths_.push_front(GetDir(curPath));
+	}
 
-  PathList::iterator begin, end;
-  auto iter = searchPaths_.begin();
-  for (; iter != searchPaths_.end(); ++iter) {
-    auto dd = open(iter->c_str(), O_RDONLY);
-    if (dd == -1) // TODO(wgtdkp): or ensure it before preprocessing
-      continue;
-    auto fd = openat(dd, name.c_str(), O_RDONLY);
-    close(dd);
-    if (fd != -1) {
-      // Intentional, so that recursive include
-      // will result in running out of file descriptor
-      //close(fd);
-      auto path = *iter + name;
-      if (next) {
-        if (path != curPath)
-          continue;
-        else
-          next = false;
-      } else {
-        if (path == curPath)
-          continue;
-        if (libHeader && !next)
-          searchPaths_.pop_back();
-        else
-          searchPaths_.pop_front();
-        return new std::string(path);
-      }
-    } else if (errno == EMFILE) {
-      Error("may recursive include");
-    }
-  }
-  return nullptr;
+	PathList::iterator begin, end;
+	auto iter = searchPaths_.begin();
+
+	for (auto& iter : searchPaths_) {
+		File::FileAttributes attrib;
+		attrib = File::ReadFileAttribute(iter);
+		if (attrib.type == File::Type::File) 
+			File::UpDirectory(iter);
+		if (attrib.type == File::Type::NotValid) continue;
+		std::string path = iter + "\\" + name;
+		attrib = File::ReadFileAttribute(path);
+		if(attrib.type == File::Type::File) {
+			// Intentional, so that recursive include
+			// will result in running out of file descriptor
+			//close(fd);
+			if (next) {
+				if (path != curPath)
+					continue;
+				else
+					next = false;
+			}
+			else {
+				if (path == curPath)
+					continue;
+				if (libHeader && !next)
+					searchPaths_.pop_back();
+				else
+					searchPaths_.pop_front();
+				return new std::string(path);
+			}
+		}
+	}
+	return nullptr;
 }
 
 
@@ -813,28 +817,30 @@ void Preprocessor::AddMacro(const std::string& name,
 
 
 static std::string* Date() {
-	char buf[14];
-	time_t t = time(NULL);
-#ifdef _MSC_VER
-	struct tm tm;
-	localtime_s(&tm,&t);
-	strftime(buf, 14, "\"%a %M %Y\"", &tm);
-#else
-  struct tm* tm = localtime(&t);
-  strftime(buf, 14, "\"%a %M %Y\"", tm);
-#endif
+  time_t t = time(NULL);
+ // struct tm* tm = localtime(&t);
+
+  struct tm tm;
+  localtime_s(&tm,&t);
+  auto buf = new char[14];
+  strftime(buf, 14, "\"%a %M %Y\"", &tm);
   auto ret = new std::string(buf);
+  delete[] buf;
   return ret;
 }
 
 
 void Preprocessor::Init() {
   // Preinclude search paths
-  AddSearchPath("/usr/local/include/");
-  AddSearchPath("/usr/include/x86_64-linux-gnu/");
-  AddSearchPath("/usr/include/linux/");
-  AddSearchPath("/usr/include/");
-  AddSearchPath("/usr/local/wgtcc/include/");
+  AddSearchPath("include\\");
+  AddSearchPath("F:\\Microsoft Visual Studio\\2017\\Professional\\VC\\Tools\\MSVC\\14.10.25017\\include\\");
+  AddSearchPath("F:\\Microsoft Visual Studio\\2017\\Professional\\VC\\Tools\\MSVC\\14.10.25017\\atlmfc\\include\\");
+  AddSearchPath("F:\\Microsoft Visual Studio\\2017\\Professional\\VC\\Auxiliary\\VS\\include\\");
+  AddSearchPath("C:\\Program Files(x86)\\Windows Kits\10\\Include\\10.0.15063.0\\ucrt\\");
+  AddSearchPath("C:\\Program Files(x86)\\Windows Kits\10\\Include\\10.0.15063.0\\um\\");
+  AddSearchPath("C:\\Program Files(x86)\\Windows Kits\10\\Include\\10.0.15063.0\\shared\\");
+  AddSearchPath("C:\\Program Files(x86)\\Windows Kits\10\\Include\\10.0.15063.0\\winrt\\");
+  AddSearchPath("C:\\Program Files(x86)\\Windows Kits\\NETFXSDK\\4.7\\Include\\um\\");
   
   // The __FILE__ and __LINE__ macro is empty
   // They are handled seperately
@@ -889,9 +895,9 @@ TokenSequence Macro::RepSeq(const std::string* filename, unsigned line) {
 
 
 void Preprocessor::AddSearchPath(std::string path) {
-  if (path.back() != '/')
-    path += "/";
-  if (path[0] != '/')
-    path = "./" + path;
+  if (path.back() != '\\')
+    path += "\\";
+ // if (path[0] != '\\')
+ //   path = ".\\" + path;
   searchPaths_.push_front(path);
 }

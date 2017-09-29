@@ -1,6 +1,5 @@
 #ifndef _WGTCC_MEM_POOL_H_
 #define _WGTCC_MEM_POOL_H_
-#include "common.h"
 
 #include <cstddef>
 #include <vector>

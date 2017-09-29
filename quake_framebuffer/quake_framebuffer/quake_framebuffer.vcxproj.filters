@@ -21,10 +21,10 @@
     <ClCompile Include="cd_null.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="cl_demo.c">
+    <ClCompile Include="chase.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="cl_ents.c">
+    <ClCompile Include="cl_demo.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="cl_input.c">
@@ -36,9 +36,6 @@
     <ClCompile Include="cl_parse.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="cl_pred.c">
-      <Filter>quake</Filter>
-    </ClCompile>
     <ClCompile Include="cl_tent.c">
       <Filter>quake</Filter>
     </ClCompile>
@@ -46,6 +43,9 @@
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="common.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="conproc.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="console.c">
@@ -96,6 +96,12 @@
     <ClCompile Include="draw.c">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="host.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="host_cmd.c">
+      <Filter>quake</Filter>
+    </ClCompile>
     <ClCompile Include="in_null.c">
       <Filter>quake</Filter>
     </ClCompile>
@@ -105,28 +111,31 @@
     <ClCompile Include="mathlib.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="md4.c">
-      <Filter>quake</Filter>
-    </ClCompile>
     <ClCompile Include="menu.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="model.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="net_chan.c">
+    <ClCompile Include="net_loop.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="net_wins.c">
+    <ClCompile Include="net_none.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="nonintel.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="pmove.c">
+    <ClCompile Include="pr_cmds.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="pmovetst.c">
+    <ClCompile Include="pr_edict.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_exec.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_aclip.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="r_alias.c">
@@ -174,10 +183,22 @@
     <ClCompile Include="screen.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="skin.c">
+    <ClCompile Include="snd_null.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="sys_win.c">
+    <ClCompile Include="sv_main.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_move.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_phys.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_user.c">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_null.c">
       <Filter>quake</Filter>
     </ClCompile>
     <ClCompile Include="vid_null.c">
@@ -189,27 +210,23 @@
     <ClCompile Include="wad.c">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="world.c">
+      <Filter>quake</Filter>
+    </ClCompile>
     <ClCompile Include="zone.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="r_aclip.c">
+    <ClCompile Include="net_main.c">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="snd_dma.c">
-      <Filter>quake</Filter>
+    <ClCompile Include="net_vcr.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="snd_mem.c">
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="quake.gif">
       <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="snd_mix.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="snd_win.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_cam.c">
-      <Filter>quake</Filter>
-    </ClCompile>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="adivtab.h">
@@ -233,9 +250,6 @@
     <ClInclude Include="block16.h">
       <Filter>quake</Filter>
     </ClInclude>
-    <ClInclude Include="bothdefs.h">
-      <Filter>quake</Filter>
-    </ClInclude>
     <ClInclude Include="bspfile.h">
       <Filter>quake</Filter>
     </ClInclude>
@@ -249,6 +263,9 @@
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="common.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="conproc.h">
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="console.h">
@@ -267,6 +284,9 @@
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="d_local.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="dosisms.h">
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="draw.h">
@@ -290,10 +310,49 @@
     <ClInclude Include="modelgen.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="mpdosock.h">
+      <Filter>quake</Filter>
+    </ClInclude>
     <ClInclude Include="net.h">
       <Filter>quake</Filter>
     </ClInclude>
-    <ClInclude Include="pmove.h">
+    <ClInclude Include="net_bw.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_dgrm.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_ipx.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_loop.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_mp.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_ser.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_udp.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_vcr.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_wins.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="net_wipx.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="pr_comp.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="progdefs.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="progs.h">
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="protocol.h">
@@ -323,6 +382,9 @@
     <ClInclude Include="screen.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="server.h">
+      <Filter>quake</Filter>
+    </ClInclude>
     <ClInclude Include="sound.h">
       <Filter>quake</Filter>
     </ClInclude>
@@ -332,16 +394,34 @@
     <ClInclude Include="sys.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="vgamodes.h">
+      <Filter>quake</Filter>
+    </ClInclude>
     <ClInclude Include="vid.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="vid_dos.h">
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="view.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="vregset.h">
+      <Filter>quake</Filter>
+    </ClInclude>
     <ClInclude Include="wad.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="winquake.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="world.h">
+      <Filter>quake</Filter>
+    </ClInclude>
     <ClInclude Include="zone.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="globals.h">
       <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,8 +1,6 @@
 #ifndef _WGTCC_SCANNER_H_
 #define _WGTCC_SCANNER_H_
-#include "common.h"
 
-#include "common.h"
 #include "error.h"
 #include "encoding.h"
 #include "token.h"
@@ -14,13 +12,17 @@
 class Scanner {
 public:
   explicit Scanner(const Token* tok)
-      : Scanner(tok->value_, tok->loc_) {}
-  Scanner(const std::string_view& text, const SourceLocation& loc)
+      : Scanner(&tok->str_, tok->loc_) {}
+  Scanner(const std::string* text, const SourceLocation& loc)
       : Scanner(text, loc.filename_, loc.line_, loc.column_) {}
-  explicit Scanner(const std::string_view& text,
-	  File file = File(),
-	  unsigned line = 1, unsigned column = 1)
-	  : text_(text), tok_(Token::END), p_(text.data()), loc_(file, 0, line, 1) {}
+  explicit Scanner(const std::string* text,
+                   const std::string* filename=nullptr,
+                   unsigned line=1, unsigned column=1)
+      : text_(text), tok_(Token::END) {
+    // TODO(wgtdkp): initialization
+    p_ = &(*text_)[0];
+    loc_ = {filename, p_, line, 1};
+  }
 
   virtual ~Scanner() {}
   Scanner(const Scanner& other) = delete;
@@ -44,7 +46,8 @@ private:
   Token* SkipNumber();
   Token* SkipLiteral();
   Token* SkipCharacter();
-  Token* MakeToken(int tag);
+  Token* MakeToken(Token::Tag tag);
+  Token* MakeToken(int tag) { return MakeToken(static_cast<Token::Tag>(tag)); }
   Token* MakeNewLine();
   Encoding ScanEncoding(int c);
   int ScanEscaped();
@@ -53,8 +56,8 @@ private:
   int ScanUCN(int len);
   void SkipWhiteSpace();
   void SkipComment();
-  inline constexpr bool IsUCN(int c) { return c == '\\' && (Test('u') || Test('U')); }
-  inline constexpr bool IsOctal(int c) { return '0' <= c && c <= '7'; }
+  bool IsUCN(int c) { return c == '\\' && (Test('u') || Test('U')); }
+  bool IsOctal(int c) { return '0' <= c && c <= '7'; }
   int XDigit(int c);
   bool Empty() const { return *p_ == 0; }
   int Peek();
@@ -69,13 +72,14 @@ private:
     return false;
   };
   void Mark() { tok_.loc_ = loc_; };
-  std::string_view text_;
+
+  const std::string* text_;
   SourceLocation loc_;
   Token tok_;
   const char* p_;
 };
 
 
-
+std::string* ReadFile(const std::string& filename);
 
 #endif

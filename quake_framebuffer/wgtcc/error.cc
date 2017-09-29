@@ -3,11 +3,12 @@
 #include "ast.h"
 #include "token.h"
 
+#include <sstream>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <string>
-
+#include <Windows.h>
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -40,14 +41,14 @@ void Error(const char* format, ...) {
 static void VError(const SourceLocation& loc,
                    const char* format,
                    va_list args) {
-  assert(loc.filename_);
-  fprintf(stderr,
-          "%s:%d:%d: " ANSI_COLOR_RED "error: " ANSI_COLOR_RESET,
-          loc.filename_->c_str(),
-          loc.line_,
-          loc.column_);
-  vfprintf(stderr, format, args);
-  fprintf(stderr, "\n    ");
+	std::stringstream ss;
+	//ANSI_COLOR_RED "error: " ANSI_COLOR_RESET
+	char buffer[2048];
+	vsnprintf(buffer, sizeof(buffer), format, args);
+	ss << loc.filename_->c_str() << ':' << loc.line_ << ':' << loc.column_ << ": ";
+	ss << "error: ";
+	ss << buffer << "\n    ";
+
 
   bool sawNoSpace = false;
   int nspaces = 0;
@@ -56,16 +57,21 @@ static void VError(const SourceLocation& loc,
       ++nspaces;
     } else {
       sawNoSpace = true;
-      fputc(*p, stderr);
+	  ss << (char)*p;
     }
   }
   
-  fprintf(stderr, "\n    ");
+  ss  << "\n    ";
   for (unsigned i = 1; i + nspaces < loc.column_; ++i)
-    fputc(' ', stderr);
-  fprintf(stderr, ANSI_COLOR_GREEN "^\n");
+	  ss << ' ';
+  ss  << "^\n";
+//  fprintf(stderr, ANSI_COLOR_GREEN "^\n");
+  OutputDebugStringA(ss.str().c_str());
+  fputs(ss.str().c_str(), stderr);
+
   exit(-1);	
 }
+
 
 
 void Error(const SourceLocation& loc, const char* format, ...) {

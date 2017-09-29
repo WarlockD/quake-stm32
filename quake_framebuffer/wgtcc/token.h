@@ -1,7 +1,6 @@
 #ifndef _WGTCC_TOKEN_H_
 #define _WGTCC_TOKEN_H_
 
-#include "common.h"
 #include "error.h"
 
 #include <cassert>
@@ -24,23 +23,21 @@ typedef std::list<const Token*> TokenList;
 
 
 struct SourceLocation {
-  File filename_;
-  size_t line_start_;
-  size_t line_;
-  size_t column_;
-  SourceLocation() : filename_(nullptr), line_start_(0), line_(0), column_(0) {}
-  SourceLocation(File filename, size_t line_start, size_t line, size_t column_) :
-	  filename_(filename), line_start_(line_start), line_(line), column_(column_) {}
+  const std::string* filename_;
+  const char* lineBegin_;
+  unsigned line_;
+  unsigned column_;
+
   const char* Begin() const {
-    return (const char*)(filename_.data() + line_start_ + column_ - 1);
+    return lineBegin_ + column_ - 1; 
   }
 };
 
-
+std::ostream& operator<<(std::ostream& os, const SourceLocation& sl);
 class Token {
   friend class Scanner;
 public:
-  enum {
+  enum Tag{
     // Punctuators
     LPAR = '(',
     RPAR = ')',
@@ -197,31 +194,31 @@ public:
     NOTOK = -1,
   };
 
-  static Token* New(int tag);
+  static Token* New(Token::Tag tag);
   static Token* New(const Token& other);
-  static Token* New(int tag,
+  static Token* New(Token::Tag tag,
                     const SourceLocation& loc,
                     const std::string& str,
                     bool ws=false);
+ 
   Token& operator=(const Token& other) {
     tag_ = other.tag_;
     ws_ = other.ws_;
     loc_ = other.loc_;
-   // str_ = other.str_;
-	value_ = other.value_;
+    str_ = other.str_;
     hs_ = other.hs_ ? new HideSet(*other.hs_): nullptr;
     return *this;
   }
   virtual ~Token() {}
   
   //Token::NOTOK represents not a kw.
-  static int KeyWordTag(const std::string& key) {
+  static Token::Tag KeyWordTag(const std::string& key) {
     auto kwIter = kwTypeMap_.find(key); 
     if (kwTypeMap_.end() == kwIter)
       return Token::NOTOK;	//not a key word type
-    return kwIter->second;
+    return static_cast<Token::Tag>(kwIter->second);
   }
-  static bool IsKeyWord(Symbol name);
+  static bool IsKeyWord(const std::string& name);
   static bool IsKeyWord(int tag) { return CONST <= tag && tag < IDENTIFIER; }
   bool IsKeyWord() const { return IsKeyWord(tag_); }
   bool IsPunctuator() const { return 0 <= tag_ && tag_ <= ELLIPSIS; }
@@ -231,15 +228,15 @@ public:
   bool IsEOF() const { return tag_ == Token::END; }
   bool IsTypeSpecQual() const { return CONST <= tag_ && tag_ <= ENUM; }
   bool IsDecl() const { return CONST <= tag_ && tag_ <= REGISTER; }
-  static Symbol Lexeme(int tag) {
+  static const char* Lexeme(int tag) {
     auto iter = TagLexemeMap_.find(tag);
     if (iter == TagLexemeMap_.end())
-      return Symbol();
+      return nullptr;
       
     return iter->second;
   }
   
-  int tag_;
+  Tag tag_;
   bool ws_ { false };
 
   // Line index of the begin
@@ -251,22 +248,23 @@ public:
 
   // ws_ standards for weither there is preceding white space
   // This is to simplify the '#' operator(stringize) in macro expansion
- // std::string str_;
-  Symbol value_;
+  std::string str_;
   HideSet* hs_ { nullptr };
-
+  std::string ToString() const;
 private:
-  explicit Token(int tag): tag_(tag) {}
-  Token(int tag, const SourceLocation& loc, Symbol value=Symbol(), bool ws = false)
-	  : tag_(tag), ws_(ws), loc_(loc), value_(value) {}
+  explicit Token(Tag tag): tag_(tag) {}
+  Token(Tag tag, const SourceLocation& loc,
+        const std::string& str, bool ws=false)
+      : tag_(tag), ws_(ws), loc_(loc), str_(str) {}
+
   Token(const Token& other) {
     *this = other;
   }
 
-  static const std::unordered_map<Symbol, int> kwTypeMap_;
-  static const std::unordered_map<int, Symbol> TagLexemeMap_;
+  static const std::unordered_map<std::string, int> kwTypeMap_;
+  static const std::unordered_map<int, const char*> TagLexemeMap_;
 };
-
+std::ostream& operator<<(std::ostream& os, const Token& sl);
 
 class TokenSequence {
   friend class Preprocessor;
@@ -319,7 +317,8 @@ public:
     const_cast<Token*>(Peek())->ws_ = leadingWS;
   }
 
-  const Token* Expect(int expect);
+  const Token* Expect(Token::Tag expect);
+  const Token* Expect(int tag) { return Expect(static_cast<Token::Tag>(tag)); }
   bool Try(int tag) {
     if (Peek()->tag_ == tag) {
       Next();
@@ -327,7 +326,8 @@ public:
     }
     return false;
   }
-  bool Test(int tag) { return Peek()->tag_ == tag; }
+  bool Test(Token::Tag tag) { return Peek()->tag_ == tag; }
+  bool Test(int tag) { return Peek()->tag_ == static_cast<Token::Tag>(tag); }
   const Token* Next() {
     auto ret = Peek();
     if (!ret->IsEOF()) {
@@ -398,7 +398,7 @@ public:
   bool IsBeginOfLine() const;
   TokenSequence GetLine();
   void SetParser(Parser* parser) { parser_ = parser; }
-  void Print(std::ostream& os = std::cout) const;
+  std::string ToString() const;  
 
 private:
   // Find a insert position with no preceding newline

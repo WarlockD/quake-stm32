@@ -1,8 +1,15 @@
+#include "common.h"
 #include "scanner.h"
 
 #include <cctype>
 #include <climits>
+#include <functional>
 
+template<int A, int B>
+static constexpr bool is_between(int v) { 
+	static_assert(A < B && A != B);
+	return v >= A && v <= B; 
+}
 
 void Scanner::Tokenize(TokenSequence& ts) {
   while (true) {
@@ -11,7 +18,7 @@ void Scanner::Tokenize(TokenSequence& ts) {
       if (ts.Empty() || (ts.Back()->tag_ != Token::NEW_LINE)) {
         auto t = Token::New(*tok);
         t->tag_ = Token::NEW_LINE;
-        t->value_ = "\n";
+        t->str_ = "\n";
         ts.InsertBack(t);
       }
       break;
@@ -36,10 +43,7 @@ std::string Scanner::ScanHeadName(const Token* lhs, const Token* rhs) {
   }
   return str;
 }
-template<int START, int END>
-static inline bool is_between(int v) { return (c >= START && c <= END);  }
-// just to make it a little more clear
-// we should just build a parse table for all this
+
 
 Token* Scanner::Scan(bool ws) {
   tok_.ws_ = ws;
@@ -53,7 +57,6 @@ Token* Scanner::Scan(bool ws) {
     return ret;
   }
   auto c = Next();
-
 
   switch (c) {
   case '#': return MakeToken(Try('#') ? Token::DSHARP: c);
@@ -118,8 +121,6 @@ Token* Scanner::Scan(bool ws) {
       return MakeToken('.');
     }
     return MakeToken(c);
-	// OH its a literal  encoding...er.... humm
-	// this needs to be moved somewhere else me thinks, peek to see if we have a "?
   case 'u': case 'U': case 'L': {
     /*auto enc = */ScanEncoding(c);
     if (Try('\'')) return SkipCharacter();
@@ -129,7 +130,6 @@ Token* Scanner::Scan(bool ws) {
   case '\'': return SkipCharacter();
   case '\"': return SkipLiteral();
 
-
   case '\\':
     // Universal character name is allowed in identifier
     if (Test('u') || Test('U'))
@@ -137,13 +137,12 @@ Token* Scanner::Scan(bool ws) {
     return MakeToken(Token::INVALID);
   case '\0': return MakeToken(Token::END);
   default: 
-	  // cause visual studio dosn't support  case ranges:(
-	  if (is_between<'0', '9'>(c)) 
-		  return SkipNumber();
-	   else if (is_between<'a', 't'>(c) || is_between<'v', 'z'>(c) || is_between<'A', 'K'>(c) ||
-			   is_between<'M', 'T'>(c) || is_between<'V', 'Z'>(c) || c == '_' || c == '$' || is_between<0x80, 0xfd>(c))
+	  if (is_between<'0', '9'>(c)) return SkipNumber();
+	  if (is_between<'a', 't'>(c) || is_between<'v', 'z'>(c) || is_between<'A', 'K'>(c) ||
+		  is_between<'M', 'T'>(c) || is_between<'V', 'Z'>(c) || is_between<'$', '_'>(c) ||
+		  is_between<0x80, 0xfd>(c)) {
 		  return SkipIdentifier();
-	  else 
+	  }
 	  return MakeToken(Token::INVALID);
   }
 }
@@ -298,6 +297,8 @@ Token* Scanner::SkipCharacter() {
 
 int Scanner::ScanEscaped() {
   auto c = Next();
+
+  return isxdigit(c);
   switch (c) {
   case '\\': case '\'': case '\"': case '\?':
     return c;
@@ -311,10 +312,11 @@ int Scanner::ScanEscaped() {
   // Non-standard GCC extention
   case 'e': return '\033';
   case 'x': return ScanHexEscaped();
-  case '0' ... '7': return ScanOctEscaped(c);
   case 'u': return ScanUCN(4);
   case 'U': return ScanUCN(8);
-  default: Error(loc_, "unrecognized escape character '%c'", c);
+  default: 
+	  if (is_between<'0', '7'>(c)) return ScanOctEscaped(c);
+	  Error(loc_, "unrecognized escape character '%c'", c);
   }
   return c; // Make compiler happy
 }
@@ -364,12 +366,7 @@ int Scanner::ScanUCN(int len) {
 
 
 int Scanner::XDigit(int c) {
-  switch (c) {
-  case '0' ... '9': return c - '0';
-  case 'a' ... 'z': return c - 'a' + 10;
-  case 'A' ... 'Z': return c - 'A' + 10;
-  default: assert(false); return c;
-  }
+	return isxdigit(c);
 }
 
 
@@ -383,7 +380,15 @@ Encoding Scanner::ScanEncoding(int c) {
 }
 
 
-
+std::string* ReadFile(const std::string& filename) {
+	SystemFile f;
+  if (!f.Open(filename, SystemFile::SysFileMode::Read)) Error("%s: No such file or directory", filename.c_str());
+  auto data = f.ReadAll();
+  data.push_back(0); 
+  auto text = new std::string((char*)data.data(), data.size());
+  f.Close();
+  return text;
+}
 
 
 int Scanner::Next() {
@@ -431,7 +436,7 @@ void Scanner::PutBack() {
 }
 
 
-Token* Scanner::MakeToken(int tag) {
+Token* Scanner::MakeToken(Token::Tag tag) {
   tok_.tag_ = tag;
   auto& str = tok_.str_;
   str.resize(0);
@@ -448,8 +453,8 @@ Token* Scanner::MakeToken(int tag) {
 
 // New line is special
 // It is generated before reading the character '\n'
-Token* Scanner::MakeNewLine() {
-  tok_.tag_ = '\n';
+Token* Scanner::MakeNewLine() { 
+	tok_.tag_ = Token::Tag::NEW_LINE;
   tok_.str_ = std::string(p_, p_ + 1);
   return Token::New(tok_);
 }

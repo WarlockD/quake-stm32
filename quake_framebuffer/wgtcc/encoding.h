@@ -1,6 +1,5 @@
 #ifndef _WGTCC_ENCODING_H_
 #define _WGTCC_ENCODING_H_
-#include "common.h"
 
 #include <string>
 

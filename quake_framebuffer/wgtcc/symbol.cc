@@ -33,26 +33,30 @@ class StringTable {
 			return std::unique_ptr<StringContainer>(s);
 		}
 	};
-	std::unordered_map<Symbol::string_type, std::unique_ptr<StringContainer>> table;
+	std::unordered_map<std::string_view, std::unique_ptr<std::string>> table;
 	std::mutex mutex;
-	StringTable() {}
-public:
-	Symbol::string_type Lookup(const Symbol::string_type& str) {
-		auto it = table.find(str);
-		if (it != table.end()) return *it->second.get();
+	const std::string*  _empty_string;
+public:	
+	const std::string*  empty_string() const { return _empty_string; }
+	StringTable() :_empty_string(Lookup("")) {}
+
+	const std::string* Lookup(std::string_view  key) {
+		auto it = table.find(key);
+		if (it != table.end()) return it->second.get();
 		else {
 			std::lock_guard<std::mutex> lock(mutex);
-			auto nstr = StringContainer::Create(str.data(), str.size());
-			table.emplace(nstr, nstr);
-			return *nstr;
+			std::string* nstr = new std::string(key);
+			key = *nstr;
+			table.emplace(key, nstr);
+			return nstr;
 		}
 	}
 };
 StringTable string_table;
 
-Symbol::Symbol() : _str("") {}
+Symbol::Symbol() : _str(string_table.empty_string()) {}
 
-Symbol::Symbol(const string_type& s) : _str(string_table.Lookup(s)) {}
+Symbol::Symbol(const std::string_view& s) : _str(string_table.Lookup(s)) {}
 Symbol::Symbol(const char* s) : _str(string_table.Lookup(s)) {}
 Symbol::Symbol(const char* s, size_t size) : _str(string_table.Lookup(std::string_view(s, size))) {}
 Symbol::Symbol(const std::string& s) : _str(string_table.Lookup(s)) {}

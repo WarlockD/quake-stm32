@@ -2,7 +2,7 @@
 #define _COMMON_H_
 
 
-
+#define NOMINMAX
 #include <vector>
 #include <list>
 #include <unordered_map>
@@ -11,9 +11,42 @@
 #include <iostream>
 #include <fstream>
 #include <string_view>
-
+#include <thread>
+#include <mutex>
+#include <fstream>
 
 #include "symbol.h"
+
+
+
+
+
+struct SystemFile {
+	enum class  SysFileMode {
+		Read = 0x1,
+		Write = 0x2, 
+		Append = 0x4, 
+		Create = 0x8, 
+		Binary = 0x18,
+	};
+	bool Open(const std::string& filenam, SysFileMode mode);
+	bool OpenAt(SystemFile& from, const std::string& filenam, SysFileMode mode);
+	void Close();
+	size_t Read(void* data, size_t len) ;
+	std::vector<uint8_t> ReadAll() ;
+	size_t Write(const void* data, size_t len);
+	size_t Size() const { return _file_size; }
+	SystemFile()  { };
+	bool isOpen() const { return _handle.is_open(); }
+private:
+	mutable std::mutex _mutex;
+	struct HandleDeleter {
+		void operator()(void* b) const;
+	};
+	std::fstream _handle;
+	std::string _filename;
+	size_t _file_size;
+};
 
 // path helper
 // cause I am trying my best NOT to include boost librarys, and even if I go c++17, visual studio 2015 dosn't yet support it.
@@ -31,12 +64,13 @@ public:
 	using vector_type = std::vector<uint8_t>;
 	static constexpr int path_sep = '\\'; 
 	static constexpr inline bool isPathSep(int c) { return c == '/' || c == '\\'; }
-	static FileAttributes ReadFileAttribute(const std::string& filename);
+	static FileAttributes ReadFileAttribute(std::string& filename);
 	static std::shared_ptr<vector_type> ReadFile(Symbol filename);
 	static void FixPath(std::string& filename);
 	static std::string GetExtension(const std::string& filename);
 	static std::string GetFileName(const std::string& path);
-	static std::string GetDirectory(const std::string& filename);
+	static void GetDirectory(std::string& filename);
+	static void UpDirectory(std::string& filename);
 	Symbol path() const { return _path; }
 
 	bool isDirectory() const { return _attributes.type == Type::Directory; }

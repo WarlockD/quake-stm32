@@ -12,11 +12,10 @@
 #include <vector>
 
 #include <fcntl.h>
-#include <fstream>
-#include <thread>
-
-
-
+#if 0
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
 
 std::string program;
 std::string filename_in;
@@ -47,20 +46,9 @@ static void Usage() {
 
 
 static std::string GetExtension(const std::string& filename) {
-	std::string ret;
-	auto pos = filename.find_last_of(".\\/");
-	if (pos != std::string::npos && filename[pos] == '.') {
-		ret = filename.substr(pos);
-	}
-	return ret;
+  return filename.substr(filename.size() >= 2 ? filename.size() - 2 : 0);
 }
 
-static std::string GetName(const std::string& path) {
-	auto pos = path.find_last_of('/\\');
-	if (pos == std::string::npos)
-		return path;
-	return path.substr(pos + 1);
-}
 
 static void ValidateFileName(const std::string& filename) {
   auto ext = GetExtension(filename);
@@ -84,7 +72,12 @@ static void DefineMacro(Preprocessor& cpp, const std::string& def) {
 }
 
 
-
+static std::string GetName(const std::string& path) {
+  auto pos = path.rfind('/');
+  if (pos == std::string::npos)
+    return path;
+  return path.substr(pos + 1);
+}
 
 static int RunWgtcc() {
   if (GetExtension(filename_in) != ".c")
@@ -96,15 +89,15 @@ static int RunWgtcc() {
   for (auto& path: include_paths)
     cpp.AddSearchPath(path);
 
+  FILE* fp = stdout;
+  if (specified_out_name) {
 
+	  fopen_s(&fp, filename_out.c_str(), "w");
+  }
   TokenSequence ts;
   cpp.Process(ts);
   if (only_preprocess) {
-	  if (specified_out_name) {
-		  std::ofstream fs(filename_out);
-		  ts.Print(fs);
-	  }
-	  else ts.Print(std::cout);
+	  fputs(ts.ToString().c_str(), fp);
     return 0;
   }
 
@@ -112,14 +105,14 @@ static int RunWgtcc() {
     filename_out = GetName(filename_in);
     filename_out.back() = 's';
   }
-  {
-	  std::ofstream fs(filename_out);
-	  Parser parser(ts);
-	  parser.Parse();
-	  Generator::SetInOut(&parser, fs);
-	  Generator().Gen();
-  }
-
+  fopen_s(&fp, filename_out.c_str(), "w");
+ // fp = fopen(filename_out.c_str(), "w");
+  
+  Parser parser(ts);
+  parser.Parse();
+  Generator::SetInOut(&parser, fp);
+  Generator().Gen();
+  fclose(fp);
   return 0;
 }
 
@@ -187,10 +180,11 @@ static void ParseOut(int argc, char* argv[], int& i) {
  * Allowing multi file may not be a good idea... 
  */
 int main(int argc, char* argv[]) {
+	program = std::string(argv[0]);
   if (argc < 2)
     Usage();
 
-  program = std::string(argv[0]);
+
   for (auto i = 1; i < argc; ++i) {
     if (argv[i][0] != '-') {
       filename_in = std::string(argv[i]);
@@ -213,11 +207,10 @@ int main(int argc, char* argv[]) {
     default:;
     }
   }
-
+#define DEBUG
 #ifdef DEBUG
   RunWgtcc();
 #else
-  std::vector<std::thread> _threads;
   for (const auto& filename: filenames_in) {
     filename_in = filename;
     bool has_error = false;

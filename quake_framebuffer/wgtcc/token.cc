@@ -2,11 +2,11 @@
 
 #include "mem_pool.h"
 #include "parser.h"
-
+#include <sstream>
 
 static MemPoolImp<Token> TokenPool;
 
-const std::unordered_map<Symbol, int> Token::kwTypeMap_ {
+const std::unordered_map<std::string, int> Token::kwTypeMap_ {
   { "auto", Token::AUTO },
   { "break", Token::BREAK },
   { "case", Token::CASE },
@@ -158,7 +158,7 @@ const std::unordered_map<int, const char*> Token::TagLexemeMap_ {
 };
 
 
-Token* Token::New(int tag) {
+Token* Token::New(Token::Tag tag) {
   return new (TokenPool.Alloc()) Token(tag);
 }
 
@@ -168,7 +168,7 @@ Token* Token::New(const Token& other) {
 }
 
 
-Token* Token::New(int tag,
+Token* Token::New(Token::Tag tag,
                   const SourceLocation& loc,
                   const std::string& str,
                   bool ws) {
@@ -214,44 +214,68 @@ const Token* TokenSequence::Peek() const {
     eof->tag_ = Token::END;
     return eof;
   } else if (parser_ && (*begin_)->tag_ == Token::IDENTIFIER &&
-             (*begin_)->value_ == "__func__") {
+             (*begin_)->str_ == "__func__") {
     auto filename = Token::New(*(*begin_));
     filename->tag_ = Token::LITERAL;
-	std::string value;
-	value.push_back('\"');
-	value.append(parser_->CurFunc()->Name());
-	value.push_back('\"');
-	filename->value_ = Symbol::Lookup(value);
+    filename->str_ = "\"" + parser_->CurFunc()->Name() + "\"";
     *begin_ = filename;
   }
   return *begin_;
 }
 
 
-const Token* TokenSequence::Expect(int expect) {
+const Token* TokenSequence::Expect(Token::Tag expect) {
   auto tok = Peek();
   if (!Try(expect)) {
+	  PutBack();
+	  std::cout << "prev: " << Next()->ToString() << std::endl;
+	  std::cout << "current: " << Next()->ToString() << std::endl;
+	  std::cout << "next: " << Peek()->ToString() << std::endl;
+	  PutBack();
     Error(tok, "'%s' expected, but got '%s'",
-        Token::Lexeme(expect), tok->value_.c_str());
+
+        Token::Lexeme(expect), tok->str_.c_str());
   }
   return tok;
 }
+std::ostream& operator<<(std::ostream& os, const SourceLocation& sl) {
+	os << "{ filename : " << (sl.filename_ == nullptr) ? "<nullptr>" : *sl.filename_;
+	os << ", line : " << sl.line_;
+	os << ", column : " << sl.column_;
+	os << " }";
+	return os;
+}
+std::ostream& operator<<(std::ostream& os, const Token& sl) {
+	os << "{ tag : " << sl.tag_;
+	os << ", ws : " << sl.ws_;
+	os << ", los : " << sl.loc_;
+	os << ", str : " << sl.str_;
+	os << ", hs : " << (sl.hs_ != nullptr) ? "true" : "false";
+	os << " }";
+	return os;
+}
 
-
-void TokenSequence::Print(std::ostream& os) const {
+std::string Token::ToString() const {
+	std::stringstream ss;
+	ss << *this;
+	return ss.str();
+}
+std::string TokenSequence::ToString() const {
+	std::stringstream ss;
   unsigned lastLine = 0;
   auto ts = *this;
   while (!ts.Empty()) {
     auto tok = ts.Next();
     if (lastLine != tok->loc_.line_) {
-		os << std::endl;
+		ss << std::endl;
 		for (unsigned i = 0; i < tok->loc_.column_; ++i)
-			os << ' ';
+			ss << ' ';
     } else if (tok->ws_) {
-		os << ' ';
+		ss << ' ';
     }
-	os << tok->value_;
+	ss << tok->str_;
     lastLine = tok->loc_.line_;
   }
-  os << std::endl;
+  ss << std::endl;
+  return ss.str();
 }

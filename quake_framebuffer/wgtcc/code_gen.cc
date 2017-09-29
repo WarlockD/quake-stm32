@@ -15,7 +15,7 @@ extern bool debug;
 
 const std::string* Generator::last_file = nullptr;
 Parser* Generator::parser_ = nullptr;
-std::ostream* Generator::outFile_ = nullptr;
+FILE* Generator::outFile_ = nullptr;
 RODataList Generator::rodatas_;
 std::vector<Declaration*> Generator::staticDecls_;
 int Generator::offset_ = 0;
@@ -1417,7 +1417,7 @@ void Generator::EmitStore(const std::string& addr, int width, bool flt) {
 
 
 void Generator::EmitLabel(const std::string& label) {
-	out() << label << ':' << std::endl;
+  fprintf(outFile_, "%s:\n", label.c_str());
 }
 
 

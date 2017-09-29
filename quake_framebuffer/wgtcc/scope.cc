@@ -7,28 +7,28 @@
 
 
 Identifier* Scope::Find(const Token* tok) {
-  auto ret = Find(tok->value_);
+  auto ret = Find(tok->str_);
   if (ret) ret->SetTok(tok);
   return ret;
 }
 
 
 Identifier* Scope::FindInCurScope(const Token* tok) {
-  auto ret = FindInCurScope(tok->value_);
+  auto ret = FindInCurScope(tok->str_);
   if (ret) ret->SetTok(tok);
   return ret;
 }
 
 
 Identifier* Scope::FindTag(const Token* tok) {
-  auto ret = FindTag(tok->value_);
+  auto ret = FindTag(tok->str_);
   if (ret) ret->SetTok(tok);
   return ret;
 }
 
 
 Identifier* Scope::FindTagInCurScope(const Token* tok) {
-  auto ret = FindTagInCurScope(tok->value_);
+  auto ret = FindTagInCurScope(tok->str_);
   if (ret) ret->SetTok(tok);
   return ret;
 }
@@ -44,7 +44,7 @@ void Scope::InsertTag(Identifier* ident) {
 }
 
 
-Identifier* Scope::Find(const Symbol& name) {
+Identifier* Scope::Find(const std::string& name) {
   auto ident = identMap_.find(name);
   if (ident != identMap_.end())
     return ident->second;
@@ -54,7 +54,7 @@ Identifier* Scope::Find(const Symbol& name) {
 }
 
 
-Identifier* Scope::FindInCurScope(const Symbol&  name) {
+Identifier* Scope::FindInCurScope(const std::string& name) {
   auto ident = identMap_.find(name);
   if (ident == identMap_.end())
     return nullptr;
@@ -62,20 +62,20 @@ Identifier* Scope::FindInCurScope(const Symbol&  name) {
 }
 
 
-void Scope::Insert(const Symbol&  name, Identifier* ident) {
+void Scope::Insert(const std::string& name, Identifier* ident) {
   assert(FindInCurScope(name) == nullptr);
   identMap_[name] = ident;
 }
 
 
-Identifier* Scope::FindTag(const Symbol&  name) {
+Identifier* Scope::FindTag(const std::string& name) {
   auto tag = Find(TagName(name));
   if (tag) assert(tag->ToTypeName());
   return tag;
 }
 
 
-Identifier* Scope::FindTagInCurScope(const Symbol&  name) {
+Identifier* Scope::FindTagInCurScope(const std::string& name) {
   auto tag = FindInCurScope(TagName(name));
   assert(tag == nullptr || tag->ToTypeName());
   return tag;

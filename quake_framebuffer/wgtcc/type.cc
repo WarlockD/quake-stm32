@@ -119,7 +119,7 @@ StructType* StructType::New(bool isStruct,
 }
 
 
-size_t ArithmType::Width() const {
+int ArithmType::Width() const {
   switch (tag_) {
   case T_BOOL: case T_CHAR: case T_UNSIGNED | T_CHAR:
     return 1;
@@ -341,7 +341,7 @@ StructType::StructType(MemPool* pool,
       bitFieldAlign_(1) {}
 
 
-Object* StructType::GetMember(const Symbol& member) {
+Object* StructType::GetMember(const std::string& member) {
   auto ident = memberMap_->FindInCurScope(member);
   if (ident == nullptr)
     return nullptr;

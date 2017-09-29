@@ -1,6 +1,5 @@
 #ifndef _WGTCC_ERROR_H_
 #define _WGTCC_ERROR_H_
-#include "common.h"
 
 
 struct SourceLocation;
