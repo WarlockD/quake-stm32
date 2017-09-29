@@ -168,7 +168,7 @@ void LoadShaderProgram() {
 void	VID_SetPalette(unsigned char *palette)
 {
 	for (size_t i = 0; i < 256; i++) {
-		byte* vid_pal = &vid_palate[i];
+		byte* vid_pal = (byte* )&vid_palate[i];
 		*vid_pal++ = *palette++;
 		*vid_pal++ = *palette++;
 		*vid_pal++ = *palette++;

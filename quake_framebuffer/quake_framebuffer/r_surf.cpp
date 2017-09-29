@@ -343,10 +343,10 @@ R_DrawSurfaceBlock8_mip0
 void R_DrawSurfaceBlock8_mip0 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
-	unsigned char	pix, *psource, *prowdest;
+	byte	pix, *psource, *prowdest;
 
 	psource = pbasesource;
-	prowdest = prowdestbase;
+	prowdest = (byte*)prowdestbase;
 
 	for (v=0 ; v<r_numvblocks ; v++)
 	{
@@ -396,7 +396,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 	unsigned char	pix, *psource, *prowdest;
 
 	psource = pbasesource;
-	prowdest = prowdestbase;
+	prowdest = (byte*)prowdestbase;
 
 	for (v=0 ; v<r_numvblocks ; v++)
 	{
@@ -446,7 +446,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 	unsigned char	pix, *psource, *prowdest;
 
 	psource = pbasesource;
-	prowdest = prowdestbase;
+	prowdest = (byte*)prowdestbase;
 
 	for (v=0 ; v<r_numvblocks ; v++)
 	{
@@ -496,7 +496,7 @@ void R_DrawSurfaceBlock8_mip3 (void)
 	unsigned char	pix, *psource, *prowdest;
 
 	psource = pbasesource;
-	prowdest = prowdestbase;
+	prowdest = (byte*)prowdestbase;
 
 	for (v=0 ; v<r_numvblocks ; v++)
 	{

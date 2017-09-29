@@ -551,7 +551,7 @@ void WritePCXfile (char *filename, byte *data, int width, int height,
 	pcx_t	*pcx;
 	byte		*pack;
 	  
-	pcx = Hunk_TempAlloc (width*height*2+1000);
+	pcx = (pcx_t*)Hunk_TempAlloc (width*height*2+1000);
 	if (pcx == NULL)
 	{
 		Con_Printf("SCR_ScreenShot_f: not enough memory\n");

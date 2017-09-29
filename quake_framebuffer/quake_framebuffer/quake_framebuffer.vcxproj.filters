@@ -18,209 +18,209 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cd_null.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="chase.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_demo.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_input.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_main.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_parse.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cl_tent.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cmd.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="common.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="conproc.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="console.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="crc.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="cvar.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_edge.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_fill.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_init.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_modech.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_part.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_polyse.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_scan.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_sky.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_sprite.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_surf.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_vars.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="d_zpoint.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="draw.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="host.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="host_cmd.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="in_null.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="keys.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="mathlib.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="menu.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="model.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="net_loop.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="net_none.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="nonintel.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="pr_cmds.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="pr_edict.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="pr_exec.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_aclip.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_alias.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_bsp.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_draw.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_edge.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_efrag.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_light.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_main.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_misc.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_part.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_sky.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_sprite.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_surf.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="r_vars.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sbar.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="screen.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="snd_null.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sv_main.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sv_move.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sv_phys.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sv_user.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="sys_null.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="vid_null.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="view.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="wad.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="world.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="zone.c">
-      <Filter>quake</Filter>
-    </ClCompile>
-    <ClCompile Include="net_main.c">
-      <Filter>quake</Filter>
-    </ClCompile>
     <ClCompile Include="net_vcr.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cd_null.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="chase.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_demo.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_input.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_main.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_parse.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_tent.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="common.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cmd.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="conproc.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="console.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="crc.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="cvar.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_edge.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_fill.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_init.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_modech.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_part.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_polyse.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_scan.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_sky.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_sprite.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_surf.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_vars.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="d_zpoint.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="draw.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="host.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="host_cmd.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="in_null.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="keys.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="mathlib.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="menu.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="model.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="net_loop.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="net_main.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="net_none.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="nonintel.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_cmds.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_edict.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_exec.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_aclip.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_alias.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_bsp.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_draw.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_edge.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_efrag.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_light.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_main.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_misc.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_part.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_sky.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_sprite.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_surf.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="r_vars.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sbar.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="screen.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_null.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_main.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_move.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_phys.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_user.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_null.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="vid_null.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="view.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="wad.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="world.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="zone.cpp">
+      <Filter>quake</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

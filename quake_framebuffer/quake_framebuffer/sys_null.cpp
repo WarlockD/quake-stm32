@@ -22,7 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "errno.h"
 
-
+#include <assert.h>
+#include <direct.h>
 
 #include <limits.h>
 #include <Windows.h>
@@ -172,7 +173,7 @@ void Sys_DebugLog(const char *file, const char *fmt, ...)
 		Sys_Printf("DEBUG: %s", data);
 	}
 	else {
-		assert(fwrite(data, 1, len, fd) == len);
+		//assert(fwrite(data, 1, len, fd) == len);
 		fd = Sys_FileOpenWrite(file);  
 		assert(Sys_FileWrite(fd, data, len) == len);
 		Sys_FileClose(fd);

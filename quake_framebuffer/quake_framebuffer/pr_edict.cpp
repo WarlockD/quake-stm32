@@ -277,7 +277,7 @@ char *PR_ValueString (etype_t type, eval_t *val)
 	ddef_t		*def;
 	dfunction_t	*f;
 	
-	type &= ~DEF_SAVEGLOBAL;
+	type =  static_cast<etype_t>(static_cast<unsigned int>(type) & ~DEF_SAVEGLOBAL);
 
 	switch (type)
 	{
@@ -329,7 +329,7 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 	ddef_t		*def;
 	dfunction_t	*f;
 	
-	type &= ~DEF_SAVEGLOBAL;
+	type = static_cast<etype_t>(static_cast<unsigned int>(type) & ~DEF_SAVEGLOBAL);
 
 	switch (type)
 	{
@@ -686,12 +686,12 @@ ED_NewString
 */
 char *ED_NewString (char *string)
 {
-	char	*new, *new_p;
+	char	*new_ptr, *new_p;
 	int		i,l;
 	
 	l = strlen(string) + 1;
-	new = Hunk_Alloc (l);
-	new_p = new;
+	new_ptr = Hunk_Alloc (l);
+	new_p = new_ptr;
 
 	for (i=0 ; i< l ; i++)
 	{
@@ -707,7 +707,7 @@ char *ED_NewString (char *string)
 			*new_p++ = string[i];
 	}
 	
-	return new;
+	return new_ptr;
 }
 
 

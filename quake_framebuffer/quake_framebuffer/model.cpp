@@ -370,7 +370,7 @@ void Mod_LoadTextures (lump_t *l)
 	m->nummiptex = LittleLong (m->nummiptex);
 	
 	loadmodel->numtextures = m->nummiptex;
-	loadmodel->textures = Hunk_AllocName (m->nummiptex * sizeof(*loadmodel->textures) , loadname);
+	loadmodel->textures = (texture_t*)Hunk_AllocName (m->nummiptex * sizeof(*loadmodel->textures) , loadname);
 
 	for (i=0 ; i<m->nummiptex ; i++)
 	{
@@ -386,7 +386,7 @@ void Mod_LoadTextures (lump_t *l)
 		if ( (mt->width & 15) || (mt->height & 15) )
 			Sys_Error ("Texture %s is not 16 aligned", mt->name);
 		pixels = mt->width*mt->height/64*85;
-		tx = Hunk_AllocName (sizeof(texture_t) +pixels, loadname );
+		tx = (texture_t*)Hunk_AllocName (sizeof(texture_t) +pixels, loadname );
 		loadmodel->textures[i] = tx;
 
 		memcpy (tx->name, mt->name, sizeof(tx->name));
@@ -507,7 +507,7 @@ void Mod_LoadLighting (lump_t *l)
 		loadmodel->lightdata = NULL;
 		return;
 	}
-	loadmodel->lightdata = Hunk_AllocName ( l->filelen, loadname);	
+	loadmodel->lightdata = (byte*)Hunk_AllocName ( l->filelen, loadname);	
 	memcpy (loadmodel->lightdata, mod_base + l->fileofs, l->filelen);
 }
 
@@ -524,7 +524,7 @@ void Mod_LoadVisibility (lump_t *l)
 		loadmodel->visdata = NULL;
 		return;
 	}
-	loadmodel->visdata = Hunk_AllocName ( l->filelen, loadname);	
+	loadmodel->visdata = (byte*)Hunk_AllocName ( l->filelen, loadname);
 	memcpy (loadmodel->visdata, mod_base + l->fileofs, l->filelen);
 }
 
@@ -541,7 +541,7 @@ void Mod_LoadEntities (lump_t *l)
 		loadmodel->entities = NULL;
 		return;
 	}
-	loadmodel->entities = Hunk_AllocName ( l->filelen, loadname);	
+	loadmodel->entities = (char*)Hunk_AllocName ( l->filelen, loadname);
 	memcpy (loadmodel->entities, mod_base + l->fileofs, l->filelen);
 }
 
@@ -557,11 +557,11 @@ void Mod_LoadVertexes (lump_t *l)
 	mvertex_t	*out;
 	int			i, count;
 
-	in = (void *)(mod_base + l->fileofs);
+	in = (dvertex_t*)((void *)(mod_base + l->fileofs));
 	if (l->filelen % sizeof(*in))
 		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
 	count = l->filelen / sizeof(*in);
-	out = Hunk_AllocName ( count*sizeof(*out), loadname);	
+	out = (mvertex_t*)Hunk_AllocName ( count*sizeof(*out), loadname);
 
 	loadmodel->vertexes = out;
 	loadmodel->numvertexes = count;
@@ -585,11 +585,11 @@ void Mod_LoadSubmodels (lump_t *l)
 	dmodel_t	*out;
 	int			i, j, count;
 
-	in = (void *)(mod_base + l->fileofs);
+	in = (dmodel_t*)((void *)(mod_base + l->fileofs));
 	if (l->filelen % sizeof(*in))
 		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
 	count = l->filelen / sizeof(*in);
-	out = Hunk_AllocName ( count*sizeof(*out), loadname);	
+	out = (dmodel_t*)Hunk_AllocName ( count*sizeof(*out), loadname);
 
 	loadmodel->submodels = out;
 	loadmodel->numsubmodels = count;
@@ -621,11 +621,11 @@ void Mod_LoadEdges (lump_t *l)
 	medge_t *out;
 	int 	i, count;
 
-	in = (void *)(mod_base + l->fileofs);
+	in = (dedge_t*)((void *)(mod_base + l->fileofs));
 	if (l->filelen % sizeof(*in))
 		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
 	count = l->filelen / sizeof(*in);
-	out = Hunk_AllocName ( (count + 1) * sizeof(*out), loadname);	
+	out = (medge_t*)Hunk_AllocName ( (count + 1) * sizeof(*out), loadname);
 
 	loadmodel->edges = out;
 	loadmodel->numedges = count;

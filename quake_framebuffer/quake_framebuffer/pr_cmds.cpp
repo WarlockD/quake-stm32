@@ -351,21 +351,21 @@ void PF_normalize (void)
 {
 	float	*value1;
 	vec3_t	newvalue;
-	float	new;
+	float	newf;
 	
 	value1 = G_VECTOR(OFS_PARM0);
 
-	new = value1[0] * value1[0] + value1[1] * value1[1] + value1[2]*value1[2];
-	new = sqrt(new);
+	newf = value1[0] * value1[0] + value1[1] * value1[1] + value1[2]*value1[2];
+	newf = sqrt(newf);
 	
-	if (new == 0)
+	if (newf == 0)
 		newvalue[0] = newvalue[1] = newvalue[2] = 0;
 	else
 	{
-		new = 1/new;
-		newvalue[0] = value1[0] * new;
-		newvalue[1] = value1[1] * new;
-		newvalue[2] = value1[2] * new;
+		newf = 1/ newf;
+		newvalue[0] = value1[0] * newf;
+		newvalue[1] = value1[1] * newf;
+		newvalue[2] = value1[2] * newf;
 	}
 	
 	VectorCopy (newvalue, G_VECTOR(OFS_RETURN));	
@@ -381,14 +381,14 @@ scalar vlen(vector)
 void PF_vlen (void)
 {
 	float	*value1;
-	float	new;
+	float	newf;
 	
 	value1 = G_VECTOR(OFS_PARM0);
 
-	new = value1[0] * value1[0] + value1[1] * value1[1] + value1[2]*value1[2];
-	new = sqrt(new);
+	newf = value1[0] * value1[0] + value1[1] * value1[1] + value1[2]*value1[2];
+	newf = sqrt(newf);
 	
-	G_FLOAT(OFS_RETURN) = new;
+	G_FLOAT(OFS_RETURN) = newf;
 }
 
 /*
