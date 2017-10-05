@@ -641,7 +641,7 @@ void Host_Loadgame_f (void)
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
 		fscanf (f, "%s\n", str);
-		sv.lightstyles[i] = Hunk_Alloc (strlen(str)+1);
+		sv.lightstyles[i] = (char*)Hunk_Alloc (Q_strlen(str)+1);
 		strcpy (sv.lightstyles[i], str);
 	}
 
@@ -665,7 +665,7 @@ void Host_Loadgame_f (void)
 			Sys_Error ("Loadgame buffer overflow");
 		str[i] = 0;
 		start = str;
-		start = COM_Parse(str);
+		start = (char*)COM_Parse(str);
 		if (!com_token[0])
 			break;		// end of file
 		if (strcmp(com_token,"{"))
@@ -909,17 +909,17 @@ Host_Name_f
 */
 void Host_Name_f (void)
 {
-	char	*newName;
+	char newName[16];
 
 	if (Cmd_Argc () == 1)
 	{
 		Con_Printf ("\"name\" is \"%s\"\n", cl_name.string);
 		return;
 	}
-	if (Cmd_Argc () == 2)
-		newName = Cmd_Argv(1);	
+	if (Cmd_Argc() == 2)
+		Q_strcpy(newName, Cmd_Argv(1));
 	else
-		newName = Cmd_Args();
+		Q_strcpy(newName, Cmd_Args());
 	newName[15] = 0;
 
 	if (cmd_source == src_command)
@@ -949,7 +949,7 @@ void Host_Name_f (void)
 void Host_Version_f (void)
 {
 	Con_Printf ("Version %4.2f\n", VERSION);
-	Con_Printf ("Exe: "__TIME__" "__DATE__"\n");
+	Con_Printf ("Exe: " __TIME__ " " __DATE__ "\n");
 }
 
 #ifdef IDGODS
@@ -1011,7 +1011,7 @@ void Host_Say(qboolean teamonly)
 	client_t *save;
 	int		j;
 	char	*p;
-	unsigned char	text[64];
+	char	text[64];
 	qboolean	fromServer = false;
 
 	if (cmd_source == src_command)
@@ -1051,8 +1051,8 @@ void Host_Say(qboolean teamonly)
 	if (Q_strlen(p) > j)
 		p[j] = 0;
 
-	strcat (text, p);
-	strcat (text, "\n");
+	Q_strcat (text, p);
+	Q_strcat (text, "\n");
 
 	for (j = 0, client = svs.clients; j < svs.maxclients; j++, client++)
 	{
@@ -1479,7 +1479,7 @@ void Host_Kick_f (void)
 
 		if (Cmd_Argc() > 2)
 		{
-			message = COM_Parse(Cmd_Args());
+			message = (char*)COM_Parse(Cmd_Args());
 			if (byNumber)
 			{
 				message++;							// skip the #

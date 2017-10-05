@@ -110,7 +110,7 @@ void Cbuf_InsertText (char *text)
 	templen = cmd_text.cursize;
 	if (templen)
 	{
-		temp = Z_Malloc (templen);
+		temp = (char*)Z_Malloc (templen);
 		Q_memcpy (temp, cmd_text.data, templen);
 		SZ_Clear (&cmd_text);
 	}
@@ -226,7 +226,7 @@ void Cmd_StuffCmds_f (void)
 	if (!s)
 		return;
 		
-	text = Z_Malloc (s+1);
+	text = (char*)Z_Malloc (s+1);
 	text[0] = 0;
 	for (i=1 ; i<com_argc ; i++)
 	{
@@ -238,7 +238,7 @@ void Cmd_StuffCmds_f (void)
 	}
 	
 // pull out the commands
-	build = Z_Malloc (s+1);
+	build = (char*)Z_Malloc (s+1);
 	build[0] = 0;
 	
 	for (i=0 ; i<s-1 ; i++)
@@ -326,7 +326,7 @@ char *CopyString (char *in)
 {
 	char	*out;
 	
-	out = Z_Malloc (strlen(in)+1);
+	out = (char*)Z_Malloc (strlen(in)+1);
 	strcpy (out, in);
 	return out;
 }
@@ -365,7 +365,7 @@ void Cmd_Alias_f (void)
 
 	if (!a)
 	{
-		a = Z_Malloc (sizeof(cmdalias_t));
+		a = (cmdalias_t*)Z_Malloc (sizeof(cmdalias_t));
 		a->next = cmd_alias;
 		cmd_alias = a;
 	}
@@ -399,7 +399,7 @@ void Cmd_Alias_f (void)
 
 static	int			cmd_argc;
 static	char		*cmd_argv[MAX_ARGS];
-static	char		*cmd_null_string = "";
+static	char		cmd_null_string[1] = { 0 };
 static	char		*cmd_args = NULL;
 
 cmd_source_t	cmd_source;
@@ -496,13 +496,13 @@ void Cmd_TokenizeString (char *text)
 		if (cmd_argc == 1)
 			 cmd_args = text;
 			
-		text = COM_Parse (text);
+		text = (char*)COM_Parse (text);
 		if (!text)
 			return;
 
 		if (cmd_argc < MAX_ARGS)
 		{
-			cmd_argv[cmd_argc] = Z_Malloc (Q_strlen(com_token)+1);
+			cmd_argv[cmd_argc] = (char*)Z_Malloc (Q_strlen(com_token)+1);
 			Q_strcpy (cmd_argv[cmd_argc], com_token);
 			cmd_argc++;
 		}
@@ -540,7 +540,7 @@ void	Cmd_AddCommand (char *cmd_name, xcommand_t function)
 		}
 	}
 
-	cmd = Hunk_Alloc (sizeof(cmd_function_t));
+	cmd = (cmd_function_t*)Hunk_Alloc (sizeof(cmd_function_t));
 	cmd->name = cmd_name;
 	cmd->function = function;
 	cmd->next = cmd_functions;

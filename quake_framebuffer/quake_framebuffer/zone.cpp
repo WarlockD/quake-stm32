@@ -48,7 +48,7 @@ all big things are allocated on the hunk.
 
 memzone_t	*mainzone;
 
-void Z_ClearZone (memzone_t *zone, int size);
+void Z_ClearZone (memzone_t *zone, size_t size);
 
 
 /*
@@ -56,7 +56,7 @@ void Z_ClearZone (memzone_t *zone, int size);
 Z_ClearZone
 ========================
 */
-void Z_ClearZone (memzone_t *zone, int size)
+void Z_ClearZone (memzone_t *zone, size_t size)
 {
 	memblock_t	*block;
 	
@@ -124,7 +124,7 @@ void Z_Free (void *ptr)
 Z_Malloc
 ========================
 */
-void *Z_Malloc (int size)
+void *Z_Malloc (size_t size)
 {
 	void	*buf;
 	
@@ -137,7 +137,7 @@ Z_CheckHeap ();	// DEBUG
 	return buf;
 }
 
-void *Z_TagMalloc (int size, int tag)
+void *Z_TagMalloc (size_t size, int tag)
 {
 	int		extra;
 	memblock_t	*start, *rover, *new_ptr, *base;
@@ -253,12 +253,12 @@ void Z_CheckHeap (void)
 typedef struct
 {
 	int		sentinal;
-	int		size;		// including sizeof(hunk_t), -1 = not allocated
+	size_t		size;		// including sizeof(hunk_t), -1 = not allocated
 	char	name[8];
 } hunk_t;
 
 byte	*hunk_base;
-int		hunk_size;
+size_t		hunk_size;
 
 int		hunk_low_used;
 int		hunk_high_used;
@@ -283,7 +283,7 @@ void Hunk_Check (void)
 	{
 		if (h->sentinal != HUNK_SENTINAL)
 			Sys_Error ("Hunk_Check: trahsed sentinal");
-		if (h->size < 16 || h->size + (byte *)h - hunk_base > hunk_size)
+		if (h->size < 16U || ((h->size + (byte *)h - hunk_base) > hunk_size))
 			Sys_Error ("Hunk_Check: bad size");
 		h = (hunk_t *)((byte *)h+h->size);
 	}
@@ -416,7 +416,7 @@ void *Hunk_AllocName (int size, char *name)
 Hunk_Alloc
 ===================
 */
-void *Hunk_Alloc (int size)
+void *Hunk_Alloc (size_t size)
 {
 	return Hunk_AllocName (size, "unknown");
 }
@@ -464,7 +464,7 @@ void Hunk_FreeToHighMark (int mark)
 Hunk_HighAllocName
 ===================
 */
-void *Hunk_HighAllocName (int size, char *name)
+void *Hunk_HighAllocName (size_t size, char *name)
 {
 	hunk_t	*h;
 
@@ -510,7 +510,7 @@ Hunk_TempAlloc
 Return space from the top of the hunk
 =================
 */
-void *Hunk_TempAlloc (int size)
+void *Hunk_TempAlloc (size_t size)
 {
 	void	*buf;
 
@@ -541,7 +541,7 @@ CACHE MEMORY
 
 typedef struct cache_system_s
 {
-	int						size;		// including this header
+	size_t						size;		// including this header
 	cache_user_t			*user;
 	char					name[16];
 	struct cache_system_s	*prev, *next;
@@ -567,7 +567,7 @@ void Cache_Move ( cache_system_t *c)
 	{
 //		Con_Printf ("cache_move ok\n");
 
-		Q_memcpy (new_ptr +1, c+1, c->size - sizeof(cache_system_t) );
+		Q_memcpy (new_ptr +1, c+1, c->size - sizeof(cache_system_t));
 		new_ptr->user = c->user;
 		Q_memcpy (new_ptr->name, c->name, sizeof(new_ptr->name));
 		Cache_Free (c->user);
@@ -871,7 +871,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 		cs = Cache_TryAlloc (size, false);
 		if (cs)
 		{
-			strncpy (cs->name, name, sizeof(cs->name)-1);
+			Q_strncpy (cs->name, name, sizeof(cs->name)-1);
 			c->data = (void *)(cs+1);
 			cs->user = c;
 			break;
@@ -895,7 +895,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 Memory_Init
 ========================
 */
-void Memory_Init (void *buf, int size)
+void Memory_Init (void *buf, size_t size)
 {
 	int p;
 	int zonesize = DYNAMIC_SIZE;

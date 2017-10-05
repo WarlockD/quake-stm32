@@ -222,7 +222,7 @@ BOOL WriteText (LPCTSTR szText)
 	INPUT_RECORD	rec;
 	char			upper, *sz;
 
-	sz = (LPTSTR) szText;
+	sz = (char*) szText;
 
 	while (*sz)
 	{

@@ -18,17 +18,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // comndef.h  -- general definitions
+#ifndef _QUAKE_COMMON_H_
+#define _QUAKE_COMMON_H_
+
+#include <cstdint>
+#include <cstdlib>
+#include <type_traits>
+#include <cassert>
 
 #if !defined BYTE_DEFINED
-typedef unsigned char 		byte;
+typedef uint8_t 		byte;
 #define BYTE_DEFINED 1
 #endif
 
-#undef true
-#undef false
 
 typedef bool qboolean;
-//typedef enum {false, true}	
 
 //============================================================================
 
@@ -99,8 +103,37 @@ extern	float	(*LittleFloat) (float l);
 
 void MSG_WriteChar (sizebuf_t *sb, int c);
 void MSG_WriteByte (sizebuf_t *sb, int c);
+// I put some templates here so we can catch some odd balls
+// alot of stuff in sv_main gets converted to bytes.  We are talking floats?  There
+// are enough warnings for me to think about changing the df file
+template<typename T, typename = std::enable_if<!std::is_same<T,int>::value && std::is_arithmetic<T>::value>>
+void MSG_WriteChar(sizebuf_t *sb, T c) {
+	//static_assert("Do you REALLY want to convert this to char?");
+	MSG_WriteChar(sb, static_cast<int>(c));
+}
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+void MSG_WriteByte(sizebuf_t *sb, T c) {
+	//static_assert("Do you REALLY want to convert this to byte?");
+	MSG_WriteByte(sb, static_cast<int>(c));
+}
+
+
 void MSG_WriteShort (sizebuf_t *sb, int c);
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+void MSG_WriteShort(sizebuf_t *sb, T c) {
+	//static_assert("Do you REALLY want to convert this to short?");
+	MSG_WriteShort(sb, static_cast<int>(c));
+}
+
+
 void MSG_WriteLong (sizebuf_t *sb, int c);
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+void MSG_WriteLong(sizebuf_t *sb, T c) {
+	//static_assert("Do you REALLY want to convert this to long?");
+	MSG_WriteLong(sb, static_cast<int>(c));
+}
+
+
 void MSG_WriteFloat (sizebuf_t *sb, float f);
 void MSG_WriteString (sizebuf_t *sb, char *s);
 void MSG_WriteCoord (sizebuf_t *sb, float f);
@@ -122,40 +155,69 @@ float MSG_ReadAngle (void);
 
 //============================================================================
 
-void Q_memset (void *dest, int fill, int count);
-void Q_memcpy (void *dest, void *src, int count);
-int Q_memcmp (void *m1, void *m2, int count);
-void Q_strcpy (char *dest, char *src);
-void Q_strncpy (char *dest, char *src, int count);
-int Q_strlen (char *str);
+void Q_memset (void *dest, int fill, size_t count);
+void Q_memcpy (void *dest, const void * src, size_t count);
+int Q_memcmp (const void * m1, const void * m2, size_t count);
+
+
+
+size_t Q_strlen(const char * str);
+void Q_strncpy(char *dest, const char * src, size_t count);
+void Q_strcpy(char *dest, const char * src);
+template<size_t N>
+int Q_strcpy(char(&dest)[N], const char * src) { Q_strncpy(dest, src, N);}
+
 char *Q_strrchr (char *s, char c);
-void Q_strcat (char *dest, char *src);
-int Q_strcmp (char *s1, char *s2);
-int Q_strncmp (char *s1, char *s2, int count);
-int Q_strcasecmp (char *s1, char *s2);
-int Q_strncasecmp (char *s1, char *s2, int n);
-int	Q_atoi (char *str);
-float Q_atof (char *str);
+const char *Q_strrchr(const char *s, char c);
+
+void Q_strcat (char *dest, const char * src);
+int Q_strcmp (const char * s1, const char * s2);
+int Q_strncmp (const char * s1, const char * s2, size_t count);
+
+int Q_strcasecmp (const char * s1, const char * s2);
+int Q_strncasecmp (const char * s1, const char * s2, size_t n);
+int	Q_atoi (const char * str);
+float Q_atof (const char * str);
+
+int Q_vsprintf(char* buffer, const char* fmt, va_list va);
+int Q_vsnprintf(char* buffer, size_t buffer_size, const char* fmt, va_list va);
+template<size_t N>
+int Q_vsprintf(char(&buffer)[N], const char* fmt, va_list va) { return Q_vsnprintf(buffer, N, fmt, va); }
+
+int Q_sprintf(char* buffer, const char* fmt, ...);
+int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...);
+
+template<size_t N>
+int Q_sprintf(char(&buffer)[N], const char* fmt, ...) { 
+	va_list va;
+	va_start(va, fmt);
+	int ret = Q_vsnprintf(buffer, N, fmt, va);
+	va_end(va);
+	return ret;
+}
 
 //============================================================================
 
 extern	char		com_token[1024];
 extern	qboolean	com_eof;
 
-char *COM_Parse (char *data);
+const char *COM_Parse (const char * data);
 
 
 extern	int		com_argc;
 extern	char	**com_argv;
 
-int COM_CheckParm (char *parm);
+int COM_CheckParm (const char * parm);
 void COM_Init (char *path);
 void COM_InitArgv (int argc, char **argv);
-
+const char *COM_SkipPath(const char *pathname);
 char *COM_SkipPath (char *pathname);
-void COM_StripExtension (char *in, char *out);
-void COM_FileBase (char *in, char *out);
-void COM_DefaultExtension (char *path, char *extension);
+void COM_StripExtension (const char *in, char *out);
+void COM_FileBase (const char *in, char *out,size_t out_size);
+template<size_t N>
+inline void COM_FileBase(const char *in, char(&out)[N]) { COM_FileBase(in, (char*)out, N); }
+
+void COM_DefaultExtension (char *path, const char *extension);
 
 char	*va(char *format, ...);
 // does a varargs printf into a temp buffer
@@ -168,17 +230,19 @@ struct cache_user_s;
 
 extern	char	com_gamedir[MAX_OSPATH];
 
-void COM_WriteFile (char *filename, void *data, int len);
-int COM_OpenFile (char *filename, int *hndl);
-int COM_FOpenFile (char *filename, FILE **file);
+void COM_WriteFile (const char * filename, const void * data, int len);
+int COM_OpenFile (const char * filename, int *hndl);
+int COM_FOpenFile (const char * filename, FILE **file);
 void COM_CloseFile (int h);
 
-byte *COM_LoadStackFile (char *path, void *buffer, int bufsize);
-byte *COM_LoadTempFile (char *path);
-byte *COM_LoadHunkFile (char *path);
-void COM_LoadCacheFile (char *path, struct cache_user_s *cu);
+byte *COM_LoadStackFile (const char * path, void *buffer, int bufsize);
+byte *COM_LoadTempFile (const char * path);
+byte *COM_LoadHunkFile (const char * path);
+void COM_LoadCacheFile (const char * path, struct cache_user_s *cu);
 
 
 extern	struct cvar_s	registered;
 
 extern qboolean		standard_quake, rogue, hipnotic;
+
+#endif

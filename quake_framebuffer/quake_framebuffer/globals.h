@@ -10,7 +10,7 @@
 // zone.c
 typedef struct memblock_s
 {
-	int		size;           // including the header and possibly tiny fragments
+	size_t		size;           // including the header and possibly tiny fragments
 	int     tag;            // a tag of 0 is a free block
 	int     id;        		// should be ZONEID
 	struct memblock_s       *next, *prev;
@@ -19,7 +19,7 @@ typedef struct memblock_s
 
 typedef struct
 {
-	int		size;		// total bytes malloced, including header
+	size_t		size;		// total bytes malloced, including header
 	memblock_t	blocklist;		// start / end cap for linked list
 	memblock_t	*rover;
 } memzone_t;
@@ -60,7 +60,7 @@ typedef struct
 #define	PR_LOCALSTACK_SIZE		2048
 
 
-global_constants_t quake_constants;
+extern global_constants_t quake_constants;
 // d_init.c defines
 #define NUM_MIPS	4
 

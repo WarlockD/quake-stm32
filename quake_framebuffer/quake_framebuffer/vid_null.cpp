@@ -131,7 +131,7 @@ void CheckLog(GLuint shader, const char* msg) {
 		char VertexShaderErrorMessage[1024];
 		assert(InfoLogLength < (1024 - 1));
 		glGetShaderInfoLog(shader, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
-		Sys_DebugLog(NULL, "Shader Error(%s): %s\n", msg, &VertexShaderErrorMessage[0]);
+		Sys_Printf(NULL, "Shader Error(%s): %s\n", msg, &VertexShaderErrorMessage[0]);
 	}
 }
 
@@ -185,7 +185,7 @@ static void glad_post_error(const char *name, void *funcptr, int len_args, ...) 
 	GLenum err;
 	while ((err = glad_glGetError()) != GL_NO_ERROR)
 	{
-		Sys_DebugLog(NULL, "ERROR %d in %s\n", err, name);
+		Sys_Printf(NULL, "GLAD ERROR %d in %s\n", err, name);
 		//fprintf(stderr, "ERROR %d in %s\n", error_code, name);
 		//Process/log the error.
 	}

@@ -197,7 +197,7 @@ ddef_t *ED_FindField (char *name)
 ED_FindGlobal
 ============
 */
-ddef_t *ED_FindGlobal (char *name)
+ddef_t *ED_FindGlobal (const char * name)
 {
 	ddef_t		*def;
 	int			i;
@@ -282,33 +282,33 @@ char *PR_ValueString (etype_t type, eval_t *val)
 	switch (type)
 	{
 	case ev_string:
-		sprintf (line, "%s", pr_strings + val->string);
+		Q_sprintf (line, "%s", pr_strings + val->string);
 		break;
 	case ev_entity:	
 		sprintf (line, "entity %i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
 		break;
 	case ev_function:
 		f = pr_functions + val->function;
-		sprintf (line, "%s()", pr_strings + f->s_name);
+		Q_sprintf (line, "%s()", pr_strings + f->s_name);
 		break;
 	case ev_field:
 		def = ED_FieldAtOfs ( val->_int );
-		sprintf (line, ".%s", pr_strings + def->s_name);
+		Q_sprintf (line, ".%s", pr_strings + def->s_name);
 		break;
 	case ev_void:
-		sprintf (line, "void");
+		Q_sprintf (line, "void");
 		break;
 	case ev_float:
-		sprintf (line, "%5.1f", val->_float);
+		Q_sprintf (line, "%5.1f", val->_float);
 		break;
 	case ev_vector:
-		sprintf (line, "'%5.1f %5.1f %5.1f'", val->vector[0], val->vector[1], val->vector[2]);
+		Q_sprintf (line, "'%5.1f %5.1f %5.1f'", val->vector[0], val->vector[1], val->vector[2]);
 		break;
 	case ev_pointer:
-		sprintf (line, "pointer");
+		Q_sprintf (line, "pointer");
 		break;
 	default:
-		sprintf (line, "bad type %i", type);
+		Q_sprintf (line, "bad type %i", type);
 		break;
 	}
 	
@@ -334,30 +334,30 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 	switch (type)
 	{
 	case ev_string:
-		sprintf (line, "%s", pr_strings + val->string);
+		Q_sprintf (line, "%s", pr_strings + val->string);
 		break;
 	case ev_entity:	
-		sprintf (line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+		Q_sprintf (line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
 		break;
 	case ev_function:
 		f = pr_functions + val->function;
-		sprintf (line, "%s", pr_strings + f->s_name);
+		Q_sprintf (line, "%s", pr_strings + f->s_name);
 		break;
 	case ev_field:
 		def = ED_FieldAtOfs ( val->_int );
-		sprintf (line, "%s", pr_strings + def->s_name);
+		Q_sprintf (line, "%s", pr_strings + def->s_name);
 		break;
 	case ev_void:
-		sprintf (line, "void");
+		Q_sprintf (line, "void");
 		break;
 	case ev_float:
-		sprintf (line, "%f", val->_float);
+		Q_sprintf (line, "%f", val->_float);
 		break;
 	case ev_vector:
-		sprintf (line, "%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
+		Q_sprintf (line, "%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
 		break;
 	default:
-		sprintf (line, "bad type %i", type);
+		Q_sprintf (line, "bad type %i", type);
 		break;
 	}
 	
@@ -386,14 +386,14 @@ char *PR_GlobalString (int ofs)
 		sprintf (line,"%i(???)", ofs);
 	else
 	{
-		s = PR_ValueString (def->type, val);
-		sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
+		s = PR_ValueString (def->type, (eval_t*)val);
+		Q_sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
 	}
 	
-	i = strlen(line);
+	i = Q_strlen(line);
 	for ( ; i<20 ; i++)
-		strcat (line," ");
-	strcat (line," ");
+		Q_strcat (line," ");
+	Q_strcat (line," ");
 		
 	return line;
 }
@@ -406,14 +406,14 @@ char *PR_GlobalStringNoContents (int ofs)
 	
 	def = ED_GlobalAtOfs(ofs);
 	if (!def)
-		sprintf (line,"%i(???)", ofs);
+		Q_sprintf (line,"%i(???)", ofs);
 	else
-		sprintf (line,"%i(%s)", ofs, pr_strings + def->s_name);
+		Q_sprintf (line,"%i(%s)", ofs, pr_strings + def->s_name);
 	
-	i = strlen(line);
+	i = Q_strlen(line);
 	for ( ; i<20 ; i++)
-		strcat (line," ");
-	strcat (line," ");
+		Q_strcat (line," ");
+	Q_strcat (line," ");
 		
 	return line;
 }
@@ -630,7 +630,7 @@ void ED_WriteGlobals (FILE *f)
 
 		name = pr_strings + def->s_name;		
 		fprintf (f,"\"%s\" ", name);
-		fprintf (f,"\"%s\"\n", PR_UglyValueString(type, (eval_t *)&pr_globals[def->ofs]));		
+		fprintf (f,"\"%s\"\n", PR_UglyValueString(static_cast<etype_t>(type), (eval_t *)&pr_globals[def->ofs]));		
 	}
 	fprintf (f,"}\n");
 }
@@ -640,7 +640,7 @@ void ED_WriteGlobals (FILE *f)
 ED_ParseGlobals
 =============
 */
-void ED_ParseGlobals (char *data)
+void ED_ParseGlobals (const char * data)
 {
 	char	keyname[64];
 	ddef_t	*key;
@@ -690,7 +690,7 @@ char *ED_NewString (char *string)
 	int		i,l;
 	
 	l = strlen(string) + 1;
-	new_ptr = Hunk_Alloc (l);
+	new_ptr = (char*)Hunk_Alloc (l);
 	new_p = new_ptr;
 
 	for (i=0 ; i< l ; i++)
@@ -811,7 +811,7 @@ char *ED_ParseEdict (char *data, edict_t *ent)
 	while (1)
 	{	
 	// parse key
-		data = COM_Parse (data);
+		data = (char*)COM_Parse (data);
 		if (com_token[0] == '}')
 			break;
 		if (!data)
@@ -842,7 +842,7 @@ if (!strcmp(com_token, "light"))
 		}
 
 	// parse value	
-		data = COM_Parse (data);
+		data = (char*)COM_Parse (data);
 		if (!data)
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
@@ -910,7 +910,7 @@ void ED_LoadFromFile (char *data)
 	while (1)
 	{
 // parse the opening brace	
-		data = COM_Parse (data);
+		data = (char*)COM_Parse (data);
 		if (!data)
 			break;
 		if (com_token[0] != '{')
@@ -1035,15 +1035,15 @@ void PR_LoadProgs (void)
 
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
-		pr_globaldefs[i].type = LittleShort (pr_globaldefs[i].type);
+		pr_globaldefs[i].type = static_cast<etype_t>(LittleShort (static_cast<short>(pr_globaldefs[i].type)));
 		pr_globaldefs[i].ofs = LittleShort (pr_globaldefs[i].ofs);
 		pr_globaldefs[i].s_name = LittleLong (pr_globaldefs[i].s_name);
 	}
 
 	for (i=0 ; i<progs->numfielddefs ; i++)
 	{
-		pr_fielddefs[i].type = LittleShort (pr_fielddefs[i].type);
-		if (pr_fielddefs[i].type & DEF_SAVEGLOBAL)
+		pr_fielddefs[i].type = static_cast<etype_t>(LittleShort(static_cast<short>(pr_fielddefs[i].type))); 
+		if (static_cast<short>(pr_fielddefs[i].type) & DEF_SAVEGLOBAL)
 			Sys_Error ("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
 		pr_fielddefs[i].ofs = LittleShort (pr_fielddefs[i].ofs);
 		pr_fielddefs[i].s_name = LittleLong (pr_fielddefs[i].s_name);

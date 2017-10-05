@@ -178,6 +178,7 @@
     <ClCompile Include="d_surf.cpp" />
     <ClCompile Include="d_vars.cpp" />
     <ClCompile Include="d_zpoint.cpp" />
+    <ClCompile Include="global.cpp" />
     <ClCompile Include="host.cpp" />
     <ClCompile Include="host_cmd.cpp" />
     <ClCompile Include="in_null.cpp" />
@@ -188,7 +189,7 @@
     <ClCompile Include="net_loop.cpp" />
     <ClCompile Include="net_main.cpp" />
     <ClCompile Include="net_none.cpp" />
-    <ClCompile Include="net_vcr.c" />
+    <ClCompile Include="net_vcr.cpp" />
     <ClCompile Include="nonintel.cpp" />
     <ClCompile Include="pr_cmds.cpp" />
     <ClCompile Include="pr_edict.cpp" />

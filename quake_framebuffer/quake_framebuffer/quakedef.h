@@ -38,13 +38,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #else
 #define	GAMENAME	"id1"
 #endif
+#include <cstdint>
+#include <cmath>
+#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdarg>
+#include <csetjmp>
+#include <vector>
+#include <algorithm>
+#include <type_traits>
 
-#include <math.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <setjmp.h>
 
 #if defined(_WIN32) && !defined(WINDED)
 

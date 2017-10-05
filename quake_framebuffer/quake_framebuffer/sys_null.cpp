@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <Windows.h>
 #include <GLFW\glfw3.h>
 #include <assert.h>
+#include <sys\stat.h>
 
 GLFWwindow* glfw_window = NULL;
 qboolean isDedicated = false;
@@ -73,7 +74,7 @@ int filelength (FILE *f)
 	return end;
 }
 
-int Sys_FileOpenRead (char *path, int *hndl)
+int Sys_FileOpenRead (const char * path, int *hndl)
 {
 	FILE    *f;
 	int             i;
@@ -92,7 +93,7 @@ int Sys_FileOpenRead (char *path, int *hndl)
 	return filelength(f);
 }
 
-int Sys_FileOpenWrite (char *path)
+int Sys_FileOpenWrite (const char * path)
 {
 	FILE    *f;
 	int             i;
@@ -123,23 +124,17 @@ int Sys_FileRead (int handle, void *dest, int count)
 	return fread (dest, 1, count, sys_handles[handle]);
 }
 
-int Sys_FileWrite (int handle, void *data, int count)
+int Sys_FileWrite (int handle, const void * data, int count)
 {
 	return fwrite (data, 1, count, sys_handles[handle]);
 }
 
-int     Sys_FileTime (char *path)
+int     Sys_FileTime (const char * path)
 {
+	struct stat s;
 	FILE    *f;
-	
-	f = fopen(path, "rb");
-	if (f)
-	{
-		fclose(f);
-		return 1;
-	}
-	
-	return -1;
+	if (stat(path, &s) < 0)  return -1;
+	return static_cast<int>(s.st_mtime);
 }
 
 void Sys_mkdir (char *path)
@@ -206,7 +201,7 @@ void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length)
 
 static void gfl3_error_callback(int error, const char* description)
 {
-	Sys_Error(stderr, "Error: %s\n", description);
+	Sys_Error("Error: %s\n", description);
 }
 
 void Sys_Quit(void)

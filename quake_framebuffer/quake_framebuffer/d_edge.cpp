@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static int	miplevel;
 
 float		scale_for_mip;
-int			screenwidth;
+extern int			screenwidth;
 int			ubasestep, errorterm, erroradjustup, erroradjustdown;
 int			vstartscan;
 
@@ -235,7 +235,7 @@ void D_DrawSurfaces (void)
 			}
 			else if (s->flags & SURF_DRAWTURB)
 			{
-				pface = s->data;
+				pface = (msurface_t*)s->data;
 				miplevel = 0;
 				cacheblock = (pixel_t *)
 						((byte *)pface->texinfo->texture +
@@ -292,7 +292,7 @@ void D_DrawSurfaces (void)
 										// make entity passed in
 				}
 
-				pface = s->data;
+				pface = (msurface_t*)s->data;
 				miplevel = D_MipLevelForScale (s->nearzi * scale_for_mip
 				* pface->texinfo->mipadjust);
 

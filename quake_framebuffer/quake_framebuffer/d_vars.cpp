@@ -37,7 +37,7 @@ float	d_sdivzstepu, d_tdivzstepu, d_zistepu;
 float	d_sdivzstepv, d_tdivzstepv, d_zistepv;
 float	d_sdivzorigin, d_tdivzorigin, d_ziorigin;
 
-fixed16_t	sadjust, tadjust, bbextents, bbextentt;
+extern fixed16_t	sadjust, tadjust, bbextents, bbextentt;
 
 pixel_t			*cacheblock;
 int				cachewidth;

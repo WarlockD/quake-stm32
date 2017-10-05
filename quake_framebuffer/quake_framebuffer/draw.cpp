@@ -42,7 +42,7 @@ int			menu_numcachepics;
 
 qpic_t	*Draw_PicFromWad (char *name)
 {
-	return W_GetLumpName (name);
+	return (qpic_t*)W_GetLumpName (name);
 }
 
 /*
@@ -68,7 +68,7 @@ qpic_t	*Draw_CachePic (char *path)
 		strcpy (pic->name, path);
 	}
 
-	dat = Cache_Check (&pic->cache);
+	dat = (qpic_t*)Cache_Check (&pic->cache);
 
 	if (dat)
 		return dat;
@@ -100,9 +100,9 @@ void Draw_Init (void)
 {
 	int		i;
 
-	draw_chars = W_GetLumpName ("conchars");
-	draw_disc = W_GetLumpName ("disc");
-	draw_backtile = W_GetLumpName ("backtile");
+	draw_chars = (byte*)W_GetLumpName ("conchars");
+	draw_disc = (qpic_t*)W_GetLumpName ("disc");
+	draw_backtile = (qpic_t*)W_GetLumpName ("backtile");
 
 	r_rectdesc.width = draw_backtile->width;
 	r_rectdesc.height = draw_backtile->height;

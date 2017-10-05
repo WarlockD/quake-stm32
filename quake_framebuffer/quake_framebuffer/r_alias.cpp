@@ -98,7 +98,7 @@ qboolean R_AliasCheckBBox (void)
 
 	currententity->trivial_accept = 0;
 	pmodel = currententity->model;
-	pahdr = (auxvert_t*)Mod_Extradata (pmodel);
+	pahdr = (aliashdr_t*)Mod_Extradata (pmodel);
 	pmdl = (mdl_t *)((byte *)pahdr + pahdr->model);
 
 	R_AliasSetUpTransform (0);

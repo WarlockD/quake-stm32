@@ -59,7 +59,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_nostep);
 
 	for (i=0 ; i<MAX_MODELS ; i++)
-		sprintf (localmodels[i], "*%i", i);
+		Q_sprintf (localmodels[i], "*%i", i);
 }
 
 /*
@@ -89,7 +89,7 @@ void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count)
 	MSG_WriteCoord (&sv.datagram, org[2]);
 	for (i=0 ; i<3 ; i++)
 	{
-		v = dir[i]*16;
+		v = static_cast<int>(dir[i]*16);
 		if (v > 127)
 			v = 127;
 		else if (v < -128)
@@ -163,11 +163,11 @@ void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
 	if (field_mask & SND_VOLUME)
 		MSG_WriteByte (&sv.datagram, volume);
 	if (field_mask & SND_ATTENUATION)
-		MSG_WriteByte (&sv.datagram, attenuation*64);
+		MSG_WriteByte (&sv.datagram, static_cast<int>(attenuation*64));
 	MSG_WriteShort (&sv.datagram, channel);
 	MSG_WriteByte (&sv.datagram, sound_num);
 	for (i=0 ; i<3 ; i++)
-		MSG_WriteCoord (&sv.datagram, entity->v.origin[i]+0.5*(entity->v.mins[i]+entity->v.maxs[i]));
+		MSG_WriteCoord (&sv.datagram, entity->v.origin[i]+0.5f*(entity->v.mins[i]+entity->v.maxs[i]));
 }           
 
 /*
@@ -192,7 +192,7 @@ void SV_SendServerinfo (client_t *client)
 	char			message[2048];
 
 	MSG_WriteByte (&client->message, svc_print);
-	sprintf (message, "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, pr_crc);
+	Q_sprintf (message, "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, pr_crc);
 	MSG_WriteString (&client->message,message);
 
 	MSG_WriteByte (&client->message, svc_serverinfo);
@@ -204,7 +204,7 @@ void SV_SendServerinfo (client_t *client)
 	else
 		MSG_WriteByte (&client->message, GAME_COOP);
 
-	sprintf (message, pr_strings+sv.edicts->v.message);
+	Q_sprintf (message, pr_strings+sv.edicts->v.message);
 
 	MSG_WriteString (&client->message,message);
 
@@ -218,8 +218,8 @@ void SV_SendServerinfo (client_t *client)
 
 // send music
 	MSG_WriteByte (&client->message, svc_cdtrack);
-	MSG_WriteByte (&client->message, sv.edicts->v.sounds);
-	MSG_WriteByte (&client->message, sv.edicts->v.sounds);
+	MSG_WriteByte (&client->message, static_cast<int>(sv.edicts->v.sounds));
+	MSG_WriteByte (&client->message, static_cast<int>(sv.edicts->v.sounds));
 
 // set view	
 	MSG_WriteByte (&client->message, svc_setview);
@@ -265,7 +265,7 @@ void SV_ConnectClient (int clientnum)
 	memset (client, 0, sizeof(*client));
 	client->netconnection = netconnection;
 
-	strcpy (client->name, "unconnected");
+	Q_strcpy (client->name, "unconnected");
 	client->active = true;
 	client->spawned = false;
 	client->edict = ent;
@@ -524,15 +524,15 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 			MSG_WriteByte (msg,e);
 
 		if (bits & U_MODEL)
-			MSG_WriteByte (msg,	ent->v.modelindex);
+			MSG_WriteByte (msg,	static_cast<int>(ent->v.modelindex));
 		if (bits & U_FRAME)
-			MSG_WriteByte (msg, ent->v.frame);
+			MSG_WriteByte (msg, static_cast<int>(ent->v.frame));
 		if (bits & U_COLORMAP)
-			MSG_WriteByte (msg, ent->v.colormap);
+			MSG_WriteByte (msg, static_cast<int>(ent->v.colormap));
 		if (bits & U_SKIN)
-			MSG_WriteByte (msg, ent->v.skin);
+			MSG_WriteByte (msg, static_cast<int>(ent->v.skin));
 		if (bits & U_EFFECTS)
-			MSG_WriteByte (msg, ent->v.effects);
+			MSG_WriteByte (msg, static_cast<int>(ent->v.effects));
 		if (bits & U_ORIGIN1)
 			MSG_WriteCoord (msg, ent->v.origin[0]);		
 		if (bits & U_ANGLE1)
@@ -562,7 +562,7 @@ void SV_CleanupEnts (void)
 	ent = NEXT_EDICT(sv.edicts);
 	for (e=1 ; e<sv.num_edicts ; e++, ent = NEXT_EDICT(ent))
 	{
-		ent->v.effects = (int)ent->v.effects & ~EF_MUZZLEFLASH;
+		ent->v.effects = static_cast<float>(static_cast<int>(ent->v.effects) & ~EF_MUZZLEFLASH);
 	}
 
 }
@@ -590,10 +590,10 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 	{
 		other = PROG_TO_EDICT(ent->v.dmg_inflictor);
 		MSG_WriteByte (msg, svc_damage);
-		MSG_WriteByte (msg, ent->v.dmg_save);
-		MSG_WriteByte (msg, ent->v.dmg_take);
+		MSG_WriteByte (msg, static_cast<int>(ent->v.dmg_save));
+		MSG_WriteByte (msg, static_cast<int>(ent->v.dmg_take));
 		for (i=0 ; i<3 ; i++)
-			MSG_WriteCoord (msg, other->v.origin[i] + 0.5*(other->v.mins[i] + other->v.maxs[i]));
+			MSG_WriteCoord (msg, other->v.origin[i] + 0.5f*(other->v.mins[i] + other->v.maxs[i]));
 	
 		ent->v.dmg_take = 0;
 		ent->v.dmg_save = 0;
@@ -665,17 +665,17 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 	MSG_WriteShort (msg, bits);
 
 	if (bits & SU_VIEWHEIGHT)
-		MSG_WriteChar (msg, ent->v.view_ofs[2]);
+		MSG_WriteChar (msg, static_cast<int>(ent->v.view_ofs[2]));
 
 	if (bits & SU_IDEALPITCH)
-		MSG_WriteChar (msg, ent->v.idealpitch);
+		MSG_WriteChar (msg, static_cast<int>(ent->v.idealpitch));
 
 	for (i=0 ; i<3 ; i++)
 	{
 		if (bits & (SU_PUNCH1<<i))
-			MSG_WriteChar (msg, ent->v.punchangle[i]);
+			MSG_WriteChar (msg, static_cast<int>(ent->v.punchangle[i]));
 		if (bits & (SU_VELOCITY1<<i))
-			MSG_WriteChar (msg, ent->v.velocity[i]/16);
+			MSG_WriteChar (msg, static_cast<int>(ent->v.velocity[i]/16));
 	}
 
 // [always sent]	if (bits & SU_ITEMS)
@@ -727,7 +727,7 @@ qboolean SV_SendClientDatagram (client_t *client)
 	msg.cursize = 0;
 
 	MSG_WriteByte (&msg, svc_time);
-	MSG_WriteFloat (&msg, sv.time);
+	MSG_WriteFloat (&msg, static_cast<float>(sv.time));
 
 // add the client specific data to the datagram
 	SV_WriteClientdataToMessage (client->edict, &msg);
@@ -772,7 +772,7 @@ void SV_UpdateToReliableMessages (void)
 				MSG_WriteShort (&client->message, host_client->edict->v.frags);
 			}
 
-			host_client->old_frags = host_client->edict->v.frags;
+			host_client->old_frags = static_cast<int>(host_client->edict->v.frags);
 		}
 	}
 	
@@ -942,8 +942,8 @@ void SV_CreateBaseline (void)
 	//
 		VectorCopy (svent->v.origin, svent->baseline.origin);
 		VectorCopy (svent->v.angles, svent->baseline.angles);
-		svent->baseline.frame = svent->v.frame;
-		svent->baseline.skin = svent->v.skin;
+		svent->baseline.frame = static_cast<int>(svent->v.frame);
+		svent->baseline.skin = static_cast<int>(svent->v.skin);
 		if (entnum > 0 && entnum <= svs.maxclients)
 		{
 			svent->baseline.colormap = entnum;
@@ -984,7 +984,7 @@ Tell all the clients that the server is changing levels
 */
 void SV_SendReconnect (void)
 {
-	char	data[128];
+	byte	data[128];
 	sizebuf_t	msg;
 
 	msg.data = data;
@@ -1016,7 +1016,7 @@ void SV_SaveSpawnparms (void)
 {
 	int		i, j;
 
-	svs.serverflags = pr_global_struct->serverflags;
+	svs.serverflags = static_cast<int>(pr_global_struct->serverflags);
 
 	for (i=0, host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)
 	{
@@ -1084,9 +1084,9 @@ void SV_SpawnServer (char *server)
 //
 	Host_ClearMemory ();
 
-	memset (&sv, 0, sizeof(sv));
+	Q_memset (&sv, 0, sizeof(sv));
 
-	strcpy (sv.name, server);
+	Q_strcpy (sv.name, server);
 #ifdef QUAKE2
 	if (startspot)
 		strcpy(sv.startspot, startspot);
@@ -1098,7 +1098,7 @@ void SV_SpawnServer (char *server)
 // allocate server memory
 	sv.max_edicts = MAX_EDICTS;
 	
-	sv.edicts = Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
+	sv.edicts = (decltype(sv.edicts))Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
 
 	sv.datagram.maxsize = sizeof(sv.datagram_buf);
 	sv.datagram.cursize = 0;
@@ -1125,8 +1125,8 @@ void SV_SpawnServer (char *server)
 
 	sv.time = 1.0;
 	
-	strcpy (sv.name, server);
-	sprintf (sv.modelname,"maps/%s.bsp", server);
+	Q_strcpy (sv.name, server);
+	Q_sprintf (sv.modelname,"maps/%s.bsp", server);
 	sv.worldmodel = Mod_ForName (sv.modelname, false);
 	if (!sv.worldmodel)
 	{
@@ -1155,7 +1155,7 @@ void SV_SpawnServer (char *server)
 // load the rest of the entities
 //	
 	ent = EDICT_NUM(0);
-	memset (&ent->v, 0, progs->entityfields * 4);
+	Q_memset (&ent->v, 0, progs->entityfields * 4);
 	ent->free = false;
 	ent->v.model = sv.worldmodel->name - pr_strings;
 	ent->v.modelindex = 1;		// world model
@@ -1173,7 +1173,7 @@ void SV_SpawnServer (char *server)
 #endif
 
 // serverflags are for cross level information (sigils)
-	pr_global_struct->serverflags = svs.serverflags;
+	pr_global_struct->serverflags = static_cast<float>(svs.serverflags);
 	
 	ED_LoadFromFile (sv.worldmodel->entities);
 
