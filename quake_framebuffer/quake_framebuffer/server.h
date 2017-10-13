@@ -39,10 +39,10 @@ typedef struct
 	qboolean	paused;
 	qboolean	loadgame;			// handle connections specially
 
-	double		time;
+	idTime		time; // was double
 	
 	int			lastcheck;			// used by PF_checkclient
-	double		lastchecktime;
+	idTime		lastchecktime;      // was doube
 	
 	char		name[64];			// map name
 #ifdef QUAKE2
@@ -83,7 +83,7 @@ typedef struct client_s
 	qboolean		privileged;			// can execute any host command
 	qboolean		sendsignon;			// only valid before spawned
 
-	double			last_message;		// reliable messages must be sent
+	idTime			last_message;		// reliable messages must be sent
 										// periodically
 
 	struct qsocket_s *netconnection;	// communications handle
@@ -98,7 +98,7 @@ typedef struct client_s
 	char			name[32];			// for printing to other people
 	int				colors;
 		
-	float			ping_times[NUM_PING_TIMES];
+	idTime			ping_times[NUM_PING_TIMES];
 	int				num_pings;			// ping_times[num_pings%NUM_PING_TIMES]
 
 // spawn parms are carried from level to level
@@ -209,7 +209,7 @@ extern	client_t	*host_client;
 
 extern	jmp_buf 	host_abortserver;
 
-extern	double		host_time;
+extern	idTime		host_time;
 
 extern	edict_t		*sv_player;
 
@@ -235,7 +235,7 @@ void SV_AddUpdates (void);
 void SV_ClientThink (void);
 void SV_AddClientToServer (struct qsocket_s	*ret);
 
-void SV_ClientPrintf (char *fmt, ...);
+void SV_ClientPrintf (const char *fmt, ...);
 void SV_BroadcastPrintf (char *fmt, ...);
 
 void SV_Physics (void);

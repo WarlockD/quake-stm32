@@ -45,7 +45,7 @@ typedef struct particle_s
 	struct particle_s	*next;
 	vec3_t		vel;
 	float		ramp;
-	float		die;
+	idTime		die;
 	ptype_t		type;
 } particle_t;
 
@@ -220,7 +220,7 @@ void R_GenTile (msurface_t *psurf, void *pdest);
 #define SKYMASK			(SKYSIZE - 1)
 
 extern float	skyspeed, skyspeed2;
-extern float	skytime;
+extern idTime	skytime;
 
 extern int		c_surf;
 extern vrect_t	scr_vrect;

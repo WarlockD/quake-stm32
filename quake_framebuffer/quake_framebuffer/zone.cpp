@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+
+
 #define	DYNAMIC_SIZE	0xc000
 
 #define	ZONEID	0x1d4a11
@@ -283,7 +285,7 @@ void Hunk_Check (void)
 	{
 		if (h->sentinal != HUNK_SENTINAL)
 			Sys_Error ("Hunk_Check: trahsed sentinal");
-		if (h->size < 16U || ((h->size + (byte *)h - hunk_base) > hunk_size))
+		if (h->size < 16U || static_cast<size_t>(((h->size + (byte *)h - hunk_base)) > hunk_size))
 			Sys_Error ("Hunk_Check: bad size");
 		h = (hunk_t *)((byte *)h+h->size);
 	}
@@ -341,7 +343,7 @@ void Hunk_Print (qboolean all)
 	//
 		if (h->sentinal != HUNK_SENTINAL)
 			Sys_Error ("Hunk_Check: trahsed sentinal");
-		if (h->size < 16 || h->size + (byte *)h - hunk_base > hunk_size)
+		if (h->size < 16U || h->size + (byte *)h - hunk_base > hunk_size)
 			Sys_Error ("Hunk_Check: bad size");
 			
 		next = (hunk_t *)((byte *)h+h->size);
@@ -394,7 +396,7 @@ void *Hunk_AllocName (int size, char *name)
 		
 	size = sizeof(hunk_t) + ((size+15)&~15);
 	
-	if (hunk_size - hunk_low_used - hunk_high_used < size)
+	if ((hunk_size - hunk_low_used - hunk_high_used) < static_cast<int>(size))
 		Sys_Error ("Hunk_Alloc: failed on %i bytes",size);
 	
 	h = (hunk_t *)(hunk_base + hunk_low_used);
@@ -853,7 +855,7 @@ void *Cache_Check (cache_user_t *c)
 Cache_Alloc
 ==============
 */
-void *Cache_Alloc (cache_user_t *c, int size, char *name)
+void *Cache_Alloc (cache_user_t *c, int size, const char *name)
 {
 	cache_system_t	*cs;
 

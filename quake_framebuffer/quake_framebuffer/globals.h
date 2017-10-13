@@ -1112,7 +1112,7 @@ typedef struct
 	qboolean block_drawing;
 	char scr_centerstring[1024];
 	float scr_centertime_start;
-	float scr_centertime_off;
+	idTime scr_centertime_off;
 	int scr_center_lines;
 	int scr_erase_lines;
 	int scr_erase_center;

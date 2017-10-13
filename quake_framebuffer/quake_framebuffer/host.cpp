@@ -32,15 +32,15 @@ A client can NOT be started if the system started as a dedicated server.
 Memory is cleared / released when a server or client begins, not when they end.
 
 */
-
+using namespace std::chrono;
 quakeparms_t host_parms;
 
 qboolean	host_initialized;		// true if into command execution
 
-double		host_frametime;
-double		host_time;
-double		realtime;				// without any filtering or bounding
-double		oldrealtime;			// last frame run
+idTime		host_frametime;
+idTime		host_time;
+idTime		realtime;				// without any filtering or bounding
+idTime		oldrealtime;			// last frame run
 int			host_framecount;
 
 int			host_hunklevel;
@@ -93,7 +93,7 @@ void Host_EndGame (char *message, ...)
 	char		string[1024];
 	
 	va_start (argptr,message);
-	vsprintf (string,message,argptr);
+	Q_vsprintf(string, message, argptr);
 	va_end (argptr);
 	Con_DPrintf ("Host_EndGame: %s\n",string);
 	
@@ -131,7 +131,7 @@ void Host_Error (char *error, ...)
 	SCR_EndLoadingPlaque ();		// reenable screen updates
 
 	va_start (argptr,error);
-	vsprintf (string,error,argptr);
+	Q_vsprintf(string,error,argptr);
 	va_end (argptr);
 	Con_Printf ("Host_Error: %s\n",string);
 	
@@ -232,7 +232,7 @@ void Host_InitLocal (void)
 
 	Host_FindMaxClients ();
 	
-	host_time = 1.0;		// so a think at time 0 won't get called
+	host_time = 1s;		// so a think at time 0 won't get called
 }
 
 
@@ -245,13 +245,12 @@ Writes key bindings and archived cvars to config.cfg
 */
 void Host_WriteConfiguration (void)
 {
-	FILE	*f;
-
 // dedicated servers initialize the host but don't parse and set the
 // config.cfg cvars
 	if (host_initialized & !isDedicated)
 	{
-		f = fopen (va("%s/config.cfg",com_gamedir), "w");
+		auto f = Sys_FileOpenWrite(va("%s/config.cfg", com_gamedir));
+		//f = fopen (va("%s/config.cfg",com_gamedir), "w");
 		if (!f)
 		{
 			Con_Printf ("Couldn't write config.cfg.\n");
@@ -260,8 +259,7 @@ void Host_WriteConfiguration (void)
 		
 		Key_WriteBindings (f);
 		Cvar_WriteVariables (f);
-
-		fclose (f);
+		Sys_FileClose(f);
 	}
 }
 
@@ -274,13 +272,13 @@ Sends text across to be displayed
 FIXME: make this just a stuffed echo?
 =================
 */
-void SV_ClientPrintf (char *fmt, ...)
+void SV_ClientPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
 	char		string[1024];
 	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	Q_vsprintf(string, fmt,argptr);
 	va_end (argptr);
 	
 	MSG_WriteByte (&host_client->message, svc_print);
@@ -301,7 +299,7 @@ void SV_BroadcastPrintf (char *fmt, ...)
 	int			i;
 	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	Q_vsprintf(string, fmt,argptr);
 	va_end (argptr);
 	
 	for (i=0 ; i<svs.maxclients ; i++)
@@ -323,9 +321,8 @@ void Host_ClientCommands (char *fmt, ...)
 {
 	va_list		argptr;
 	char		string[1024];
-	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	Q_vsprintf(string, fmt,argptr);
 	va_end (argptr);
 	
 	MSG_WriteByte (&host_client->message, svc_stufftext);
@@ -408,7 +405,7 @@ void Host_ShutdownServer(qboolean crash)
 	int		count;
 	sizebuf_t	buf;
 	char		message[4];
-	double	start;
+	idTime	start;
 
 	if (!sv.active)
 		return;
@@ -440,7 +437,7 @@ void Host_ShutdownServer(qboolean crash)
 				}
 			}
 		}
-		if ((Sys_FloatTime() - start) > 3.0)
+		if ((Sys_FloatTime() - start) > 3s)
 			break;
 	}
 	while (count);
@@ -450,7 +447,7 @@ void Host_ShutdownServer(qboolean crash)
 	buf.maxsize = 4;
 	buf.cursize = 0;
 	MSG_WriteByte(&buf, svc_disconnect);
-	count = NET_SendToAll(&buf, 5);
+	count = NET_SendToAll(&buf, 5s);
 	if (count)
 		Con_Printf("Host_ShutdownServer: NET_SendToAll failed for %u clients\n", count);
 
@@ -498,24 +495,26 @@ Host_FilterTime
 Returns false if the time is too short to run a frame
 ===================
 */
-qboolean Host_FilterTime (float time)
+qboolean Host_FilterTime (idTime time)
 {
+	using namespace std::chrono;
+	static constexpr idTime max_framerate = idCast<idTime>(1.0f / 72.0f);
 	realtime += time;
 
-	if (!cls.timedemo && realtime - oldrealtime < 1.0/72.0)
+	if (!cls.timedemo && (realtime - oldrealtime) < max_framerate)
 		return false;		// framerate is too high
 
 	host_frametime = realtime - oldrealtime;
 	oldrealtime = realtime;
 
 	if (host_framerate.value > 0)
-		host_frametime = host_framerate.value;
+		host_frametime = idCast<idTime>(host_framerate.value);
 	else
 	{	// don't allow really long or short frames
-		if (host_frametime > 0.1)
-			host_frametime = 0.1;
-		if (host_frametime < 0.001)
-			host_frametime = 0.001;
+		if (host_frametime > 100ms)
+			host_frametime = 100ms;
+		if (host_frametime < 1ms)
+			host_frametime = 1ms;
 	}
 	
 	return true;
@@ -630,12 +629,11 @@ Host_Frame
 Runs all active servers
 ==================
 */
-void _Host_Frame (float time)
+void _Host_Frame (idTime time)
 {
-	static double		time1 = 0;
-	static double		time2 = 0;
-	static double		time3 = 0;
-	int			pass1, pass2, pass3;
+	static idTime		time1 = idTime::zero();
+	static idTime		time2 = idTime::zero();
+	static idTime		time3 = idTime::zero();
 
 	if (setjmp (host_abortserver) )
 		return;			// something bad happened, or the server disconnected
@@ -715,23 +713,23 @@ void _Host_Frame (float time)
 
 	if (host_speeds.value)
 	{
-		pass1 = (time1 - time3)*1000;
+		idTime pass1 = (time1 - time3);
 		time3 = Sys_FloatTime ();
-		pass2 = (time2 - time1)*1000;
-		pass3 = (time3 - time2)*1000;
+		idTime pass2 = (time2 - time1);
+		idTime pass3 = (time3 - time2);
 		Con_Printf ("%3i tot %3i server %3i gfx %3i snd\n",
-					pass1+pass2+pass3, pass1, pass2, pass3);
+					(pass1+pass2+pass3).count(), pass1.count(), pass2.count(), pass3.count());
 	}
 	
 	host_framecount++;
 }
 
-void Host_Frame (float time)
+void Host_Frame (idTime time)
 {
-	double	time1, time2;
-	static double	timetotal;
+	idTime	time1, time2;
+	static idTime	timetotal;
 	static int		timecount;
-	int		i, c, m;
+	int		i, c;
 
 	if (!serverprofile.value)
 	{
@@ -749,9 +747,9 @@ void Host_Frame (float time)
 	if (timecount < 1000)
 		return;
 
-	m = timetotal*1000/timecount;
+	idTime m(timetotal.count()* 1000/timecount);
 	timecount = 0;
-	timetotal = 0;
+	timetotal = idTime::zero();
 	c = 0;
 	for (i=0 ; i<svs.maxclients ; i++)
 	{
@@ -759,7 +757,7 @@ void Host_Frame (float time)
 			c++;
 	}
 
-	Con_Printf ("serverprofile: %2i clients %2i msec\n",  c,  m);
+	Con_Printf ("serverprofile: %2i clients %2i msec\n",  c,  m.count());
 }
 
 //============================================================================

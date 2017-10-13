@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
-
+using namespace std::chrono;
 /*
 
 The view is allowed to move slightly from it's true position for bobbing,
@@ -86,7 +86,7 @@ float V_CalcRoll (vec3_t angles, vec3_t velocity)
 	
 	AngleVectors (angles, forward, right, up);
 	side = DotProduct (velocity, right);
-	sign = side < 0 ? -1 : 1;
+	sign = side < 0.0f ? -1.0f : 1.0f;
 	side = fabs(side);
 	
 	value = cl_rollangle.value;
@@ -114,19 +114,19 @@ float V_CalcBob (void)
 	float	bob;
 	float	cycle;
 	
-	cycle = cl.time - (int)(cl.time/cl_bobcycle.value)*cl_bobcycle.value;
+	cycle = idCast<float>(cl.time) - (int)(idCast<float>(cl.time)/cl_bobcycle.value)*cl_bobcycle.value;
 	cycle /= cl_bobcycle.value;
 	if (cycle < cl_bobup.value)
-		cycle = M_PI * cycle / cl_bobup.value;
+		cycle = static_cast<float>(M_PI) * cycle / cl_bobup.value;
 	else
-		cycle = M_PI + M_PI*(cycle-cl_bobup.value)/(1.0 - cl_bobup.value);
+		cycle = static_cast<float>(M_PI) + static_cast<float>(M_PI)*(cycle-cl_bobup.value)/(1.0f - cl_bobup.value);
 
 // bob is proportional to velocity in the xy plane
 // (don't count Z, or jumping messes it up)
 
-	bob = sqrt(cl.velocity[0]*cl.velocity[0] + cl.velocity[1]*cl.velocity[1]) * cl_bob.value;
+	bob = Q_sqrt(cl.velocity[0]*cl.velocity[0] + cl.velocity[1]*cl.velocity[1]) * cl_bob.value;
 //Con_Printf ("speed: %5.1f\n", Length(cl.velocity));
-	bob = bob*0.3 + bob*0.7*sin(cycle);
+	bob = bob*0.3f + bob*0.7f*Q_sin(cycle);
 	if (bob > 4)
 		bob = 4;
 	else if (bob < -7)
@@ -182,6 +182,7 @@ lookspring is non 0, or when
 void V_DriftPitch (void)
 {
 	float		delta, move;
+	const float fhosttime = idCast<float>(host_frametime);
 
 	if (noclip_anglehack || !cl.onground || cls.demoplayback )
 	{
@@ -196,7 +197,7 @@ void V_DriftPitch (void)
 		if ( fabs(cl.cmd.forwardmove) < cl_forwardspeed.value)
 			cl.driftmove = 0;
 		else
-			cl.driftmove += host_frametime;
+			cl.driftmove += fhosttime;
 	
 		if ( cl.driftmove > v_centermove.value)
 		{
@@ -213,8 +214,8 @@ void V_DriftPitch (void)
 		return;
 	}
 
-	move = host_frametime * cl.pitchvel;
-	cl.pitchvel += host_frametime * v_centerspeed.value;
+	move = fhosttime * cl.pitchvel;
+	cl.pitchvel += fhosttime * v_centerspeed.value;
 	
 //Con_Printf ("move: %f (%f)\n", move, host_frametime);
 
@@ -278,7 +279,7 @@ void BuildGammaTable (float g)
 	
 	for (i=0 ; i<256 ; i++)
 	{
-		inf = 255 * pow ( (i+0.5)/255.5 , g ) + 0.5;
+		inf = static_cast<int>(255.0f * Q_pow ( (i+0.5f)/255.5f , g ) + 0.5f);
 		if (inf < 0)
 			inf = 0;
 		if (inf > 255)
@@ -328,13 +329,13 @@ void V_ParseDamage (void)
 	for (i=0 ; i<3 ; i++)
 		from[i] = MSG_ReadCoord ();
 
-	count = blood*0.5 + armor*0.5;
+	count = blood*0.5f + armor*0.5f;
 	if (count < 10)
 		count = 10;
 
-	cl.faceanimtime = cl.time + 0.2;		// but sbar face into pain frame
+	cl.faceanimtime = cl.time + 100ms;		// but sbar face into pain frame
 
-	cl.cshifts[CSHIFT_DAMAGE].percent += 3*count;
+	cl.cshifts[CSHIFT_DAMAGE].percent += static_cast<int>(3.0f*count);
 	if (cl.cshifts[CSHIFT_DAMAGE].percent < 0)
 		cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 	if (cl.cshifts[CSHIFT_DAMAGE].percent > 150)
@@ -389,7 +390,7 @@ void V_cshift_f (void)
 	cshift_empty.destcolor[0] = atoi(Cmd_Argv(1));
 	cshift_empty.destcolor[1] = atoi(Cmd_Argv(2));
 	cshift_empty.destcolor[2] = atoi(Cmd_Argv(3));
-	cshift_empty.percent = atoi(Cmd_Argv(4));
+	cshift_empty.percent = Q_atoi(Cmd_Argv(4));
 }
 
 
@@ -619,6 +620,7 @@ void V_UpdatePalette (void)
 	byte	pal[768];
 	int		r,g,b;
 	qboolean force;
+	const float fhosttime = idCast<float>(host_frametime);
 
 	V_CalcPowerupCshift ();
 	
@@ -640,12 +642,12 @@ void V_UpdatePalette (void)
 	}
 	
 // drop the damage value
-	cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*150;
+	cl.cshifts[CSHIFT_DAMAGE].percent -= static_cast<int>(fhosttime *150.0f);
 	if (cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
 		cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 
 // drop the bonus value
-	cl.cshifts[CSHIFT_BONUS].percent -= host_frametime*100;
+	cl.cshifts[CSHIFT_BONUS].percent -= static_cast<int>(fhosttime *100.0f);
 	if (cl.cshifts[CSHIFT_BONUS].percent <= 0)
 		cl.cshifts[CSHIFT_BONUS].percent = 0;
 
@@ -707,21 +709,22 @@ void CalcGunAngle (void)
 	float	yaw, pitch, move;
 	static float oldyaw = 0;
 	static float oldpitch = 0;
-	
+	const float fhosttime = idCast<float>(host_frametime);
+
 	yaw = r_refdef.viewangles[YAW];
 	pitch = -r_refdef.viewangles[PITCH];
 
-	yaw = angledelta(yaw - r_refdef.viewangles[YAW]) * 0.4;
+	yaw = angledelta(yaw - r_refdef.viewangles[YAW]) * 0.4f;
 	if (yaw > 10)
 		yaw = 10;
 	if (yaw < -10)
 		yaw = -10;
-	pitch = angledelta(-pitch - r_refdef.viewangles[PITCH]) * 0.4;
+	pitch = angledelta(-pitch - r_refdef.viewangles[PITCH]) * 0.4f;
 	if (pitch > 10)
 		pitch = 10;
 	if (pitch < -10)
 		pitch = -10;
-	move = host_frametime*20;
+	move = fhosttime *20;
 	if (yaw > oldyaw)
 	{
 		if (oldyaw + move < yaw)
@@ -750,9 +753,9 @@ void CalcGunAngle (void)
 	cl.viewent.angles[YAW] = r_refdef.viewangles[YAW] + yaw;
 	cl.viewent.angles[PITCH] = - (r_refdef.viewangles[PITCH] + pitch);
 
-	cl.viewent.angles[ROLL] -= v_idlescale.value * sin(cl.time*v_iroll_cycle.value) * v_iroll_level.value;
-	cl.viewent.angles[PITCH] -= v_idlescale.value * sin(cl.time*v_ipitch_cycle.value) * v_ipitch_level.value;
-	cl.viewent.angles[YAW] -= v_idlescale.value * sin(cl.time*v_iyaw_cycle.value) * v_iyaw_level.value;
+	cl.viewent.angles[ROLL] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_iroll_cycle.value) * v_iroll_level.value;
+	cl.viewent.angles[PITCH] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_ipitch_cycle.value) * v_ipitch_level.value;
+	cl.viewent.angles[YAW] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_iyaw_cycle.value) * v_iyaw_level.value;
 }
 
 /*
@@ -792,9 +795,10 @@ Idle swaying
 */
 void V_AddIdle (void)
 {
-	r_refdef.viewangles[ROLL] += v_idlescale.value * sin(cl.time*v_iroll_cycle.value) * v_iroll_level.value;
-	r_refdef.viewangles[PITCH] += v_idlescale.value * sin(cl.time*v_ipitch_cycle.value) * v_ipitch_level.value;
-	r_refdef.viewangles[YAW] += v_idlescale.value * sin(cl.time*v_iyaw_cycle.value) * v_iyaw_level.value;
+	const float time = idCast<float>(cl.time);
+	r_refdef.viewangles[ROLL] += v_idlescale.value * Q_sin(time*v_iroll_cycle.value) * v_iroll_level.value;
+	r_refdef.viewangles[PITCH] += v_idlescale.value * Q_sin(time*v_ipitch_cycle.value) * v_ipitch_level.value;
+	r_refdef.viewangles[YAW] += v_idlescale.value * Q_sin(time*v_iyaw_cycle.value) * v_iyaw_level.value;
 }
 
 
@@ -812,16 +816,17 @@ void V_CalcViewRoll (void)
 	side = V_CalcRoll (cl_entities[cl.viewentity].angles, cl.velocity);
 	r_refdef.viewangles[ROLL] += side;
 
-	if (v_dmg_time > 0)
+	if (v_dmg_time > 0.0f)
 	{
+		const float fhosttime = idCast<float>(host_frametime);
 		r_refdef.viewangles[ROLL] += v_dmg_time/v_kicktime.value*v_dmg_roll;
 		r_refdef.viewangles[PITCH] += v_dmg_time/v_kicktime.value*v_dmg_pitch;
-		v_dmg_time -= host_frametime;
+		v_dmg_time -= fhosttime;
 	}
 
-	if (cl.stats[STAT_HEALTH] <= 0)
+	if (cl.stats[STAT_HEALTH] <= 0.0f)
 	{
-		r_refdef.viewangles[ROLL] = 80;	// dead view angle
+		r_refdef.viewangles[ROLL] = 80.0f;	// dead view angle
 		return;
 	}
 
@@ -929,7 +934,7 @@ void V_CalcRefdef (void)
 
 	for (i=0 ; i<3 ; i++)
 	{
-		view->origin[i] += forward[i]*bob*0.4;
+		view->origin[i] += forward[i]*bob*0.4f;
 //		view->origin[i] += right[i]*bob*0.4;
 //		view->origin[i] += up[i]*bob*0.8;
 	}
@@ -960,14 +965,14 @@ void V_CalcRefdef (void)
 // smooth out stair step ups
 if (cl.onground && ent->origin[2] - oldz > 0)
 {
-	float steptime;
+	idTime steptime;
 	
 	steptime = cl.time - cl.oldtime;
-	if (steptime < 0)
+	if (steptime < idTime::zero())
 //FIXME		I_Error ("steptime < 0");
-		steptime = 0;
+		steptime = idTime::zero();
 
-	oldz += steptime * 80;
+	oldz += idCast<float>(steptime) * 80.0f;
 	if (oldz > ent->origin[2])
 		oldz = ent->origin[2];
 	if (ent->origin[2] - oldz > 12)
@@ -1025,7 +1030,7 @@ void V_RenderView (void)
 		int		i;
 
 		vid.rowbytes <<= 1;
-		vid.aspect *= 0.5;
+		vid.aspect *= 0.5f;
 
 		r_refdef.viewangles[YAW] -= lcd_yaw.value;
 		for (i=0 ; i<3 ; i++)
@@ -1036,7 +1041,7 @@ void V_RenderView (void)
 
 		R_PushDlights ();
 
-		r_refdef.viewangles[YAW] += lcd_yaw.value*2;
+		r_refdef.viewangles[YAW] += lcd_yaw.value*2.0f;
 		for (i=0 ; i<3 ; i++)
 			r_refdef.vieworg[i] += 2*right[i]*lcd_x.value;
 		R_RenderView ();
@@ -1046,7 +1051,7 @@ void V_RenderView (void)
 		r_refdef.vrect.height <<= 1;
 
 		vid.rowbytes >>= 1;
-		vid.aspect *= 2;
+		vid.aspect *= 2.0f;
 	}
 	else
 	{
@@ -1055,8 +1060,8 @@ void V_RenderView (void)
 
 #ifndef GLQUAKE
 	if (crosshair.value)
-		Draw_Character (scr_vrect.x + scr_vrect.width/2 + cl_crossx.value, 
-			scr_vrect.y + scr_vrect.height/2 + cl_crossy.value, '+');
+		Draw_Character (scr_vrect.x + scr_vrect.width/2 + static_cast<int>(cl_crossx.value),
+			scr_vrect.y + scr_vrect.height/2 + static_cast<int>(cl_crossy.value), '+');
 #endif
 		
 }

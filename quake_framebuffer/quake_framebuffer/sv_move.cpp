@@ -180,7 +180,7 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 			VectorAdd (ent->v.origin, move, ent->v.origin);
 			if (relink)
 				SV_LinkEdict (ent, true);
-			ent->v.flags = (int)ent->v.flags & ~FL_ONGROUND;
+			ent->v.flags = static_cast<float>((int)ent->v.flags & ~FL_ONGROUND);
 //	Con_Printf ("fall down\n"); 
 			return true;
 		}
@@ -309,9 +309,9 @@ void SV_NewChaseDir (edict_t *actor, edict_t *enemy, float dist)
 	if (d[1] != DI_NODIR && d[2] != DI_NODIR)
 	{
 		if (d[1] == 0)
-			tdir = d[2] == 90 ? 45 : 315;
+			tdir = d[2] == 90.0f ? 45.0f : 315.0f;
 		else
-			tdir = d[2] == 90 ? 135 : 215;
+			tdir = d[2] == 90.0f ? 135.0f : 215.0f;
 			
 		if (tdir != turnaround && SV_StepDirection(actor, tdir, dist))
 			return;

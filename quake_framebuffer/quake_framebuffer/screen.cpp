@@ -57,7 +57,7 @@ vrect_t		scr_vrect;
 
 qboolean	scr_disabled_for_loading;
 qboolean	scr_drawloading;
-float		scr_disabled_time;
+idTime		scr_disabled_time;
 qboolean	scr_skipupdate;
 
 qboolean	block_drawing;
@@ -73,8 +73,8 @@ CENTER PRINTING
 */
 
 char		scr_centerstring[1024];
-float		scr_centertime_start;	// for slow victory printing
-float		scr_centertime_off;
+idTime		scr_centertime_start;	// for slow victory printing
+idTime		scr_centertime_off;
 int			scr_center_lines;
 int			scr_erase_lines;
 int			scr_erase_center;
@@ -89,8 +89,8 @@ for a few moments
 */
 void SCR_CenterPrint (char *str)
 {
-	strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
-	scr_centertime_off = scr_centertime.value;
+	Q_strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
+	scr_centertime_off = idCast<idTime>(scr_centertime.value);
 	scr_centertime_start = cl.time;
 
 // count the number of lines for centering
@@ -132,7 +132,7 @@ void SCR_DrawCenterString (void)
 
 // the finale prints the characters one at a time
 	if (cl.intermission)
-		remaining = scr_printspeed.value * (cl.time - scr_centertime_start);
+		remaining = static_cast<int>(scr_printspeed.value * idCast<float>(cl.time - scr_centertime_start));
 	else
 		remaining = 9999;
 
@@ -177,7 +177,7 @@ void SCR_CheckDrawCenterString (void)
 
 	scr_centertime_off -= host_frametime;
 	
-	if (scr_centertime_off <= 0 && !cl.intermission)
+	if (scr_centertime_off <= idTime::zero() && !cl.intermission)
 		return;
 	if (key_dest != key_game)
 		return;
@@ -359,6 +359,8 @@ void SCR_DrawRam (void)
 SCR_DrawTurtle
 ==============
 */
+using namespace std::chrono;
+
 void SCR_DrawTurtle (void)
 {
 	static int	count;
@@ -366,7 +368,7 @@ void SCR_DrawTurtle (void)
 	if (!scr_showturtle.value)
 		return;
 
-	if (host_frametime < 0.1)
+	if (host_frametime < 100ms) 
 	{
 		count = 0;
 		return;
@@ -386,7 +388,7 @@ SCR_DrawNet
 */
 void SCR_DrawNet (void)
 {
-	if (realtime - cl.last_received_message < 0.3)
+	if ((realtime - cl.last_received_message) < 300ms)
 		return;
 	if (cls.demoplayback)
 		return;
@@ -445,6 +447,7 @@ SCR_SetUpToDrawConsole
 */
 void SCR_SetUpToDrawConsole (void)
 {
+	const float fhost_frametime = idCast<float>(host_frametime);
 	Con_CheckResize ();
 	
 	if (scr_drawloading)
@@ -465,14 +468,14 @@ void SCR_SetUpToDrawConsole (void)
 	
 	if (scr_conlines < scr_con_current)
 	{
-		scr_con_current -= scr_conspeed.value*host_frametime;
+		scr_con_current -= scr_conspeed.value*fhost_frametime;
 		if (scr_conlines > scr_con_current)
 			scr_con_current = scr_conlines;
 
 	}
 	else if (scr_conlines > scr_con_current)
 	{
-		scr_con_current += scr_conspeed.value*host_frametime;
+		scr_con_current += scr_conspeed.value*fhost_frametime;
 		if (scr_conlines < scr_con_current)
 			scr_con_current = scr_conlines;
 	}
@@ -671,7 +674,7 @@ void SCR_BeginLoadingPlaque (void)
 	
 // redraw with no console and the loading plaque
 	Con_ClearNotify ();
-	scr_centertime_off = 0;
+	scr_centertime_off = idTime::zero();
 	scr_con_current = 0;
 
 	scr_drawloading = true;
@@ -784,7 +787,7 @@ void SCR_BringDownConsole (void)
 {
 	int		i;
 	
-	scr_centertime_off = 0;
+	scr_centertime_off = idTime::zero();
 	
 	for (i=0 ; i<20 && scr_conlines != scr_con_current ; i++)
 		SCR_UpdateScreen ();
@@ -819,7 +822,7 @@ void SCR_UpdateScreen (void)
 
 	if (scr_disabled_for_loading)
 	{
-		if (realtime - scr_disabled_time > 60)
+		if ((realtime - scr_disabled_time) > 60s)
 		{
 			scr_disabled_for_loading = false;
 			Con_Printf ("load failed.\n");

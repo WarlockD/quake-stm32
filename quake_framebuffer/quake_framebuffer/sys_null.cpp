@@ -74,7 +74,7 @@ int filelength (FILE *f)
 	return end;
 }
 
-int Sys_FileOpenRead (const char * path, int *hndl)
+int Sys_FileOpenRead (const char * path, idFileHandle *hndl)
 {
 	FILE    *f;
 	int             i;
@@ -92,8 +92,19 @@ int Sys_FileOpenRead (const char * path, int *hndl)
 	
 	return filelength(f);
 }
-
-int Sys_FileOpenWrite (const char * path)
+int Sys_FilevPrintF(idFileHandle handle, const char* fmt, va_list va)
+{
+	return vfprintf(sys_handles[handle], fmt, va);
+}
+int Sys_FilePrintF(idFileHandle handle, const char* fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+	int r = Sys_FilevPrintF(handle, fmt, va);
+	va_end(va);
+	return r;
+}
+idFileHandle Sys_FileOpenWrite (const char * path)
 {
 	FILE    *f;
 	int             i;
@@ -108,23 +119,23 @@ int Sys_FileOpenWrite (const char * path)
 	return i;
 }
 
-void Sys_FileClose (int handle)
+void Sys_FileClose (idFileHandle handle)
 {
 	fclose (sys_handles[handle]);
 	sys_handles[handle] = NULL;
 }
 
-void Sys_FileSeek (int handle, int position)
+void Sys_FileSeek (idFileHandle handle, int position)
 {
 	fseek (sys_handles[handle], position, SEEK_SET);
 }
 
-int Sys_FileRead (int handle, void *dest, int count)
+int Sys_FileRead (idFileHandle handle, void *dest, int count)
 {
 	return fread (dest, 1, count, sys_handles[handle]);
 }
 
-int Sys_FileWrite (int handle, const void * data, int count)
+int Sys_FileWrite (idFileHandle handle, const void * data, int count)
 {
 	return fwrite (data, 1, count, sys_handles[handle]);
 }
@@ -174,6 +185,8 @@ void Sys_DebugLog(const char *file, const char *fmt, ...)
 		Sys_FileClose(fd);
 	}
 };
+
+
 
 void Sys_Printf(char *fmt, ...)
 {
@@ -237,7 +250,7 @@ void Sys_Error(char *error, ...)
 	// change stdin to non blocking
 
 	va_start(argptr, error);
-	int len = vsprintf(string, error, argptr);
+	int len = Q_vsprintf(string, error, argptr);
 	va_end(argptr);
 	Sys_Printf("Error: %s\n", string);
 
@@ -252,14 +265,16 @@ void Sys_Warn(char *warning, ...)
 	char        string[1024];
 
 	va_start(argptr, warning);
-	vsprintf(string, warning, argptr);
+	Q_vsprintf(string, warning, argptr);
 	va_end(argptr);
 	Sys_Printf("Warning: %s", string);
 }
 
-double Sys_FloatTime (void)
+idTime Sys_FloatTime (void)
 {
-	return glfwGetTime();
+	float ftime = (float)glfwGetTime();
+	idTime time = idCast<idTime>(ftime);
+	return time;
 }
 
 char *Sys_ConsoleInput (void)
@@ -304,7 +319,7 @@ void Sys_LowFPPrecision (void)
 
 void main (int argc, char **argv)
 {
-	double		time, oldtime, newtime;
+	idTime		time, oldtime, newtime;
 	static quakeparms_t    parms;
 
 	parms.memsize = 8*1024*1024;

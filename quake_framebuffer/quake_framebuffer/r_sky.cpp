@@ -28,7 +28,7 @@ int		iskyspeed = 8;
 int		iskyspeed2 = 2;
 float	skyspeed, skyspeed2;
 
-float		skytime;
+idTime		skytime;
 
 byte		*r_skysource;
 
@@ -102,8 +102,8 @@ void R_MakeSky (void)
 	unsigned	*pnewsky;
 	static int	xlast = -1, ylast = -1;
 
-	xshift = skytime*skyspeed;
-	yshift = skytime*skyspeed;
+	xshift = static_cast<int>(idCast<float>(skytime) * skyspeed);
+	yshift = static_cast<int>(idCast<float>(skytime) * skyspeed);
 
 	if ((xshift == xlast) && (yshift == ylast))
 		return;
@@ -166,8 +166,8 @@ void R_GenSkyTile (void *pdest)
 	unsigned	*pnewsky;
 	unsigned	*pd;
 
-	xshift = skytime*skyspeed;
-	yshift = skytime*skyspeed;
+	xshift = static_cast<int>(idCast<float>(skytime) * skyspeed);
+	yshift = static_cast<int>(idCast<float>(skytime) * skyspeed);
 
 	pnewsky = (unsigned *)&newsky[0];
 	pd = (unsigned *)pdest;
@@ -225,8 +225,8 @@ void R_GenSkyTile16 (void *pdest)
 	byte			*pnewsky;
 	unsigned short	*pd;
 
-	xshift = skytime * skyspeed;
-	yshift = skytime * skyspeed;
+	xshift = static_cast<int>( idCast<float>(skytime) * skyspeed);
+	yshift = static_cast<int>(idCast<float>(skytime) * skyspeed);
 
 	pnewsky = (byte *)&newsky[0];
 	pd = (unsigned short *)pdest;
@@ -271,7 +271,7 @@ void R_SetSkyFrame (void)
 	s2 = iskyspeed2 / g;
 	temp = SKYSIZE * s1 * s2;
 
-	skytime = cl.time - ((int)(cl.time / temp) * temp);
+	skytime = cl.time - std::chrono::seconds(static_cast<int>((idCast<float>(cl.time) / temp) * temp));
 	
 
 	r_skymade = 0;

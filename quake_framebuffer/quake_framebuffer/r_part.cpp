@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+using namespace std::chrono;
 
 #define MAX_PARTICLES			2048	// default max # of particles at one
 										//  time
@@ -116,12 +117,12 @@ R_EntityParticles
 
 extern	float	r_avertexnormals[NUMVERTEXNORMALS][3];
 vec3_t	avelocities[NUMVERTEXNORMALS];
-float	beamlength = 16;
-vec3_t	avelocity = {23, 7, 3};
-float	partstep = 0.01;
-float	timescale = 0.01;
+float	beamlength = 16.0f;
+vec3_t	avelocity = {23.0f, 7.0f, 3.0f};
+float	partstep = 0.01f;
+float	timescale = 0.01f;
 
-void R_EntityParticles (entity_t *ent)
+void R_EntityParticles(entity_t *ent)
 {
 	int			count;
 	int			i;
@@ -130,29 +131,29 @@ void R_EntityParticles (entity_t *ent)
 	float		sr, sp, sy, cr, cp, cy;
 	vec3_t		forward;
 	float		dist;
-	
+
 	dist = 64;
 	count = 50;
 
-if (!avelocities[0][0])
-{
-for (i=0 ; i<NUMVERTEXNORMALS*3 ; i++)
-avelocities[0][i] = (rand()&255) * 0.01;
-}
-
-
-	for (i=0 ; i<NUMVERTEXNORMALS ; i++)
+	if (!avelocities[0][0])
 	{
-		angle = cl.time * avelocities[i][0];
-		sy = sin(angle);
-		cy = cos(angle);
-		angle = cl.time * avelocities[i][1];
-		sp = sin(angle);
-		cp = cos(angle);
-		angle = cl.time * avelocities[i][2];
-		sr = sin(angle);
-		cr = cos(angle);
-	
+		for (i = 0; i < NUMVERTEXNORMALS * 3; i++)
+			avelocities[0][i] = (rand() & 255) * 0.01f;
+	}
+
+	const float ftime = idCast<float>(cl.time);
+	for (i = 0; i < NUMVERTEXNORMALS; i++)
+	{
+		angle = ftime * avelocities[i][0];
+		sy = Q_sin(angle);
+		cy = Q_cos(angle);
+		angle = ftime* avelocities[i][1];
+		sp = Q_sin(angle);
+		cp = Q_cos(angle);
+		angle = ftime * avelocities[i][2];
+		sr = Q_sin(angle);
+		cr = Q_cos(angle);
+
 		forward[0] = cp*cy;
 		forward[1] = cp*sy;
 		forward[2] = -sp;
@@ -164,13 +165,13 @@ avelocities[0][i] = (rand()&255) * 0.01;
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 0.01;
+		p->die = cl.time + 10ms;
 		p->color = 0x6f;
 		p->type = pt_explode;
-		
-		p->org[0] = ent->origin[0] + r_avertexnormals[i][0]*dist + forward[0]*beamlength;			
-		p->org[1] = ent->origin[1] + r_avertexnormals[i][1]*dist + forward[1]*beamlength;			
-		p->org[2] = ent->origin[2] + r_avertexnormals[i][2]*dist + forward[2]*beamlength;			
+
+		p->org[0] = ent->origin[0] + r_avertexnormals[i][0] * dist + forward[0] * beamlength;
+		p->org[1] = ent->origin[1] + r_avertexnormals[i][1] * dist + forward[1] * beamlength;
+		p->org[2] = ent->origin[2] + r_avertexnormals[i][2] * dist + forward[2] * beamlength;
 	}
 }
 
@@ -185,11 +186,11 @@ void R_ClearParticles (void)
 	int		i;
 	
 	free_particles = &particles[0];
-	active_particles = NULL;
+	active_particles = nullptr;
 
 	for (i=0 ;i<r_numparticles ; i++)
 		particles[i].next = &particles[i+1];
-	particles[r_numparticles-1].next = NULL;
+	particles[r_numparticles-1].next = nullptr;
 }
 
 
@@ -202,7 +203,7 @@ void R_ReadPointFile_f (void)
 	particle_t	*p;
 	char	name[MAX_OSPATH];
 	
-	sprintf (name,"maps/%s.pts", sv.name);
+	Q_sprintf (name,"maps/%s.pts", sv.name);
 
 	COM_FOpenFile (name, &f);
 	if (!f)
@@ -230,7 +231,7 @@ void R_ReadPointFile_f (void)
 		p->next = active_particles;
 		active_particles = p;
 		
-		p->die = 99999;
+		p->die = 99999s;
 		p->color = (-c)&15;
 		p->type = pt_static;
 		VectorCopy (vec3_origin, p->vel);
@@ -288,7 +289,7 @@ void R_ParticleExplosion (vec3_t org)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 5;
+		p->die = cl.time + 5s;
 		p->color = ramp1[0];
 		p->ramp = rand()&3;
 		if (i & 1)
@@ -333,7 +334,7 @@ void R_ParticleExplosion2 (vec3_t org, int colorStart, int colorLength)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 0.3;
+		p->die = cl.time + 300ms;
 		p->color = colorStart + (colorMod % colorLength);
 		colorMod++;
 
@@ -366,7 +367,7 @@ void R_BlobExplosion (vec3_t org)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 1 + (rand()&8)*0.05;
+		p->die = cl.time + 1s + (50ms * (rand() & 8));
 
 		if (i & 1)
 		{
@@ -413,7 +414,7 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 
 		if (count == 1024)
 		{	// rocket explosion
-			p->die = cl.time + 5;
+			p->die = cl.time + 5s;
 			p->color = ramp1[0];
 			p->ramp = rand()&3;
 			if (i & 1)
@@ -437,7 +438,7 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 		}
 		else
 		{
-			p->die = cl.time + 0.1*(rand()%5);
+			p->die = cl.time + (100ms*(rand()%5));
 			p->color = (color&~7) + (rand()&7);
 			p->type = pt_slowgrav;
 			for (j=0 ; j<3 ; j++)
@@ -474,7 +475,7 @@ void R_LavaSplash (vec3_t org)
 				p->next = active_particles;
 				active_particles = p;
 		
-				p->die = cl.time + 2 + (rand()&31) * 0.02;
+				p->die = cl.time + 2s + (20ms * (rand() & 31));
 				p->color = 224 + (rand()&7);
 				p->type = pt_slowgrav;
 				
@@ -516,7 +517,7 @@ void R_TeleportSplash (vec3_t org)
 				p->next = active_particles;
 				active_particles = p;
 		
-				p->die = cl.time + 0.2 + (rand()&7) * 0.02;
+				p->die = cl.time + 200ms + (20ms * (rand() & 7));
 				p->color = 7 + (rand()&7);
 				p->type = pt_slowgrav;
 				
@@ -565,7 +566,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 		active_particles = p;
 		
 		VectorCopy (vec3_origin, p->vel);
-		p->die = cl.time + 2;
+		p->die = cl.time + 2s;
 
 		switch (type)
 		{
@@ -594,7 +595,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 
 			case 3:
 			case 5:	// tracer
-				p->die = cl.time + 0.5;
+				p->die = cl.time + 500ms;
 				p->type = pt_static;
 				if (type == 3)
 					p->color = 52 + ((tracercount&4)<<1);
@@ -627,7 +628,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 			case 6:	// voor trail
 				p->color = 9*16 + 8 + (rand()&3);
 				p->type = pt_static;
-				p->die = cl.time + 0.3;
+				p->die = cl.time + 300ms;
 				for (j=0 ; j<3 ; j++)
 					p->org[j] = start[j] + ((rand()&15)-8);
 				break;
@@ -651,10 +652,10 @@ void R_DrawParticles (void)
 	particle_t		*p, *kill;
 	float			grav;
 	int				i;
-	float			time2, time3;
-	float			time1;
+	idTime			time2, time3;
+	idTime			time1;
 	float			dvel;
-	float			frametime;
+	idTime			frametime;
 	
 #ifdef GLQUAKE
 	vec3_t			up, right;
@@ -678,8 +679,8 @@ void R_DrawParticles (void)
 	time3 = frametime * 15;
 	time2 = frametime * 10; // 15;
 	time1 = frametime * 5;
-	grav = frametime * sv_gravity.value * 0.05;
-	dvel = 4*frametime;
+	grav = idCast<float>(frametime) * sv_gravity.value * 0.05f;
+	dvel = 4.0f* idCast<float>(frametime);
 	
 	for ( ;; ) 
 	{
@@ -727,27 +728,28 @@ void R_DrawParticles (void)
 #else
 		D_DrawParticle (p);
 #endif
-		p->org[0] += p->vel[0]*frametime;
-		p->org[1] += p->vel[1]*frametime;
-		p->org[2] += p->vel[2]*frametime;
+		const float fframetime = idCast<float>(frametime);
+		p->org[0] += p->vel[0]* fframetime;
+		p->org[1] += p->vel[1]* fframetime;
+		p->org[2] += p->vel[2]* fframetime;
 		
 		switch (p->type)
 		{
 		case pt_static:
 			break;
 		case pt_fire:
-			p->ramp += time1;
+			p->ramp += idCast<int>(time1);
 			if (p->ramp >= 6)
-				p->die = -1;
+				p->die = -1s;
 			else
 				p->color = ramp3[(int)p->ramp];
 			p->vel[2] += grav;
 			break;
 
 		case pt_explode:
-			p->ramp += time2;
+			p->ramp += idCast<int>(time2);
 			if (p->ramp >=8)
-				p->die = -1;
+				p->die = -1s;
 			else
 				p->color = ramp1[(int)p->ramp];
 			for (i=0 ; i<3 ; i++)
@@ -756,13 +758,13 @@ void R_DrawParticles (void)
 			break;
 
 		case pt_explode2:
-			p->ramp += time3;
+			p->ramp += idCast<int>(time3);
 			if (p->ramp >=8)
-				p->die = -1;
+				p->die = -1s;
 			else
 				p->color = ramp2[(int)p->ramp];
 			for (i=0 ; i<3 ; i++)
-				p->vel[i] -= p->vel[i]*frametime;
+				p->vel[i] -= p->vel[i]* fframetime;
 			p->vel[2] -= grav;
 			break;
 

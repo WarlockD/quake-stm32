@@ -119,9 +119,9 @@ struct qsockaddr
 typedef struct qsocket_s
 {
 	struct qsocket_s	*next;
-	double			connecttime;
-	double			lastMessageTime;
-	double			lastSendTime;
+	idTime			connecttime;
+	idTime			lastMessageTime;
+	idTime			lastSendTime;
 
 	qboolean		disconnected;
 	qboolean		canSend;
@@ -218,7 +218,7 @@ extern int		unreliableMessagesReceived;
 
 qsocket_t *NET_NewQSocket (void);
 void NET_FreeQSocket(qsocket_t *);
-double SetNetTime(void);
+idTime SetNetTime(void);
 
 
 #define HOSTCACHESIZE	8
@@ -263,7 +263,7 @@ qboolean IsID(struct qsockaddr *addr);
 //
 //============================================================================
 
-extern	double		net_time;
+extern	idTime		net_time;
 extern	sizebuf_t	net_message;
 extern	int			net_activeconnections;
 
@@ -294,7 +294,7 @@ int			NET_SendUnreliableMessage (struct qsocket_s *sock, sizebuf_t *data);
 // returns 1 if the message was sent properly
 // returns -1 if the connection died
 
-int			NET_SendToAll(sizebuf_t *data, int blocktime);
+int			NET_SendToAll(sizebuf_t *data, idTime blocktime);
 // This is a reliable *blocking* send to all attached clients.
 
 
@@ -313,12 +313,12 @@ void NET_Poll(void);
 typedef struct _PollProcedure
 {
 	struct _PollProcedure	*next;
-	double					nextTime;
+	idTime					nextTime;
 	void					(*procedure)(void*);
 	void					*arg;
 } PollProcedure;
 
-void SchedulePollProcedure(PollProcedure *pp, double timeOffset);
+void SchedulePollProcedure(PollProcedure *pp, idTime timeOffset);
 
 extern	qboolean	serialAvailable;
 extern	qboolean	ipxAvailable;

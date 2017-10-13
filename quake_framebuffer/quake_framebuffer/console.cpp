@@ -47,7 +47,7 @@ char		*con_text=0;
 cvar_t		con_notifytime = {"con_notifytime","3"};		//seconds
 
 #define	NUM_CON_TIMES 4
-float		con_times[NUM_CON_TIMES];	// realtime time the line was generated
+idTime		con_times[NUM_CON_TIMES];	// realtime time the line was generated
 								// for transparent notify lines
 
 int			con_vislines;
@@ -115,7 +115,7 @@ void Con_ClearNotify (void)
 	int		i;
 	
 	for (i=0 ; i<NUM_CON_TIMES ; i++)
-		con_times[i] = 0;
+		con_times[i] = idTime::zero();
 }
 
 						
@@ -221,9 +221,9 @@ void Con_Init (void)
 
 	if (con_debuglog)
 	{
-		if (strlen (com_gamedir) < (MAXGAMEDIRLEN - strlen (t2)))
+		if (Q_strlen (com_gamedir) < (MAXGAMEDIRLEN - Q_strlen (t2)))
 		{
-			sprintf (temp, "%s%s", com_gamedir, t2);
+			Q_sprintf (temp, "%s%s", com_gamedir, t2);
 			unlink (temp);
 		}
 	}
@@ -270,7 +270,7 @@ All console printing must go through this in order to be logged to disk
 If no console is visible, the notify window will pop up.
 ================
 */
-void Con_Print (char *txt)
+void Con_Print (const char *txt)
 {
 	int		y;
 	int		c, l;
@@ -345,14 +345,87 @@ void Con_Print (char *txt)
 		
 	}
 }
+void Con_Print(const char *txt, size_t size) {
+	int		y;
+	int		c, l;
+	static int	cr;
+	int		mask;
 
+	con_backscroll = 0;
+
+	if (txt[0] == 1)
+	{
+		mask = 128;		// go to colored text
+		S_LocalSound("misc/talk.wav");
+		// play talk wav
+		txt++;
+	}
+	else if (txt[0] == 2)
+	{
+		mask = 128;		// go to colored text
+		txt++;
+	}
+	else
+		mask = 0;
+
+
+	while ((c = *txt) && size--)
+	{
+		// count word length
+		for (l = 0; l< con_linewidth; l++)
+			if (txt[l] <= ' ')
+				break;
+
+		// word wrap
+		if (l != con_linewidth && (con_x + l > con_linewidth))
+			con_x = 0;
+
+		txt++;
+
+		if (cr)
+		{
+			con_current--;
+			cr = false;
+		}
+
+
+		if (!con_x)
+		{
+			Con_Linefeed();
+			// mark time for transparent overlay
+			if (con_current >= 0)
+				con_times[con_current % NUM_CON_TIMES] = realtime;
+		}
+
+		switch (c)
+		{
+		case '\n':
+			con_x = 0;
+			break;
+
+		case '\r':
+			con_x = 0;
+			cr = 1;
+			break;
+
+		default:	// display character and advance
+			y = con_current % con_totallines;
+			con_text[y*con_linewidth + con_x] = c | mask;
+			con_x++;
+			if (con_x >= con_linewidth)
+				con_x = 0;
+			break;
+		}
+
+	}
+}
 
 /*
 ================
 Con_DebugLog
 ================
 */
-void Con_DebugLog(char *file, char *fmt, ...)
+void Con_DebugLog(const char *file, char *fmt, ...)
 {
     va_list argptr; 
     static char data[1024];
@@ -376,14 +449,14 @@ Handles cursor positioning, line wrapping, etc
 */
 #define	MAXPRINTMSG	4096
 // FIXME: make a buffer size safe vsprintf?
-void Con_Printf (char *fmt, ...)
+void Con_Printf (const char *fmt, ...)
 {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
 	static qboolean	inupdate;
 	
 	va_start (argptr,fmt);
-	vsprintf (msg,fmt,argptr);
+	Q_vsprintf (msg,fmt,argptr);
 	va_end (argptr);
 	
 // also echo to debugging console
@@ -423,7 +496,7 @@ Con_DPrintf
 A Con_Printf that only shows up if the "developer" cvar is set
 ================
 */
-void Con_DPrintf (char *fmt, ...)
+void Con_DPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
@@ -432,7 +505,7 @@ void Con_DPrintf (char *fmt, ...)
 		return;			// don't confuse non-developers with techie stuff...
 
 	va_start (argptr,fmt);
-	vsprintf (msg,fmt,argptr);
+	Q_vsprintf (msg,fmt,argptr);
 	va_end (argptr);
 	
 	Con_Printf ("%s", msg);
@@ -446,14 +519,14 @@ Con_SafePrintf
 Okay to call even when the screen can't be updated
 ==================
 */
-void Con_SafePrintf (char *fmt, ...)
+void Con_SafePrintf (const char *fmt, ...)
 {
 	va_list		argptr;
 	char		msg[1024];
 	int			temp;
 		
 	va_start (argptr,fmt);
-	vsprintf (msg,fmt,argptr);
+	Q_vsprintf (msg,fmt,argptr);
 	va_end (argptr);
 
 	temp = scr_disabled_for_loading;
@@ -491,7 +564,7 @@ void Con_DrawInput (void)
 	text = key_lines[edit_line];
 	
 // add the cursor frame
-	text[key_linepos] = 10+((int)(realtime*con_cursorspeed)&1);
+	text[key_linepos] = 10+((int)(idCast<float>(realtime)*con_cursorspeed)&1);
 	
 // fill out remainder with spaces
 	for (i=key_linepos+1 ; i< con_linewidth ; i++)
@@ -524,7 +597,7 @@ void Con_DrawNotify (void)
 	int		x, v;
 	char	*text;
 	int		i;
-	float	time;
+	idTime	time;
 	extern char chat_buffer[];
 
 	v = 0;
@@ -533,10 +606,10 @@ void Con_DrawNotify (void)
 		if (i < 0)
 			continue;
 		time = con_times[i % NUM_CON_TIMES];
-		if (time == 0)
+		if (time == idTime::zero())
 			continue;
 		time = realtime - time;
-		if (time > con_notifytime.value)
+		if (idCast<float>(time) > con_notifytime.value)
 			continue;
 		text = con_text + (i % con_totallines)*con_linewidth;
 		
@@ -563,7 +636,7 @@ void Con_DrawNotify (void)
 			Draw_Character ( (x+5)<<3, v, chat_buffer[x]);
 			x++;
 		}
-		Draw_Character ( (x+5)<<3, v, 10+((int)(realtime*con_cursorspeed)&1));
+		Draw_Character ( (x+5)<<3, v, 10+((int)(idCast<float>(realtime)*con_cursorspeed)&1));
 		v += 8;
 	}
 	
@@ -620,9 +693,9 @@ void Con_DrawConsole (int lines, qboolean drawinput)
 Con_NotifyBox
 ==================
 */
-void Con_NotifyBox (char *text)
+void Con_NotifyBox (const char *text)
 {
-	double		t1, t2;
+	idTime		t1, t2;
 
 // during startup for sound / cd warnings
 	Con_Printf("\n\n\35\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\37\n");
@@ -646,6 +719,6 @@ void Con_NotifyBox (char *text)
 
 	Con_Printf ("\n");
 	key_dest = key_game;
-	realtime = 0;				// put the cursor back to invisible
+	realtime = idTime::zero();				// put the cursor back to invisible
 }
 

@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "net_vcr.h"
+using namespace std::chrono;
 
 qsocket_t	*net_activeSockets = NULL;
 qsocket_t	*net_freeSockets = NULL;
@@ -46,13 +47,13 @@ static qboolean	listening = false;
 qboolean	slistInProgress = false;
 qboolean	slistSilent = false;
 qboolean	slistLocal = true;
-static double	slistStartTime;
+static idTime	slistStartTime;
 static int		slistLastShown;
 
 static void Slist_Send(void*);
 static void Slist_Poll(void*);
-PollProcedure	slistSendProcedure = {NULL, 0.0, Slist_Send};
-PollProcedure	slistPollProcedure = {NULL, 0.0, Slist_Poll};
+PollProcedure	slistSendProcedure = {NULL, idTime::zero(), Slist_Send};
+PollProcedure	slistPollProcedure = {NULL, idTime::zero(), Slist_Poll};
 
 
 sizebuf_t		net_message;
@@ -90,9 +91,9 @@ qboolean recording = false;
 int	net_driverlevel;
 
 
-double			net_time;
+idTime			net_time;
 
-double SetNetTime(void)
+idTime SetNetTime(void)
 {
 	net_time = Sys_FloatTime();
 	return net_time;
@@ -305,8 +306,8 @@ void NET_Slist_f (void)
 	slistInProgress = true;
 	slistStartTime = Sys_FloatTime();
 
-	SchedulePollProcedure(&slistSendProcedure, 0.0);
-	SchedulePollProcedure(&slistPollProcedure, 0.1);
+	SchedulePollProcedure(&slistSendProcedure, 0ms);
+	SchedulePollProcedure(&slistPollProcedure, 100ms);
 
 	hostCacheCount = 0;
 }
@@ -323,8 +324,8 @@ static void Slist_Send(void*)
 		dfunc.SearchForHosts (true);
 	}
 
-	if ((Sys_FloatTime() - slistStartTime) < 0.5)
-		SchedulePollProcedure(&slistSendProcedure, 0.75);
+	if ((Sys_FloatTime() - slistStartTime) < 500ms)
+		SchedulePollProcedure(&slistSendProcedure, 750ms);
 }
 
 
@@ -342,9 +343,9 @@ static void Slist_Poll(void*)
 	if (! slistSilent)
 		PrintSlist();
 
-	if ((Sys_FloatTime() - slistStartTime) < 1.5)
+	if ((Sys_FloatTime() - slistStartTime) < 1500ms)
 	{
-		SchedulePollProcedure(&slistPollProcedure, 0.1);
+		SchedulePollProcedure(&slistPollProcedure, 100ms);
 		return;
 	}
 
@@ -449,7 +450,7 @@ NET_CheckNewConnections
 
 struct
 {
-	double	time;
+	idTime	time;
 	int		op;
 	long	session;
 } vcrConnect;
@@ -528,7 +529,7 @@ returns -1 if connection is invalid
 
 struct
 {
-	double	time;
+	idTime	time;
 	int		op;
 	long	session;
 	int		ret;
@@ -557,7 +558,7 @@ int	NET_GetMessage (qsocket_t *sock)
 	// see if this connection has timed out
 	if (ret == 0 && sock->driver)
 	{
-		if (net_time - sock->lastMessageTime > net_messagetimeout.value)
+		if (net_time - sock->lastMessageTime > idCast<idTime>(net_messagetimeout.value))
 		{
 			NET_Close(sock);
 			return -1;
@@ -616,7 +617,7 @@ returns -1 if the connection died
 */
 struct
 {
-	double	time;
+	idTime	time;
 	int		op;
 	long	session;
 	int		r;
@@ -719,9 +720,9 @@ qboolean NET_CanSendMessage (qsocket_t *sock)
 }
 
 
-int NET_SendToAll(sizebuf_t *data, int blocktime)
+int NET_SendToAll(sizebuf_t *data, idTime blocktime)
 {
-	double		start;
+	idTime		start;
 	int			i;
 	int			count = 0;
 	qboolean	state1 [MAX_SCOREBOARD];
@@ -955,7 +956,7 @@ void NET_Poll(void)
 }
 
 
-void SchedulePollProcedure(PollProcedure *proc, double timeOffset)
+void SchedulePollProcedure(PollProcedure *proc, idTime timeOffset)
 {
 	PollProcedure *pp, *prev;
 

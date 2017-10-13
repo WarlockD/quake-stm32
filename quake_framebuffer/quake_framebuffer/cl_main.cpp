@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_main.c  -- client main loop
 
 #include "quakedef.h"
-
+using namespace std::chrono;
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
 
@@ -363,7 +363,7 @@ void CL_DecayLights (void)
 {
 	int			i;
 	dlight_t	*dl;
-	float		time;
+	idTime		time;
 	
 	time = cl.time - cl.oldtime;
 
@@ -373,9 +373,9 @@ void CL_DecayLights (void)
 		if (dl->die < cl.time || !dl->radius)
 			continue;
 		
-		dl->radius -= time*dl->decay;
-		if (dl->radius < 0)
-			dl->radius = 0;
+		dl->radius -= idCast<float>(time)*dl->decay;
+		if (dl->radius < 0.0f)
+			dl->radius = 0.0f;
 	}
 }
 
@@ -388,32 +388,32 @@ Determines the fraction between the last two messages that the objects
 should be put at.
 ===============
 */
-float	CL_LerpPoint (void)
+float	CL_LerpPoint(void)
 {
 	float	f, frac;
 
-	f = cl.mtime[0] - cl.mtime[1];
-	
+	f = idCast<float>(cl.mtime[0] - cl.mtime[1]);
+
 	if (!f || cl_nolerp.value || cls.timedemo || sv.active)
 	{
 		cl.time = cl.mtime[0];
 		return 1;
 	}
-		
+
 	if (f > 0.1)
 	{	// dropped packet, or start of demo
-		cl.mtime[1] = cl.mtime[0] - 0.1;
-		f = 0.1;
+		cl.mtime[1] = cl.mtime[0] - 100ms;
+		f = 0.1f;
 	}
-	frac = (cl.time - cl.mtime[1]) / f;
-//Con_Printf ("frac: %f\n",frac);
+	frac = idCast<float>((cl.time - cl.mtime[1])) / f;
+	//Con_Printf ("frac: %f\n",frac);
 	if (frac < 0)
 	{
 		if (frac < -0.01)
 		{
-SetPal(1);
+			SetPal(1);
 			cl.time = cl.mtime[1];
-//				Con_Printf ("low frac\n");
+			//				Con_Printf ("low frac\n");
 		}
 		frac = 0;
 	}
@@ -421,15 +421,15 @@ SetPal(1);
 	{
 		if (frac > 1.01)
 		{
-SetPal(2);
+			SetPal(2);
 			cl.time = cl.mtime[0];
-//				Con_Printf ("high frac\n");
+			//				Con_Printf ("high frac\n");
 		}
 		frac = 1;
 	}
 	else
 		SetPal(0);
-		
+
 	return frac;
 }
 
@@ -475,7 +475,7 @@ void CL_RelinkEntities (void)
 		}
 	}
 	
-	bobjrotate = anglemod(100*cl.time);
+	bobjrotate = anglemod(100.0f*idCast<float>(cl.time));
 	
 // start on the entity after the world
 	for (i=1,ent=cl_entities+1 ; i<cl.num_entities ; i++,ent++)
@@ -549,7 +549,7 @@ void CL_RelinkEntities (void)
 			VectorMA (dl->origin, 18, fv, dl->origin);
 			dl->radius = 200 + (rand()&31);
 			dl->minlight = 32;
-			dl->die = cl.time + 0.1;
+			dl->die = cl.time + 100ms;
 		}
 		if (ent->effects & EF_BRIGHTLIGHT)
 		{			
@@ -557,14 +557,14 @@ void CL_RelinkEntities (void)
 			VectorCopy (ent->origin,  dl->origin);
 			dl->origin[2] += 16;
 			dl->radius = 400 + (rand()&31);
-			dl->die = cl.time + 0.001;
+			dl->die = cl.time + 1ms;
 		}
 		if (ent->effects & EF_DIMLIGHT)
 		{			
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
 			dl->radius = 200 + (rand()&31);
-			dl->die = cl.time + 0.001;
+			dl->die = cl.time + 1ms;
 		}
 #ifdef QUAKE2
 		if (ent->effects & EF_DARKLIGHT)
@@ -598,7 +598,7 @@ void CL_RelinkEntities (void)
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin, dl->origin);
 			dl->radius = 200;
-			dl->die = cl.time + 0.01;
+			dl->die = cl.time + 10ms;
 		}
 		else if (ent->model->flags & EF_GRENADE)
 			R_RocketTrail (oldorg, ent->origin, 1);

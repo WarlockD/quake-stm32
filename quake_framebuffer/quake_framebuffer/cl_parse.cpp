@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+using namespace std::chrono;
+
 char *svc_strings[] =
 {
 	"svc_bad",
@@ -145,8 +147,8 @@ so the server doesn't disconnect.
 */
 void CL_KeepaliveMessage (void)
 {
-	float	time;
-	static float lastmsg;
+	
+	static idTime lastmsg;
 	int		ret;
 	sizebuf_t	old;
 	byte		olddata[8192];
@@ -183,8 +185,8 @@ void CL_KeepaliveMessage (void)
 	memcpy (net_message.data, olddata, net_message.cursize);
 
 // check time
-	time = Sys_FloatTime ();
-	if (time - lastmsg < 5)
+	idTime time = Sys_FloatTime ();
+	if (time - lastmsg < 5s)
 		return;
 	lastmsg = time;
 
@@ -772,7 +774,7 @@ void CL_ParseServerMessage (void)
 			
 		case svc_time:
 			cl.mtime[1] = cl.mtime[0];
-			cl.mtime[0] = MSG_ReadFloat ();			
+			cl.mtime[0] = idCast<idTime>(MSG_ReadFloat ());			
 			break;
 			
 		case svc_clientdata:
@@ -936,20 +938,20 @@ void CL_ParseServerMessage (void)
 
 		case svc_intermission:
 			cl.intermission = 1;
-			cl.completed_time = cl.time;
+			cl.completed_time = idCast<int>(cl.time);
 			vid.recalc_refdef = true;	// go to full screen
 			break;
 
 		case svc_finale:
 			cl.intermission = 2;
-			cl.completed_time = cl.time;
+			cl.completed_time = idCast<int>(cl.time);
 			vid.recalc_refdef = true;	// go to full screen
 			SCR_CenterPrint (MSG_ReadString ());			
 			break;
 
 		case svc_cutscene:
 			cl.intermission = 3;
-			cl.completed_time = cl.time;
+			cl.completed_time = idCast<int>(cl.time);
 			vid.recalc_refdef = true;	// go to full screen
 			SCR_CenterPrint (MSG_ReadString ());			
 			break;

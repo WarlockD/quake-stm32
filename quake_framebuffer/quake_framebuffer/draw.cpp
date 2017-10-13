@@ -65,7 +65,7 @@ qpic_t	*Draw_CachePic (char *path)
 		if (menu_numcachepics == MAX_CACHED_PICS)
 			Sys_Error ("menu_numcachepics == MAX_CACHED_PICS");
 		menu_numcachepics++;
-		strcpy (pic->name, path);
+		Q_strcpy (pic->name, path);
 	}
 
 	dat = (qpic_t*)Cache_Check (&pic->cache);
@@ -98,8 +98,6 @@ Draw_Init
 */
 void Draw_Init (void)
 {
-	int		i;
-
 	draw_chars = (byte*)W_GetLumpName ("conchars");
 	draw_disc = (qpic_t*)W_GetLumpName ("disc");
 	draw_backtile = (qpic_t*)W_GetLumpName ("backtile");
@@ -282,9 +280,9 @@ void Draw_Pic (int x, int y, qpic_t *pic)
 	int				v, u;
 
 	if ((x < 0) ||
-		(x + pic->width > vid.width) ||
+		(static_cast<unsigned int>(x + pic->width) > vid.width) ||
 		(y < 0) ||
-		(y + pic->height > vid.height))
+		(static_cast<unsigned int>(y + pic->height) > vid.height))
 	{
 		Sys_Error ("Draw_Pic: bad coordinates");
 	}
@@ -527,7 +525,6 @@ Draw_ConsoleBackground
 */
 void Draw_ConsoleBackground (int lines)
 {
-	int				x, y, v;
 	byte			*src, *dest;
 	unsigned short	*pusdest;
 	int				f, fstep;
@@ -538,7 +535,7 @@ void Draw_ConsoleBackground (int lines)
 
 // hack the version number directly into the pic
 #ifdef _WIN32
-	sprintf (ver, "(WinQuake) %4.2f", (float)VERSION);
+	Q_sprintf (ver, "(WinQuake) %4.2f", (float)VERSION);
 	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
 #elif defined(X11)
 	sprintf (ver, "(X11 Quake %2.2f) %4.2f", (float)X11_VERSION, (float)VERSION);
@@ -551,7 +548,7 @@ void Draw_ConsoleBackground (int lines)
 	sprintf (ver, "%4.2f", VERSION);
 #endif
 
-	for (x=0 ; x<strlen(ver) ; x++)
+	for (size_t x=0 ; x<strlen(ver) ; x++)
 		Draw_CharToConback (ver[x], dest+(x<<3));
 	
 // draw the pic
@@ -559,9 +556,9 @@ void Draw_ConsoleBackground (int lines)
 	{
 		dest = vid.conbuffer;
 
-		for (y=0 ; y<lines ; y++, dest += vid.conrowbytes)
+		for (int y=0 ; y<lines ; y++, dest += vid.conrowbytes)
 		{
-			v = (vid.conheight - lines + y)*200/vid.conheight;
+			int v = (vid.conheight - lines + y)*200/vid.conheight;
 			src = conback->data + v*320;
 			if (vid.conwidth == 320)
 				memcpy (dest, src, vid.conwidth);
@@ -569,7 +566,7 @@ void Draw_ConsoleBackground (int lines)
 			{
 				f = 0;
 				fstep = 320*0x10000/vid.conwidth;
-				for (x=0 ; x<vid.conwidth ; x+=4)
+				for (size_t x=0 ; x<vid.conwidth ; x+=4)
 				{
 					dest[x] = src[f>>16];
 					f += fstep;
@@ -587,15 +584,15 @@ void Draw_ConsoleBackground (int lines)
 	{
 		pusdest = (unsigned short *)vid.conbuffer;
 
-		for (y=0 ; y<lines ; y++, pusdest += (vid.conrowbytes >> 1))
+		for (int y=0 ; y<lines ; y++, pusdest += (vid.conrowbytes >> 1))
 		{
 		// FIXME: pre-expand to native format?
 		// FIXME: does the endian switching go away in production?
-			v = (vid.conheight - lines + y)*200/vid.conheight;
+			int v = (vid.conheight - lines + y)*200/vid.conheight;
 			src = conback->data + v*320;
 			f = 0;
 			fstep = 320*0x10000/vid.conwidth;
-			for (x=0 ; x<vid.conwidth ; x+=4)
+			for (size_t x=0 ; x<vid.conwidth ; x+=4)
 			{
 				pusdest[x] = d_8to16table[src[f>>16]];
 				f += fstep;
@@ -832,21 +829,18 @@ Draw_FadeScreen
 */
 void Draw_FadeScreen (void)
 {
-	int			x,y;
-	byte		*pbuf;
-
 	VID_UnlockBuffer ();
 	S_ExtraUpdate ();
 	VID_LockBuffer ();
 
-	for (y=0 ; y<vid.height ; y++)
+	for (size_t y=0 ; y<vid.height ; y++)
 	{
 		int	t;
 
-		pbuf = (byte *)(vid.buffer + vid.rowbytes*y);
+		byte* pbuf = (byte *)(vid.buffer + vid.rowbytes*y);
 		t = (y & 1) << 1;
 
-		for (x=0 ; x<vid.width ; x++)
+		for (size_t x=0 ; x<vid.width ; x++)
 		{
 			if ((x & 3) != t)
 				pbuf[x] = 0;

@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+using namespace std::chrono;
 
 
 /*
@@ -368,7 +369,7 @@ void PR_ExecuteProgram (func_t fnum)
 	if (!fnum || fnum >= progs->numfunctions)
 	{
 		if (pr_global_struct->self)
-			ED_Print (PROG_TO_EDICT(pr_global_struct->self));
+			PROG_TO_EDICT(pr_global_struct->self)->Print();
 		Host_Error ("PR_ExecuteProgram: NULL function");
 	}
 	
@@ -646,7 +647,7 @@ while (1)
 #ifdef FPS_20
 		ed->v.nextthink = pr_global_struct->time + 0.05;
 #else
-		ed->v.nextthink = pr_global_struct->time + 0.1;
+		ed->v.nextthink = pr_global_struct->time + 100ms;
 #endif
 		if (a->_float != ed->v.frame)
 		{

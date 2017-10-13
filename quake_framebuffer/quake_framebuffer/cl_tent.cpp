@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+using namespace std::chrono;
+
 int			num_temp_entities;
 entity_t	cl_temp_entities[MAX_TEMP_ENTITIES];
 beam_t		cl_beams[MAX_BEAMS];
@@ -85,7 +87,7 @@ void CL_ParseBeam (model_t *m)
 		{
 			b->entity = ent;
 			b->model = m;
-			b->endtime = cl.time + 0.2;
+			b->endtime = cl.time + 200ms;
 			VectorCopy (start, b->start);
 			VectorCopy (end, b->end);
 			return;
@@ -98,7 +100,7 @@ void CL_ParseBeam (model_t *m)
 		{
 			b->entity = ent;
 			b->model = m;
-			b->endtime = cl.time + 0.2;
+			b->endtime = cl.time + 200ms;
 			VectorCopy (start, b->start);
 			VectorCopy (end, b->end);
 			return;
@@ -199,7 +201,7 @@ void CL_ParseTEnt (void)
 		dl = CL_AllocDlight (0);
 		VectorCopy (pos, dl->origin);
 		dl->radius = 350;
-		dl->die = cl.time + 0.5;
+		dl->die = cl.time + 500ms;
 		dl->decay = 300;
 		S_StartSound (-1, 0, cl_sfx_r_exp3, pos, 1, 1);
 		break;
@@ -255,7 +257,7 @@ void CL_ParseTEnt (void)
 		dl = CL_AllocDlight (0);
 		VectorCopy (pos, dl->origin);
 		dl->radius = 350;
-		dl->die = cl.time + 0.5;
+		dl->die = cl.time + 500ms;
 		dl->decay = 300;
 		S_StartSound (-1, 0, cl_sfx_r_exp3, pos, 1, 1);
 		break;
@@ -359,14 +361,14 @@ void CL_UpdateTEnts (void)
 		}
 		else
 		{
-			yaw = (int) (atan2(dist[1], dist[0]) * 180 / M_PI);
-			if (yaw < 0)
-				yaw += 360;
+			yaw = static_cast<int> (Q_atan2(dist[1], dist[0]) * 180.0f / static_cast<float>(M_PI));
+			if (yaw < 0.0f)
+				yaw += 360.0f;
 	
-			forward = sqrt (dist[0]*dist[0] + dist[1]*dist[1]);
-			pitch = (int) (atan2(dist[2], forward) * 180 / M_PI);
-			if (pitch < 0)
-				pitch += 360;
+			forward = Q_sqrt (dist[0]*dist[0] + dist[1]*dist[1]);
+			pitch = static_cast<int>  (Q_atan2(dist[2], forward) * 180.0f / static_cast<float>(M_PI));
+			if (pitch < 0.0f)
+				pitch += 360.0f;
 		}
 
 	// add new entities for the lightning
@@ -381,7 +383,7 @@ void CL_UpdateTEnts (void)
 			ent->model = b->model;
 			ent->angles[0] = pitch;
 			ent->angles[1] = yaw;
-			ent->angles[2] = rand()%360;
+			ent->angles[2] = static_cast<float>(rand()%360);
 
 			for (i=0 ; i<3 ; i++)
 				org[i] += dist[i]*30;

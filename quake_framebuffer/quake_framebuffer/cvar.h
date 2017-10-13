@@ -52,34 +52,102 @@ r_draworder 0		sets the current value to 0
 Cvars are restricted from having the same names as commands to keep this
 interface from being ambiguous.
 */
-
-typedef struct cvar_s
+#if 0
+class cvar_t
 {
-	char	*name;
-	char	*string;
+public:
+	enum Type {
+		Null =0,
+		InitalString,
+		String,
+		Number,
+		Bool
+	};
+	cvar_t(const char* name, bool archive=false, bool server=false) : _name(name), _type(Type::Null), _inital(nullptr) , _archive(archive), _server(server) {}
+	cvar_t(const char* name, float n, bool archive = false, bool server = false) : _name(name), _type(Type::Number), _value(n), _archive(archive), _server(server) {}
+	cvar_t(const char* name, bool n, bool archive = false, bool server = false) : _name(name), _type(Type::Bool), _bool(n), _archive(archive), _server(server) {}
+	cvar_t(const char* name, const char* s, bool archive = false, bool server = false) : _name(name), _type(Type::InitalString), _inital(s), _archive(archive), _server(server) {}
+	cvar_t(const cvar_t& copy) = delete;
+	cvar_t& operator=(const cvar_t& copy) = delete;
+	inline void clear() { if (_type == Type::String) _string.~basic_string(); _type = Type::Null; }
+	cvar_t& operator=(nullptr_t) { if (_type == Type::String) _string.~basic_string(); _type = Type::Null; }
+	cvar_t& operator=(const char* v) { 
+		if (_type == Type::String)
+			_string.assign(v);
+		else {
+			_type = Type::String;
+			_string = std::move(ZString(v));
+		}
+	}
+	template<typename C, typename CT, typename CA>
+	cvar_t& operator=(const std::basic_string<C,CT,CA>& v) {
+		if (_type == Type::String)
+			_string.assign(v);
+		else {
+			_type = Type::String;
+			_string = std::move(ZString(v));
+		}
+	}
+	cvar_t& operator=(bool v) {
+		clear();
+		_bool = v;
+		_type = Type::Bool;
+		return *this;
+	}
+	cvar_t& operator=(float v) {
+		clear();
+		_value = v;
+		_type = Type::Number;
+		return *this;
+	}
+	const char* name() const { return _name; }
+	bool archive() const { return _archive; }
+	bool server() const { return _server; }
+
+	~cvar_t() { clear(); }
+private:
+	static cvar_t	*& cvar_vars() { static cvar_t* root = nullptr; return root; }
+	const char	*_name;
+	Type _type;
+	union {
+		ZString _string;
+		const char* _inital;
+		float _value;
+		bool _bool;
+	};
+	qboolean _archive;		// set to true to cause it to be saved to vars.rc
+	qboolean _server;		// notifies players when changed
+	cvar_t *next;
+} ;
+
+
+#else
+struct cvar_t {
+	char* name;
+	char* string;
+	float value;
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
 	qboolean server;		// notifies players when changed
-	float	value;
-	struct cvar_s *next;
-} cvar_t;
-
+	cvar_t *next;
+};
+#endif
 void 	Cvar_RegisterVariable (cvar_t *variable);
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
-void 	Cvar_Set (char *var_name, char *value);
+void 	Cvar_Set (const char *var_name, char *value);
 // equivelant to "<name> <variable>" typed at the console
 
-void	Cvar_SetValue (char *var_name, float value);
+void	Cvar_SetValue (const char *var_name, float value);
 // expands value to a string and calls Cvar_Set
 
-float	Cvar_VariableValue (char *var_name);
+float	Cvar_VariableValue (const char *var_name);
 // returns 0 if not defined or non numeric
 
-char	*Cvar_VariableString (char *var_name);
+char	*Cvar_VariableString (const char *var_name);
 // returns an empty string if not defined
 
-char 	*Cvar_CompleteVariable (char *partial);
+char 	*Cvar_CompleteVariable (const char *partial);
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 
@@ -88,10 +156,12 @@ qboolean Cvar_Command (void);
 // command.  Returns true if the command was a variable reference that
 // was handled. (print or change)
 
-void 	Cvar_WriteVariables (FILE *f);
+void 	Cvar_WriteVariables (idFileHandle f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
-cvar_t *Cvar_FindVar (char *var_name);
+cvar_t *Cvar_FindVar (const char *var_name);
 
-extern cvar_t	*cvar_vars;
+
+extern	cvar_t	registered;
+//extern cvar_t	*cvar_vars;

@@ -52,6 +52,8 @@ SV_SetIdealPitch
 #define	MAX_FORWARD	6
 void SV_SetIdealPitch (void)
 {
+	static constexpr float m_pi = static_cast<float>(M_PI);
+	static constexpr float r_to_d = static_cast<float>(M_PI * 2.0 / 360);
 	float	angleval, sinval, cosval;
 	trace_t	tr;
 	vec3_t	top, bottom;
@@ -61,8 +63,9 @@ void SV_SetIdealPitch (void)
 
 	if (!((int)sv_player->v.flags & FL_ONGROUND))
 		return;
-		
-	angleval = sv_player->v.angles[YAW] * M_PI*2 / 360;
+
+	//angleval = sv_player->v.angles[YAW] * M_PI*2 / 360;
+	angleval = sv_player->v.angles[YAW] * r_to_d;
 	sinval = sin(angleval);
 	cosval = cos(angleval);
 
@@ -90,7 +93,7 @@ void SV_SetIdealPitch (void)
 	steps = 0;
 	for (j=1 ; j<i ; j++)
 	{
-		step = z[j] - z[j-1];
+		step = static_cast<int>(z[j] - z[j-1]);
 		if (step > -ON_EPSILON && step < ON_EPSILON)
 			continue;
 
@@ -148,7 +151,7 @@ void SV_UserFriction (void)
 
 // apply friction	
 	control = speed < sv_stopspeed.value ? sv_stopspeed.value : speed;
-	newspeed = speed - host_frametime*control*friction;
+	newspeed = speed - idCast<float>(host_frametime)*control*friction;
 	
 	if (newspeed < 0)
 		newspeed = 0;
@@ -196,7 +199,7 @@ void SV_Accelerate (void)
 	addspeed = wishspeed - currentspeed;
 	if (addspeed <= 0)
 		return;
-	accelspeed = sv_accelerate.value*host_frametime*wishspeed;
+	accelspeed = sv_accelerate.value*idCast<float>(host_frametime)*wishspeed;
 	if (accelspeed > addspeed)
 		accelspeed = addspeed;
 	
@@ -217,7 +220,7 @@ void SV_AirAccelerate (vec3_t wishveloc)
 	if (addspeed <= 0)
 		return;
 //	accelspeed = sv_accelerate.value * host_frametime;
-	accelspeed = sv_accelerate.value*wishspeed * host_frametime;
+	accelspeed = sv_accelerate.value*wishspeed * idCast<float>(host_frametime);
 	if (accelspeed > addspeed)
 		accelspeed = addspeed;
 	
@@ -232,7 +235,7 @@ void DropPunchAngle (void)
 	
 	len = VectorNormalize (sv_player->v.punchangle);
 	
-	len -= 10*host_frametime;
+	len -= 10* idCast<float>(host_frametime);
 	if (len < 0)
 		len = 0;
 	VectorScale (sv_player->v.punchangle, len, sv_player->v.punchangle);
@@ -269,7 +272,7 @@ void SV_WaterMove (void)
 		VectorScale (wishvel, sv_maxspeed.value/wishspeed, wishvel);
 		wishspeed = sv_maxspeed.value;
 	}
-	wishspeed *= 0.7;
+	wishspeed *= 0.7f;
 
 //
 // water friction
@@ -277,7 +280,7 @@ void SV_WaterMove (void)
 	speed = Length (velocity);
 	if (speed)
 	{
-		newspeed = speed - host_frametime * speed * sv_friction.value;
+		newspeed = speed - idCast<float>(host_frametime) * speed * sv_friction.value;
 		if (newspeed < 0)
 			newspeed = 0;	
 		VectorScale (velocity, newspeed/speed, velocity);
@@ -296,7 +299,7 @@ void SV_WaterMove (void)
 		return;
 
 	VectorNormalize (wishvel);
-	accelspeed = sv_accelerate.value * wishspeed * host_frametime;
+	accelspeed = sv_accelerate.value * wishspeed * idCast<float>(host_frametime);
 	if (accelspeed > addspeed)
 		accelspeed = addspeed;
 
@@ -309,8 +312,8 @@ void SV_WaterJump (void)
 	if (sv.time > sv_player->v.teleport_time
 	|| !sv_player->v.waterlevel)
 	{
-		sv_player->v.flags = (int)sv_player->v.flags & ~FL_WATERJUMP;
-		sv_player->v.teleport_time = 0;
+		sv_player->v.flags = static_cast<float>((int)sv_player->v.flags & ~FL_WATERJUMP);
+		sv_player->v.teleport_time = idTime::zero();
 	}
 	sv_player->v.velocity[0] = sv_player->v.movedir[0];
 	sv_player->v.velocity[1] = sv_player->v.movedir[1];
@@ -443,7 +446,7 @@ void SV_ReadClientMove (usercmd_t *move)
 	
 // read ping time
 	host_client->ping_times[host_client->num_pings%NUM_PING_TIMES]
-		= sv.time - MSG_ReadFloat ();
+		= sv.time - idCast<idTime,float>(MSG_ReadFloat());
 	host_client->num_pings++;
 
 // read current angles	
@@ -453,18 +456,18 @@ void SV_ReadClientMove (usercmd_t *move)
 	VectorCopy (angle, host_client->edict->v.v_angle);
 		
 // read movement
-	move->forwardmove = MSG_ReadShort ();
-	move->sidemove = MSG_ReadShort ();
-	move->upmove = MSG_ReadShort ();
+	move->forwardmove =static_cast<float>( MSG_ReadShort ());
+	move->sidemove = static_cast<float>(MSG_ReadShort ());
+	move->upmove = static_cast<float>(MSG_ReadShort ());
 	
 // read buttons
 	bits = MSG_ReadByte ();
-	host_client->edict->v.button0 = bits & 1;
-	host_client->edict->v.button2 = (bits & 2)>>1;
+	host_client->edict->v.button0 = static_cast<float>(bits & 1);
+	host_client->edict->v.button2 = static_cast<float>((bits & 2)>>1);
 
 	i = MSG_ReadByte ();
 	if (i)
-		host_client->edict->v.impulse = i;
+		host_client->edict->v.impulse = static_cast<float>(i);
 
 #ifdef QUAKE2
 // read light level

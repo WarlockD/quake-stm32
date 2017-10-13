@@ -72,12 +72,12 @@ extern cvar_t	r_reportedgeout;
 extern cvar_t	r_maxedges;
 extern cvar_t	r_numedges;
 
-#define XCENTERING	(1.0 / 2.0)
-#define YCENTERING	(1.0 / 2.0)
+#define XCENTERING	(1.0f / 2.0f)
+#define YCENTERING	(1.0f / 2.0f)
 
-#define CLIP_EPSILON		0.001
+#define CLIP_EPSILON		0.001f
 
-#define BACKFACE_EPSILON	0.01
+#define BACKFACE_EPSILON	0.01f
 
 //===========================================================================
 
@@ -281,9 +281,9 @@ extern int			r_maxvalidedgeoffset;
 
 void R_AliasClipTriangle (mtriangle_t *ptri);
 
-extern float	r_time1;
-extern float	dp_time1, dp_time2, db_time1, db_time2, rw_time1, rw_time2;
-extern float	se_time1, se_time2, de_time1, de_time2, dv_time1, dv_time2;
+extern idTime	r_time1;
+extern idTime	dp_time1, dp_time2, db_time1, db_time2, rw_time1, rw_time2;
+extern idTime	se_time1, se_time2, de_time1, de_time2, dv_time1, dv_time2;
 extern int		r_frustum_indexes[4*6];
 extern int		r_maxsurfsseen, r_maxedgesseen, r_cnumsurfs;
 extern qboolean	r_surfsonstack;

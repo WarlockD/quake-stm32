@@ -19,11 +19,46 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 // this file is shared by quake and qcc
+#include <type_traits>
 
 typedef int	func_t;
 typedef int	string_t;
 
-enum etype_t  {ev_void, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_function, ev_pointer} ;
+//#define	DEF_SAVEGLOBAL	(1<<15)
+static constexpr uint16_t def_saveglobal = (1 << 15);
+enum class etype_t : uint16_t {ev_void=0, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_function, ev_pointer, ev_saveglobal = def_saveglobal } ;
+
+class idType {
+public:
+	using underlying_type = std::underlying_type<etype_t>::type;
+	static constexpr size_t	type_size[8] = { 1, sizeof(string_t) / 4,1,3,1,1,sizeof(func_t) / 4, sizeof(void *) / 4 };
+	static constexpr const char*	type_string[8] = { "void","string","float","vector","entity","field","function","pointer" };
+	constexpr static inline etype_t ClearSaveGlobal(etype_t t) {
+		return static_cast<etype_t>(static_cast<underlying_type>(t) & ~def_saveglobal);
+	}
+	constexpr static inline etype_t SetSaveGlobal(etype_t t) {
+		return static_cast<etype_t>(static_cast<underlying_type>(t) | def_saveglobal);
+	}
+	constexpr static inline bool isSetSaveGlobal(etype_t t) {
+		return static_cast<underlying_type>(t) & def_saveglobal;
+	}
+	constexpr static inline size_t eTypeSize(etype_t t) {
+		return type_size[static_cast<underlying_type>(t) & ~def_saveglobal];
+	}
+	constexpr static inline const char* eTypeString(etype_t t) {
+		return type_string[static_cast<underlying_type>(t) & ~def_saveglobal];
+	}
+	constexpr idType(etype_t t = etype_t::ev_void) : _type(t) {}
+	constexpr idType(etype_t t,bool save_global) : _type(save_global ? SetSaveGlobal(t) : ClearSaveGlobal(t)) {}
+	constexpr size_t size() const { return eTypeSize(_type); }
+	constexpr const char* string() const { return eTypeString(_type); }
+	constexpr bool saveglobal() const { return isSetSaveGlobal(_type); }
+	constexpr operator etype_t() const { return ClearSaveGlobal(_type); }
+private:
+	etype_t _type;
+};
+
+
 
 
 #define	OFS_NULL		0
@@ -136,7 +171,7 @@ typedef struct
 	unsigned short	ofs;
 	int			s_name;
 } ddef_t;
-#define	DEF_SAVEGLOBAL	(1<<15)
+
 
 #define	MAX_PARMS	8
 

@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sbar.c -- status bar code
 
 #include "quakedef.h"
+using namespace std::chrono;
 
 
 int			sb_updates;		// if >= vid.numpages, no update needed
@@ -438,7 +439,7 @@ void Sbar_UpdateScoreboard (void)
 	{
 		k = fragsort[i];
 		s = &cl.scores[k];
-		sprintf (&scoreboardtext[i][1], "%3i %s", s->frags, s->name);
+		Q_sprintf (&scoreboardtext[i][1], "%3i %s", s->frags, s->name);
 
 		top = s->colors & 0xf0;
 		bottom = (s->colors & 15) <<4;
@@ -460,22 +461,23 @@ void Sbar_SoloScoreboard (void)
 	int		minutes, seconds, tens, units;
 	int		l;
 
-	sprintf (str,"Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+	Q_sprintf (str,"Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
 	Sbar_DrawString (8, 4, str);
 
-	sprintf (str,"Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
+	Q_sprintf (str,"Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
 	Sbar_DrawString (8, 12, str);
 
 // time
-	minutes = cl.time / 60;
-	seconds = cl.time - 60*minutes;
+	long time = std::chrono::duration_cast< std::chrono::seconds>(cl.time).count();
+	minutes = time / 60;
+	seconds = time - 60 * minutes;
 	tens = seconds / 10;
 	units = seconds - 10*tens;
-	sprintf (str,"Time :%3i:%i%i", minutes, tens, units);
+	Q_sprintf (str,"Time :%3i:%i%i", minutes, tens, units);
 	Sbar_DrawString (184, 4, str);
 
 // draw level name
-	l = strlen (cl.levelname);
+	l = Q_strlen (cl.levelname);
 	Sbar_DrawString (232 - l*4, 12, cl.levelname);
 }
 
@@ -547,8 +549,9 @@ void Sbar_DrawInventory (void)
 {
 	int		i;
 	char	num[6];
-	float	time;
+	idTime	time;
 	int		flashon;
+	long	isec = idCast<int>(cl.time);  
 
 	if (rogue)
 	{
@@ -568,7 +571,7 @@ void Sbar_DrawInventory (void)
 		if (cl.items & (IT_SHOTGUN<<i) )
 		{
 			time = cl.item_gettime[i];
-			flashon = (int)((cl.time - time)*10);
+			flashon = static_cast<int>(idCast<float>(cl.time - time)*10.0f);
 			if (flashon >= 10)
 			{
 				if ( cl.stats[STAT_ACTIVEWEAPON] == (IT_SHOTGUN<<i)  )
@@ -596,7 +599,7 @@ void Sbar_DrawInventory (void)
          if (cl.items & (1<<hipweapons[i]) )
          {
             time = cl.item_gettime[hipweapons[i]];
-            flashon = (int)((cl.time - time)*10);
+            flashon = static_cast<int>(idCast<float>(cl.time - time)*10.0f);
             if (flashon >= 10)
             {
                if ( cl.stats[STAT_ACTIVEWEAPON] == (1<<hipweapons[i])  )
@@ -661,7 +664,7 @@ void Sbar_DrawInventory (void)
 // ammo counts
 	for (i=0 ; i<4 ; i++)
 	{
-		sprintf (num, "%3i",cl.stats[STAT_SHELLS+i] );
+		Q_sprintf (num, "%3i",cl.stats[STAT_SHELLS+i] );
 		if (num[0] != ' ')
 			Sbar_DrawCharacter ( (6*i+1)*8 - 2, -24, 18 + num[0] - '0');
 		if (num[1] != ' ')
@@ -676,7 +679,7 @@ void Sbar_DrawInventory (void)
       if (cl.items & (1<<(17+i)))
       {
          time = cl.item_gettime[17+i];
-         if (time && time > cl.time - 2 && flashon )
+         if (time != idTime::zero() && time > (cl.time - 2s) && flashon )
          {  // flash frame
             sb_updates = 0;
          }
@@ -688,7 +691,7 @@ void Sbar_DrawInventory (void)
                Sbar_DrawPic (192 + i*16, -16, sb_items[i]);
             }
          }
-         if (time && time > cl.time - 2)
+         if (time != idTime::zero() && time > (cl.time - 2s))
             sb_updates = 0;
       }
    //MED 01/04/97 added hipnotic items
@@ -699,7 +702,7 @@ void Sbar_DrawInventory (void)
          if (cl.items & (1<<(24+i)))
          {
             time = cl.item_gettime[24+i];
-            if (time && time > cl.time - 2 && flashon )
+            if (time != idTime::zero() && time > (cl.time - 2s) && flashon )
             {  // flash frame
                sb_updates = 0;
             }
@@ -707,7 +710,7 @@ void Sbar_DrawInventory (void)
             {
                Sbar_DrawPic (288 + i*16, -16, hsb_items[i]);
             }
-            if (time && time > cl.time - 2)
+            if (time != idTime::zero() && time > (cl.time - 2s))
                sb_updates = 0;
          }
    }
@@ -721,7 +724,7 @@ void Sbar_DrawInventory (void)
 			{
 				time = cl.item_gettime[29+i];
 
-				if (time &&	time > cl.time - 2 && flashon )
+				if (time != idTime::zero() &&	(time > cl.time - 2s) && flashon )
 				{	// flash frame
 					sb_updates = 0;
 				}
@@ -730,7 +733,7 @@ void Sbar_DrawInventory (void)
 					Sbar_DrawPic (288 + i*16, -16, rsb_items[i]);
 				}
 
-				if (time &&	time > cl.time - 2)
+				if (time != idTime::zero() &&	time > (cl.time - 2s))
 					sb_updates = 0;
 			}
 		}
@@ -743,13 +746,13 @@ void Sbar_DrawInventory (void)
 			if (cl.items & (1<<(28+i)))
 			{
 				time = cl.item_gettime[28+i];
-				if (time &&	time > cl.time - 2 && flashon )
+				if (time != idTime::zero() &&	time > (cl.time - 2s) && flashon )
 				{	// flash frame
 					sb_updates = 0;
 				}
 				else
 					Sbar_DrawPic (320-32 + i*8, -16, sb_sigil[i]);
-				if (time &&	time > cl.time - 2)
+				if (time != idTime::zero() &&	time > (cl.time - 2s))
 					sb_updates = 0;
 			}
 		}
@@ -802,7 +805,7 @@ void Sbar_DrawFrags (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		Q_sprintf (num, "%3i",f);
 
 		Sbar_DrawCharacter ( (x+1)*8 , -24, num[0]);
 		Sbar_DrawCharacter ( (x+2)*8 , -24, num[1]);
@@ -859,7 +862,7 @@ void Sbar_DrawFace (void)
 
 		// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		Q_sprintf (num, "%3i",f);
 
 		if (top==8)
 		{
@@ -1124,7 +1127,7 @@ void Sbar_DeathmatchOverlay (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		Q_sprintf (num, "%3i",f);
 
 		Draw_Character ( x+8 , y, num[0]);
 		Draw_Character ( x+16 , y, num[1]);
@@ -1224,7 +1227,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		Q_sprintf (num, "%3i",f);
 
 		Draw_Character ( x+8 , y, num[0]);
 		Draw_Character ( x+16 , y, num[1]);

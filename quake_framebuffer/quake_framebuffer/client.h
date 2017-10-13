@@ -73,7 +73,7 @@ typedef struct
 {
 	vec3_t	origin;
 	float	radius;
-	float	die;				// stop lighting after this time
+	idTime	die;				// stop lighting after this time
 	float	decay;				// drop this each second
 	float	minlight;			// don't add when contributing less
 	int		key;
@@ -88,7 +88,7 @@ typedef struct
 {
 	int		entity;
 	struct model_s	*model;
-	float	endtime;
+	idTime	endtime;
 	vec3_t	start, end;
 } beam_t;
 
@@ -129,7 +129,7 @@ typedef struct
 	FILE		*demofile;
 	int			td_lastframe;		// to meter out one message a frame
 	int			td_startframe;		// host_framecount at start
-	float		td_starttime;		// realtime at second frame of timedemo
+	idTime		td_starttime;		// realtime at second frame of timedemo
 
 
 // connection information
@@ -156,8 +156,8 @@ typedef struct
 // information for local display
 	int			stats[MAX_CL_STATS];	// health, etc
 	int			items;			// inventory bit flags
-	float	item_gettime[32];	// cl.time of aquiring item, for blinking
-	float		faceanimtime;	// use anim frame if cl.time < this
+	idTime	item_gettime[32];	// cl.time of aquiring item, for blinking
+	idTime		faceanimtime;	// use anim frame if cl.time < this
 
 	cshift_t	cshifts[NUM_CSHIFTS];	// color shifts for damage, powerups
 	cshift_t	prev_cshifts[NUM_CSHIFTS];	// and content types
@@ -181,7 +181,7 @@ typedef struct
 	float		pitchvel;
 	qboolean	nodrift;
 	float		driftmove;
-	double		laststop;
+	idTime		laststop;
 
 	float		viewheight;
 	float		crouch;			// local amount for smoothing stepups
@@ -193,15 +193,15 @@ typedef struct
 	int			intermission;	// don't change view angle, full screen, etc
 	int			completed_time;	// latched at intermission start
 	
-	double		mtime[2];		// the timestamp of last two messages	
-	double		time;			// clients view of time, should be between
+	idTime		mtime[2];		// the timestamp of last two messages	
+	idTime		time;			// clients view of time, should be between
 								// servertime and oldservertime to generate
 								// a lerp point for other data
-	double		oldtime;		// previous cl.time, time-oldtime is used
+	idTime		oldtime;		// previous cl.time, time-oldtime is used
 								// to decay light values and smooth step ups
 	
 
-	float		last_received_message;	// (realtime) for net trouble icon
+	idTime		last_received_message;	// (realtime) for net trouble icon
 
 //
 // information that is static for the entire time connected to a server

@@ -21,6 +21,37 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+
+// time commm
+template<typename T>
+static bool AreEqual(T f1, T f2, T fe = std::numeric_limits<T>::epsilon()) {
+	return (std::fabs(f1 - f2) <= fe * std::fmax(fabs(f1), fabs(f2)));
+}
+#ifdef USE_CUSTOM_IDTIME
+//https://stackoverflow.com/questions/4548004/how-to-correctly-and-standardly-compare-floats
+template<typename T>
+
+
+idTime::idTime() : _time(0.0f) {}
+idTime::idTime(float f) : _time(f) {}
+idTime::idTime(double f) : _time(static_cast<float>(f)) {}
+idTime::operator float() const { return _time; }
+idTime& idTime::operator+=(const idTime& r) { _time += r._time; return *this; }
+idTime& idTime::operator-=(const idTime& r) { _time -= r._time; return *this; }
+bool idTime::operator==(const idTime& r) const { return AreEqual(_time, r._time); }
+bool idTime::operator!=(const idTime& r) const { return !AreEqual(_time, r._time); }
+bool idTime::operator<(const idTime& r) const { return _time < r._time; }
+bool idTime::operator>(const idTime& r) const { return _time < r._time; }
+bool idTime::operator<=(const idTime& r) const { return operator==(r) || _time < r._time; }
+bool idTime::operator>=(const idTime& r) const { return operator==(r) || _time < r._time; }
+idTime& idTime::operator+=(float r) { _time += r; return *this; }
+idTime& idTime::operator-=(float r) { _time -= r; return *this; }
+idTime idTime::Seconds(int sec) { return idTime(static_cast<float>(sec)); }
+idTime idTime::MilliSeconds(int msec) { return idTime(static_cast<float>(msec) * 1000); }
+idTime idTime::UilliSeconds(int msec) { return idTime(static_cast<float>(msec) * 1000000); }
+#endif
+
+
 #define NUM_SAFE_ARGVS  7
 
 static char     *largv[MAX_NUM_ARGVS + NUM_SAFE_ARGVS + 1];
@@ -198,9 +229,7 @@ void Q_strncpy (char *dest, const char * src, size_t count)
 
 size_t Q_strlen (const char * str)
 {
-	int             count;
-	
-	count = 0;
+	size_t count = 0;
 	while (str[count])
 		count++;
 
@@ -316,6 +345,106 @@ int Q_strncasecmp (const char * s1, const char * s2, size_t n)
 int Q_strcasecmp (const char * s1, const char * s2)
 {
 	return Q_strncasecmp (s1, s2, 99999);
+}
+static const char* SkipWhiteSpace(const char* data)  {
+	while (1) {
+		if (data[0] <= ' ') { data++; continue; }
+		if (data[0] == '/' && data[1] == '/') {
+			while (*data != '\n' && *data != '\0') data++;
+			continue;
+		}
+		break;
+	}
+}
+
+
+bool idStrRef::equal(const char* rstr) const {
+	for (size_t n = 0; n <= _size && (rstr[n] == _str[n]) ; n++) {
+		if (n == _size) return true;
+	}
+	return false;
+}
+bool idStrRef::equal(const idStrRef& str) const {
+	return _size == str._size && Q_memcmp(_str, str._str, _size) == 0;
+}
+static inline int toHex(int c) { 
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	else if (c >= 'a' && c <= 'f')
+		return  c - 'a' + 10;
+	else if (c >= 'A' && c <= 'F')
+		return  c - 'A' + 10;
+	else return -1; 
+}
+
+int idStrRef::to_int(int& i, size_t offset) const {
+	assert(0);
+	return 0; // not implmented yet
+
+}
+int idStrRef::to_float(float& val, size_t offset ) const {
+	// streight copy from Q_atf
+	if (offset >= _size) return -1;
+	const char* str = SkipWhiteSpace(_str + offset);
+	int             sign;
+	int             c;
+
+
+	if (*str == '-') {
+		sign = -1;
+		str++;
+	}
+	else
+		sign = 1;
+
+	//
+	// check for hex
+	//
+	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+	{
+		str += 2;
+		int ivalue = 0, itotal = 0;
+		while ((ivalue = toHex(*str++)) != -1)
+			itotal = (itotal * 16) + ivalue;
+		size_t len = str - _str;
+		if (len == 2 || (len == 3 && sign < 0)) return 0; // no numbers after the 0x, bad number
+		val = itotal * sign;
+		return (int)len;
+	}
+
+	//
+	// check for character
+	//
+	if (str[0] == '\'') // ahh for charaters humm
+	{
+		val = sign * str[1];
+		return 2;
+	}
+
+	//
+	// assume decimal
+	//
+	int             decimal = -1, total;
+	for (total = 0; (*str >= '0' && *str <= '9') || *str == '.'; total++)
+	{
+		if (*str == '.') { // man I see a parsing error here
+			decimal = total;
+			continue;
+		}
+		val = val * 10 + c - '0';
+	}
+	assert(decimal != 0); // hummmmmmmmm
+
+	if (decimal > 0) {
+		while (total > decimal)
+		{
+			val /= 10;
+			total--;
+		}
+	}
+
+	val *= sign;
+	return (int)(str - _str);
 }
 
 int Q_atoi (const char * str)
@@ -931,7 +1060,9 @@ void COM_DefaultExtension (char *path, const char *extension)
 	Q_strcat (path, extension);
 }
 
-
+inline static bool isComPunc(int c) {
+	return (c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':';
+}
 /*
 ==============
 COM_Parse
@@ -939,77 +1070,76 @@ COM_Parse
 Parse a token out of a string
 ==============
 */
-const char *COM_Parse (const char * data)
-{
-	int             c;
-	int             len;
-	
-	len = 0;
-	com_token[0] = 0;
-	
-	if (!data)
-		return NULL;
-		
-// skip whitespace
-skipwhite:
-	while ( (c = *data) <= ' ')
-	{
-		if (c == 0)
-			return NULL;                    // end of file;
-		data++;
-	}
-	
-// skip // comments
-	if (c=='/' && data[1] == '/')
-	{
-		while (*data && *data != '\n')
-			data++;
-		goto skipwhite;
-	}
-	
+// switched to more state based
+bool COM_Parser::Next(idStrRef& token) {
+	if (_data == nullptr || _data == _end) return false;
+	skip_whitespace();
+	size_t len = 0;
+	switch (*_data) {
+	case '\0': 
+		assert(0);
+		return false;  // nothing left to parse	or error?
+	case '\"':
+		len++;
+		while (_data[len] != '\"' && &_data[len] < _end) len++;
+		token = idStrRef(_data, len - 2);
+		++len; // skip the '\"'
+		break;
+		// is this really needed?  its not in quake world
+	default:
+		if (isComPunc(*_data))
+			len = 1;
+		else {
+			// parse a regular word
+			while (!isComPunc(_data[len]) && _data[len] > 32 && &_data[len] < _end) len++;
+		}
 
-// handle quoted strings specially
-	if (c == '\"')
-	{
-		data++;
-		while (1)
-		{
-			c = *data++;
-			if (c=='\"' || !c)
-			{
-				com_token[len] = 0;
-				return data;
-			}
-			com_token[len] = c;
-			len++;
+	};
+	token = idStrRef(_data, len);
+	if (&_data[len] < _end) _data += len;
+	return true;
+}
+void COM_Parser::skip_whitespace() {
+	_data = SkipWhiteSpace(_data);
+}
+void COM_File_Parser::fill_buffer() {
+	if (_size == 0) {
+		auto len = Sys_FileRead(_handle, _buffer, sizeof(_buffer));
+		if (len <= 0) {
+			// error or end of file
+			Close();
+		}
+		else {
+			_size = static_cast<size_t>(len);
+			_data = _buffer;
+			_end = _buffer + _size;
 		}
 	}
-
-// parse single characters
-	if (c=='{' || c=='}'|| c==')'|| c=='(' || c=='\'' || c==':')
-	{
-		com_token[len] = c;
-		len++;
-		com_token[len] = 0;
-		return data+1;
-	}
-
-// parse a regular word
-	do
-	{
-		com_token[len] = c;
-		data++;
-		len++;
-		c = *data;
-	if (c=='{' || c=='}'|| c==')'|| c=='(' || c=='\'' || c==':')
-			break;
-	} while (c>32);
-	
-	com_token[len] = 0;
-	return data;
 }
-
-
+bool COM_File_Parser::Next(idStrRef& token) {
+	while (isOpen()) {
+		if (COM_Parser::Next(token)) return true;
+		fill_buffer();
+	}
+	return false;
+}
+bool COM_File_Parser::Open(const char* filename)  {
+	Close();
+	if (Sys_FileOpenRead(filename, &_handle)) {
+		fill_buffer();
+		return true;
+	}
+	else {
+		_handle = 0; 
+		return false;
+	}
+}
+void COM_File_Parser::Close() {
+	if (_handle != 0) {
+		Sys_FileClose(_handle);
+		_handle = idFileHandle();
+	}
+}
 /*
 ================
 COM_CheckParm
@@ -1197,18 +1327,19 @@ varargs versions of all text functions.
 FIXME: make this buffer size safe someday
 ============
 */
+#if 0
 char    *va(char *format, ...)
 {
 	va_list         argptr;
 	static char             string[1024];
 	
 	va_start (argptr, format);
-	vsprintf (string, format,argptr);
+	Q_vsprintf (string, format,argptr);
 	va_end (argptr);
 
 	return string;  
 }
-
+#endif
 
 /// just for debugging
 int     memsearch (byte *start, int count, int search)
@@ -1452,7 +1583,7 @@ int COM_FindFile (const char *filename, int *handle, FILE **file)
 					continue;
 			}
 			
-			sprintf (netpath, "%s/%s",search->filename, filename);
+			Q_sprintf (netpath, "%s/%s",search->filename, filename);
 			
 			findtime = Sys_FileTime (netpath);
 			if (findtime == -1)
@@ -1460,14 +1591,14 @@ int COM_FindFile (const char *filename, int *handle, FILE **file)
 				
 		// see if the file needs to be updated in the cache
 			if (!com_cachedir[0])
-				strcpy (cachepath, netpath);
+				Q_strcpy (cachepath, netpath);
 			else
 			{	
 #if defined(_WIN32)
 				if ((strlen(netpath) < 2) || (netpath[1] != ':'))
-					sprintf (cachepath,"%s%s", com_cachedir, netpath);
+					Q_sprintf (cachepath,"%s%s", com_cachedir, netpath);
 				else
-					sprintf (cachepath,"%s%s", com_cachedir, netpath+2);
+					Q_sprintf (cachepath,"%s%s", com_cachedir, netpath+2);
 #else
 				sprintf (cachepath,"%s%s", com_cachedir, netpath);
 #endif
@@ -1717,20 +1848,20 @@ Sets com_gamedir, adds the directory to the head of the path,
 then loads and adds pak1.pak pak2.pak ... 
 ================
 */
-void COM_AddGameDirectory (char *dir)
+void COM_AddGameDirectory (const char *dir)
 {
 	int                             i;
 	searchpath_t    *search;
 	pack_t                  *pak;
 	char                    pakfile[MAX_OSPATH];
 
-	strcpy (com_gamedir, dir);
+	Q_strcpy (com_gamedir, dir);
 
 //
 // add the directory to the search path
 //
 	search = (searchpath_t*)Hunk_Alloc (sizeof(searchpath_t));
-	strcpy (search->filename, dir);
+	Q_strcpy (search->filename, dir);
 	search->next = com_searchpaths;
 	com_searchpaths = search;
 
@@ -1739,7 +1870,7 @@ void COM_AddGameDirectory (char *dir)
 //
 	for (i=0 ; ; i++)
 	{
-		sprintf (pakfile, "%s/pak%i.pak", dir, i);
+		Q_sprintf (pakfile, "%s/pak%i.pak", dir, i);
 		pak = COM_LoadPackFile (pakfile);
 		if (!pak)
 			break;
@@ -1772,9 +1903,9 @@ void COM_InitFilesystem (void)
 //
 	i = COM_CheckParm ("-basedir");
 	if (i && i < com_argc-1)
-		strcpy (basedir, com_argv[i+1]);
+		Q_strcpy (basedir, com_argv[i+1]);
 	else
-		strcpy (basedir, host_parms.basedir);
+		Q_strcpy (basedir, host_parms.basedir);
 
 	j = strlen (basedir);
 
@@ -1805,24 +1936,28 @@ void COM_InitFilesystem (void)
 //
 // start up with GAMENAME by default (id1)
 //
-	COM_AddGameDirectory (va("%s/" GAMENAME, basedir) );
-
-	if (COM_CheckParm ("-rogue"))
-		COM_AddGameDirectory (va("%s/rogue", basedir) );
-	if (COM_CheckParm ("-hipnotic"))
-		COM_AddGameDirectory (va("%s/hipnotic", basedir) );
-
-//
-// -game <gamedir>
-// Adds basedir/gamedir as an override game
-//
-	i = COM_CheckParm ("-game");
-	if (i && i < com_argc-1)
 	{
-		com_modified = true;
-		COM_AddGameDirectory (va("%s/%s", basedir, com_argv[i+1]));
-	}
+		buffer_t<1024> buffer;
+		COM_AddGameDirectory(buffer.print("%s/" GAMENAME, basedir));
 
+		if (COM_CheckParm("-rogue"))
+			COM_AddGameDirectory(buffer.print("%s/rogue", basedir));
+		if (COM_CheckParm("-hipnotic"))
+			COM_AddGameDirectory(buffer.print("%s/hipnotic", basedir));
+
+
+
+		//
+		// -game <gamedir>
+		// Adds basedir/gamedir as an override game
+		//
+		i = COM_CheckParm("-game");
+		if (i && i < com_argc - 1)
+		{
+			com_modified = true;
+			COM_AddGameDirectory(buffer.print("%s/%s", basedir, com_argv[i + 1]));
+		}
+	}
 //
 // -path <dir or packfile> [<dir or packfile>] ...
 // Fully specifies the exact serach path, overriding the generated one

@@ -37,7 +37,7 @@ static inline float vec##n##_len(vec##n const v) \
 } \
 static inline void vec##n##_norm(vec##n r, vec##n const v) \
 { \
-	float k = 1.0 / vec##n##_len(v); \
+	float k = 1.0f / vec##n##_len(v); \
 	vec##n##_scale(r, v, k); \
 } \
 static inline void vec##n##_min(vec##n r, vec##n a, vec##n b) \

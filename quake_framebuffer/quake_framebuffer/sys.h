@@ -18,23 +18,30 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // sys.h -- non-portable functions
+#ifndef _QUAKE_SYS_H_
+#define _QUAKE_SYS_H_
+
+#include "quakedef.h"
+#include <iostream>
+#include <fstream>
 
 //
 // file IO
 //
 
-// returns the file size
-// return -1 if file is not present
-// the file should be in BINARY mode for stupid OSs that care
-int Sys_FileOpenRead (const char * path, int *hndl);
-
-int Sys_FileOpenWrite (const char * path);
-void Sys_FileClose (int handle);
-void Sys_FileSeek (int handle, int position);
-int Sys_FileRead (int handle, void *dest, int count);
-int Sys_FileWrite (int handle, const void * data, int count);
+using idFileHandle = int;
+int Sys_FileOpenRead (const char * path, idFileHandle *hndl);
+int Sys_FilevPrintF(idFileHandle handle, const char* fmt, va_list va);
+int Sys_FilePrintF(idFileHandle handle, const char* fmt, ...);
+idFileHandle Sys_FileOpenWrite (const char * path);
+void Sys_FileClose (idFileHandle handle);
+void Sys_FileSeek (idFileHandle handle, int position);
+int Sys_FileRead (idFileHandle handle, void *dest, int count);
+int Sys_FileWrite (idFileHandle handle, const void * data, int count);
 int	Sys_FileTime (const char * path);
 void Sys_mkdir (char *path);
+
+
 
 //
 // memory protection
@@ -54,7 +61,7 @@ void Sys_Printf (char *fmt, ...);
 
 void Sys_Quit (void);
 
-double Sys_FloatTime (void);
+idTime Sys_FloatTime (void);
 
 char *Sys_ConsoleInput (void);
 
@@ -69,3 +76,4 @@ void Sys_LowFPPrecision (void);
 void Sys_HighFPPrecision (void);
 void Sys_SetFPCW (void);
 
+#endif

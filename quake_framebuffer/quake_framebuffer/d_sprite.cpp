@@ -350,7 +350,7 @@ void D_SpriteCalculateGradients (void)
 	TransformVector (r_spritedesc.vup, p_taxis);
 	VectorInverse (p_taxis);
 
-	distinv = 1.0 / (-DotProduct (modelorg, r_spritedesc.vpn));
+	distinv = 1.0f / (-DotProduct (modelorg, r_spritedesc.vpn));
 
 	d_sdivzstepu = p_saxis[0] * xscaleinv;
 	d_tdivzstepu = p_taxis[0] * xscaleinv;
@@ -397,8 +397,8 @@ void D_DrawSprite (void)
 
 // find the top and bottom vertices, and make sure there's at least one scan to
 // draw
-	ymin = 999999.9;
-	ymax = -999999.9;
+	ymin = 999999.9f;
+	ymax = -999999.9f;
 	pverts = r_spritedesc.pverts;
 
 	for (i=0 ; i<r_spritedesc.nump ; i++)

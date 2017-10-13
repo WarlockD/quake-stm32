@@ -125,17 +125,17 @@ Returns false if the entity removed itself.
 */
 qboolean SV_RunThink (edict_t *ent)
 {
-	float	thinktime;
+	idTime	thinktime;
 
 	thinktime = ent->v.nextthink;
-	if (thinktime <= 0 || thinktime > sv.time + host_frametime)
+	if (thinktime <= idTime::zero() || thinktime > sv.time + host_frametime)
 		return true;
 		
 	if (thinktime < sv.time)
 		thinktime = sv.time;	// don't let things stay in the past.
 								// it is possible to start that way
 								// by a trigger with a local time.
-	ent->v.nextthink = 0;
+	ent->v.nextthink = idTime::zero();
 	pr_global_struct->time = thinktime;
 	pr_global_struct->self = EDICT_TO_PROG(ent);
 	pr_global_struct->other = EDICT_TO_PROG(sv.edicts);
@@ -226,7 +226,7 @@ If steptrace is not NULL, the trace of any vertical wall hit will be stored
 ============
 */
 #define	MAX_CLIP_PLANES	5
-int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
+int SV_FlyMove (edict_t *ent, const idTime&  time, trace_t *steptrace)
 {
 	int			bumpcount, numbumps;
 	vec3_t		dir;
@@ -247,7 +247,7 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 	VectorCopy (ent->v.velocity, primal_velocity);
 	numplanes = 0;
 	
-	time_left = time;
+	time_left = idCast<float>(time);
 
 	for (bumpcount=0 ; bumpcount<numbumps ; bumpcount++)
 	{
@@ -283,7 +283,7 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 			blocked |= 1;		// floor
 			if (trace.ent->v.solid == SOLID_BSP)
 			{
-				ent->v.flags =	(int)ent->v.flags | FL_ONGROUND;
+				ent->v.flags =	static_cast<float>((int)ent->v.flags | FL_ONGROUND);
 				ent->v.groundentity = EDICT_TO_PROG(trace.ent);
 			}
 		}
@@ -386,7 +386,7 @@ void SV_AddGravity (edict_t *ent)
 	else
 		ent_gravity = 1.0;
 #endif
-	ent->v.velocity[2] -= ent_gravity * sv_gravity.value * host_frametime;
+	ent->v.velocity[2] -= ent_gravity * sv_gravity.value * idCast<float>(host_frametime);
 }
 
 
@@ -436,8 +436,9 @@ SV_PushMove
 
 ============
 */
-void SV_PushMove (edict_t *pusher, float movetime)
+void SV_PushMove (edict_t *pusher, const idTime& movetime)
 {
+	const float fmovetime = idCast<float>(movetime);
 	int			i, e;
 	edict_t		*check, *block;
 	vec3_t		mins, maxs, move;
@@ -454,7 +455,7 @@ void SV_PushMove (edict_t *pusher, float movetime)
 
 	for (i=0 ; i<3 ; i++)
 	{
-		move[i] = pusher->v.velocity[i] * movetime;
+		move[i] = pusher->v.velocity[i] * fmovetime;
 		mins[i] = pusher->v.absmin[i] + move[i];
 		maxs[i] = pusher->v.absmax[i] + move[i];
 	}
@@ -502,7 +503,7 @@ void SV_PushMove (edict_t *pusher, float movetime)
 
 	// remove the onground flag for non-players
 		if (check->v.movetype != MOVETYPE_WALK)
-			check->v.flags = (int)check->v.flags & ~FL_ONGROUND;
+			check->v.flags = static_cast<float>((int)check->v.flags & ~FL_ONGROUND);
 		
 		VectorCopy (check->v.origin, entorig);
 		VectorCopy (check->v.origin, moved_from[num_moved]);
@@ -703,9 +704,9 @@ SV_Physics_Pusher
 */
 void SV_Physics_Pusher (edict_t *ent)
 {
-	float	thinktime;
-	float	oldltime;
-	float	movetime;
+	idTime	thinktime;
+	idTime	oldltime;
+	idTime	movetime;
 
 	oldltime = ent->v.ltime;
 	
@@ -713,13 +714,13 @@ void SV_Physics_Pusher (edict_t *ent)
 	if (thinktime < ent->v.ltime + host_frametime)
 	{
 		movetime = thinktime - ent->v.ltime;
-		if (movetime < 0)
-			movetime = 0;
+		if (movetime < idTime::zero())
+			movetime = idTime::zero();
 	}
 	else
 		movetime = host_frametime;
 
-	if (movetime)
+	if (movetime != idTime::zero())
 	{
 #ifdef QUAKE2
 		if (ent->v.avelocity[0] || ent->v.avelocity[1] || ent->v.avelocity[2])
@@ -731,7 +732,7 @@ void SV_Physics_Pusher (edict_t *ent)
 		
 	if (thinktime > oldltime && thinktime <= ent->v.ltime)
 	{
-		ent->v.nextthink = 0;
+		ent->v.nextthink = idTime::zero();
 		pr_global_struct->time = sv.time;
 		pr_global_struct->self = EDICT_TO_PROG(ent);
 		pr_global_struct->other = EDICT_TO_PROG(sv.edicts);
@@ -825,9 +826,9 @@ qboolean SV_CheckWater (edict_t *ent)
 #ifdef QUAKE2
 		truecont = SV_TruePointContents (point);
 #endif
-		ent->v.watertype = cont;
+		ent->v.watertype = static_cast<float>(cont);
 		ent->v.waterlevel = 1;
-		point[2] = ent->v.origin[2] + (ent->v.mins[2] + ent->v.maxs[2])*0.5;
+		point[2] = ent->v.origin[2] + (ent->v.mins[2] + ent->v.maxs[2])*0.5f;
 		cont = SV_PointContents (point);
 		if (cont <= CONTENTS_WATER)
 		{
@@ -900,6 +901,7 @@ This is a hack, but in the interest of good gameplay...
 */
 int SV_TryUnstick (edict_t *ent, vec3_t oldvel)
 {
+	using namespace std::chrono;
 	int		i;
 	vec3_t	oldorg;
 	vec3_t	dir;
@@ -930,7 +932,7 @@ int SV_TryUnstick (edict_t *ent, vec3_t oldvel)
 		ent->v.velocity[0] = oldvel[0];
 		ent->v. velocity[1] = oldvel[1];
 		ent->v. velocity[2] = 0;
-		clip = SV_FlyMove (ent, 0.1, &steptrace);
+		clip = SV_FlyMove (ent, 100ms, &steptrace);
 
 		if ( fabs(oldorg[1] - ent->v.origin[1]) > 4
 		|| fabs(oldorg[0] - ent->v.origin[0]) > 4 )
@@ -963,12 +965,12 @@ void SV_WalkMove (edict_t *ent)
 	int			clip;
 	int			oldonground;
 	trace_t		steptrace, downtrace;
-	
+
 //
 // do a regular slide move unless it looks like you ran into a step
 //
 	oldonground = (int)ent->v.flags & FL_ONGROUND;
-	ent->v.flags = (int)ent->v.flags & ~FL_ONGROUND;
+	ent->v.flags = static_cast<float>((int)ent->v.flags & ~FL_ONGROUND);
 	
 	VectorCopy (ent->v.origin, oldorg);
 	VectorCopy (ent->v.velocity, oldvel);
@@ -1001,7 +1003,7 @@ void SV_WalkMove (edict_t *ent)
 	VectorCopy (vec3_origin, upmove);
 	VectorCopy (vec3_origin, downmove);
 	upmove[2] = STEPSIZE;
-	downmove[2] = -STEPSIZE + oldvel[2]*host_frametime;
+	downmove[2] = -STEPSIZE + oldvel[2]* idCast<float>(host_frametime);
 
 // move up
 	SV_PushEntity (ent, upmove);	// FIXME: don't link?
@@ -1034,7 +1036,7 @@ void SV_WalkMove (edict_t *ent)
 	{
 		if (ent->v.solid == SOLID_BSP)
 		{
-			ent->v.flags =	(int)ent->v.flags | FL_ONGROUND;
+			ent->v.flags = static_cast<float>((int)ent->v.flags | FL_ONGROUND);
 			ent->v.groundentity = EDICT_TO_PROG(downtrace.ent);
 		}
 	}
@@ -1113,7 +1115,7 @@ void SV_Physics_Client (edict_t	*ent, int num)
 	case MOVETYPE_NOCLIP:
 		if (!SV_RunThink (ent))
 			return;
-		VectorMA (ent->v.origin, host_frametime, ent->v.velocity, ent->v.origin);
+		VectorMA (ent->v.origin, idCast<float>(host_frametime), ent->v.velocity, ent->v.origin);
 		break;
 		
 	default:
@@ -1175,8 +1177,8 @@ void SV_Physics_Noclip (edict_t *ent)
 	if (!SV_RunThink (ent))
 		return;
 	
-	VectorMA (ent->v.angles, host_frametime, ent->v.avelocity, ent->v.angles);
-	VectorMA (ent->v.origin, host_frametime, ent->v.velocity, ent->v.origin);
+	VectorMA (ent->v.angles, idCast<float>(host_frametime), ent->v.avelocity, ent->v.angles);
+	VectorMA (ent->v.origin, idCast<float>(host_frametime), ent->v.velocity, ent->v.origin);
 
 	SV_LinkEdict (ent, false);
 }
@@ -1210,7 +1212,7 @@ void SV_CheckWaterTransition (edict_t *ent)
 #endif
 	if (!ent->v.watertype)
 	{	// just spawned here
-		ent->v.watertype = cont;
+		ent->v.watertype = static_cast<float>(cont);
 		ent->v.waterlevel = 1;
 		return;
 	}
@@ -1221,7 +1223,7 @@ void SV_CheckWaterTransition (edict_t *ent)
 		{	// just crossed into water
 			SV_StartSound (ent, 0, "misc/h2ohit1.wav", 255, 1);
 		}		
-		ent->v.watertype = cont;
+		ent->v.watertype = static_cast<float>(cont);
 		ent->v.waterlevel = 1;
 	}
 	else
@@ -1231,7 +1233,7 @@ void SV_CheckWaterTransition (edict_t *ent)
 			SV_StartSound (ent, 0, "misc/h2ohit1.wav", 255, 1);
 		}		
 		ent->v.watertype = CONTENTS_EMPTY;
-		ent->v.waterlevel = cont;
+		ent->v.waterlevel = static_cast<float>(cont);
 	}
 }
 
@@ -1293,13 +1295,13 @@ void SV_Physics_Toss (edict_t *ent)
 #endif
 
 // move angles
-	VectorMA (ent->v.angles, host_frametime, ent->v.avelocity, ent->v.angles);
+	VectorMA (ent->v.angles, idCast<float>(host_frametime), ent->v.avelocity, ent->v.angles);
 
 // move origin
 #ifdef QUAKE2
 	VectorAdd (ent->v.velocity, ent->v.basevelocity, ent->v.velocity);
 #endif
-	VectorScale (ent->v.velocity, host_frametime, move);
+	VectorScale (ent->v.velocity, idCast<float>(host_frametime), move);
 	trace = SV_PushEntity (ent, move);
 #ifdef QUAKE2
 	VectorSubtract (ent->v.velocity, ent->v.basevelocity, ent->v.velocity);
@@ -1329,7 +1331,7 @@ void SV_Physics_Toss (edict_t *ent)
 		if (ent->v.velocity[2] < 60 || ent->v.movetype != MOVETYPE_BOUNCE)
 #endif
 		{
-			ent->v.flags = (int)ent->v.flags | FL_ONGROUND;
+			ent->v.flags = static_cast<float>((int)ent->v.flags | FL_ONGROUND);
 			ent->v.groundentity = EDICT_TO_PROG(trace.ent);
 			VectorCopy (vec3_origin, ent->v.velocity);
 			VectorCopy (vec3_origin, ent->v.avelocity);

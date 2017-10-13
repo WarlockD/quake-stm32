@@ -60,7 +60,7 @@ void Host_Status_f (void)
 	int			minutes;
 	int			hours = 0;
 	int			j;
-	void		(*print) (char *fmt, ...);
+	void		(*print) (const char *fmt, ...);
 	
 	if (cmd_source == src_command)
 	{
@@ -86,7 +86,7 @@ void Host_Status_f (void)
 	{
 		if (!client->active)
 			continue;
-		seconds = (int)(net_time - client->netconnection->connecttime);
+		seconds = idCast<int>(net_time- client->netconnection->connecttime);
 		minutes = seconds / 60;
 		if (minutes)
 		{
@@ -213,7 +213,7 @@ Host_Ping_f
 void Host_Ping_f (void)
 {
 	int		i, j;
-	float	total;
+	idTime	total;
 	client_t	*client;
 	
 	if (cmd_source == src_command)
@@ -227,11 +227,11 @@ void Host_Ping_f (void)
 	{
 		if (!client->active)
 			continue;
-		total = 0;
+		total = idTime::zero();
 		for (j=0 ; j<NUM_PING_TIMES ; j++)
 			total+=client->ping_times[j];
 		total /= NUM_PING_TIMES;
-		SV_ClientPrintf ("%4i %s\n", (int)(total*1000), client->name);
+		SV_ClientPrintf ("%4i %s\n", idCast<int>(total), client->name);
 	}
 }
 
@@ -582,7 +582,7 @@ void Host_Loadgame_f (void)
 
 	cls.demonum = -1;		// stop demo loop in case this fails
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	Q_sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
 	COM_DefaultExtension (name, ".sav");
 	
 // we can't call SCR_BeginLoadingPlaque, because too much stack space has
@@ -692,7 +692,7 @@ void Host_Loadgame_f (void)
 	}
 	
 	sv.num_edicts = entnum;
-	sv.time = time;
+	sv.time = idCast<idTime>(time);
 
 	fclose (f);
 
@@ -1333,7 +1333,7 @@ void Host_Spawn_f (void)
 
 // send time of update
 	MSG_WriteByte (&host_client->message, svc_time);
-	MSG_WriteFloat (&host_client->message, sv.time);
+	MSG_WriteFloat (&host_client->message, idCast<float>(sv.time));
 
 	for (i=0, client = svs.clients ; i<svs.maxclients ; i++, client++)
 	{
@@ -1823,7 +1823,7 @@ void Host_Startdemos_f (void)
 	Con_Printf ("%i demo(s) in loop\n", c);
 
 	for (i=1 ; i<c+1 ; i++)
-		strncpy (cls.demos[i-1], Cmd_Argv(i), sizeof(cls.demos[0])-1);
+		Q_strncpy (cls.demos[i-1], Cmd_Argv(i), sizeof(cls.demos[0])-1);
 
 	if (!sv.active && cls.demonum != -1 && !cls.demoplayback)
 	{

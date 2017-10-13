@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sv_main.c -- server main program
 
 #include "quakedef.h"
-
+using namespace std::chrono;
 server_t		sv;
 server_static_t	svs;
 
@@ -727,7 +727,7 @@ qboolean SV_SendClientDatagram (client_t *client)
 	msg.cursize = 0;
 
 	MSG_WriteByte (&msg, svc_time);
-	MSG_WriteFloat (&msg, static_cast<float>(sv.time));
+	MSG_WriteFloat (&msg, idCast<float>(sv.time));
 
 // add the client specific data to the datagram
 	SV_WriteClientdataToMessage (client->edict, &msg);
@@ -818,6 +818,7 @@ SV_SendClientMessages
 */
 void SV_SendClientMessages (void)
 {
+	using namespace std::chrono;
 	int			i;
 	
 // update frags, names, etc
@@ -843,7 +844,7 @@ void SV_SendClientMessages (void)
 		// between signon stages
 			if (!host_client->sendsignon)
 			{
-				if (realtime - host_client->last_message > 5)
+				if (realtime - host_client->last_message > 5s)
 					SV_SendNop (host_client);
 				continue;	// don't send out non-signon messages
 			}
@@ -993,7 +994,7 @@ void SV_SendReconnect (void)
 
 	MSG_WriteChar (&msg, svc_stufftext);
 	MSG_WriteString (&msg, "reconnect\n");
-	NET_SendToAll (&msg, 5);
+	NET_SendToAll (&msg, 5s);
 	
 	if (cls.state != ca_dedicated)
 #ifdef QUAKE2
@@ -1039,7 +1040,7 @@ SV_SpawnServer
 This is called at the start of each level
 ================
 */
-extern float		scr_centertime_off;
+extern idTime		scr_centertime_off;
 
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
@@ -1047,13 +1048,14 @@ void SV_SpawnServer (char *server, char *startspot)
 void SV_SpawnServer (char *server)
 #endif
 {
+
 	edict_t		*ent;
 	int			i;
 
 	// let's not have any servers with no name
 	if (hostname.string[0] == 0)
 		Cvar_Set ("hostname", "UNNAMED");
-	scr_centertime_off = 0;
+	scr_centertime_off = idTime::zero();
 
 	Con_DPrintf ("SpawnServer: %s\n",server);
 	svs.changelevel_issued = false;		// now safe to issue another
@@ -1123,7 +1125,7 @@ void SV_SpawnServer (char *server)
 	sv.state = ss_loading;
 	sv.paused = false;
 
-	sv.time = 1.0;
+	sv.time = 1s;
 	
 	Q_strcpy (sv.name, server);
 	Q_sprintf (sv.modelname,"maps/%s.bsp", server);
@@ -1183,7 +1185,7 @@ void SV_SpawnServer (char *server)
 	sv.state = ss_active;
 	
 // run two frames to allow everything to settle
-	host_frametime = 0.1;
+	host_frametime = 100ms;
 	SV_Physics ();
 	SV_Physics ();
 

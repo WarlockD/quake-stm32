@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+using namespace std::chrono;
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -63,7 +64,7 @@ void PF_error (void)
 	Con_Printf ("======SERVER ERROR in %s:\n%s\n"
 	,pr_strings + pr_xfunction->s_name,s);
 	ed = PROG_TO_EDICT(pr_global_struct->self);
-	ED_Print (ed);
+	ed->Print ();
 
 	Host_Error ("Program error");
 }
@@ -87,8 +88,8 @@ void PF_objerror (void)
 	Con_Printf ("======OBJECT ERROR in %s:\n%s\n"
 	,pr_strings + pr_xfunction->s_name,s);
 	ed = PROG_TO_EDICT(pr_global_struct->self);
-	ED_Print (ed);
-	ED_Free (ed);
+	ed->Print();
+	ed->Free();
 	
 	Host_Error ("Program error");
 }
@@ -155,7 +156,7 @@ void SetMinMaxSize (edict_t *e, float *min, float *max, qboolean rotate)
 	// find min / max for rotations
 		angles = e->v.angles;
 		
-		a = angles[1]/180 * M_PI;
+		a = angles[1]/180.0f * static_cast<float>(M_PI);
 		
 		xvector[0] = cos(a);
 		xvector[1] = sin(a);
@@ -409,7 +410,7 @@ void PF_vectoyaw (void)
 		yaw = 0;
 	else
 	{
-		yaw = (int) (atan2(value1[1], value1[0]) * 180 / M_PI);
+		yaw = (int) (Q_atan2(value1[1], value1[0]) * 180.0f / static_cast<float>(M_PI));
 		if (yaw < 0)
 			yaw += 360;
 	}
@@ -433,7 +434,7 @@ void PF_vectoangles (void)
 	
 	value1 = G_VECTOR(OFS_PARM0);
 
-	if (value1[1] == 0 && value1[0] == 0)
+	if (value1[1] == 0.0f && value1[0] == 0.0f)
 	{
 		yaw = 0;
 		if (value1[2] > 0)
@@ -443,19 +444,19 @@ void PF_vectoangles (void)
 	}
 	else
 	{
-		yaw = (int) (atan2(value1[1], value1[0]) * 180 / M_PI);
-		if (yaw < 0)
-			yaw += 360;
+		yaw = (int) (Q_atan2(value1[1], value1[0]) * 180.0f / static_cast<float>(M_PI));
+		if (yaw < 0.0f)
+			yaw += 360.0f;
 
 		forward = sqrt (value1[0]*value1[0] + value1[1]*value1[1]);
-		pitch = (int) (atan2(value1[2], forward) * 180 / M_PI);
-		if (pitch < 0)
-			pitch += 360;
+		pitch = (int) (Q_atan2(value1[2], forward) * 180.0f / static_cast<float>(M_PI));
+		if (pitch < 0.0f)
+			pitch += 360.0f;
 	}
 
 	G_FLOAT(OFS_RETURN+0) = pitch;
 	G_FLOAT(OFS_RETURN+1) = yaw;
-	G_FLOAT(OFS_RETURN+2) = 0;
+	G_FLOAT(OFS_RETURN+2) = 0.0f;
 }
 
 /*
@@ -758,7 +759,7 @@ void PF_checkclient (void)
 	vec3_t	view;
 	
 // find a new check if on a new frame
-	if (sv.time - sv.lastchecktime >= 0.1)
+	if (sv.time - sv.lastchecktime >= 100ms)
 	{
 		sv.lastcheck = PF_newcheckclient (sv.lastcheck);
 		sv.lastchecktime = sv.time;
@@ -928,9 +929,9 @@ void PF_ftos (void)
 	v = G_FLOAT(OFS_PARM0);
 	
 	if (v == (int)v)
-		sprintf (pr_string_temp, "%d",(int)v);
+		Q_sprintf (pr_string_temp, "%d",(int)v);
 	else
-		sprintf (pr_string_temp, "%5.1f",v);
+		Q_sprintf (pr_string_temp, "%5.1f",v);
 	G_INT(OFS_RETURN) = pr_string_temp - pr_strings;
 }
 
@@ -943,7 +944,7 @@ void PF_fabs (void)
 
 void PF_vtos (void)
 {
-	sprintf (pr_string_temp, "'%5.1f %5.1f %5.1f'", G_VECTOR(OFS_PARM0)[0], G_VECTOR(OFS_PARM0)[1], G_VECTOR(OFS_PARM0)[2]);
+	Q_sprintf (pr_string_temp, "'%5.1f %5.1f %5.1f'", G_VECTOR(OFS_PARM0)[0], G_VECTOR(OFS_PARM0)[1], G_VECTOR(OFS_PARM0)[2]);
 	G_INT(OFS_RETURN) = pr_string_temp - pr_strings;
 }
 
@@ -967,7 +968,7 @@ void PF_Remove (void)
 	edict_t	*ed;
 	
 	ed = G_EDICT(OFS_PARM0);
-	ED_Free (ed);
+	ed->Free();
 }
 
 
@@ -1161,10 +1162,10 @@ void PF_walkmove (void)
 		return;
 	}
 
-	yaw = yaw*M_PI*2 / 360;
+	yaw = yaw*M_PI*2.0f / 360.0f;
 	
-	move[0] = cos(yaw)*dist;
-	move[1] = sin(yaw)*dist;
+	move[0] = Q_cos(yaw)*dist;
+	move[1] = Q_sin(yaw)*dist;
 	move[2] = 0;
 
 // save program state, because SV_movestep may call other progs
@@ -1249,9 +1250,9 @@ void PF_rint (void)
 	float	f;
 	f = G_FLOAT(OFS_PARM0);
 	if (f > 0)
-		G_FLOAT(OFS_RETURN) = (int)(f + 0.5);
+		G_FLOAT(OFS_RETURN) = (int)(f + 0.5f);
 	else
-		G_FLOAT(OFS_RETURN) = (int)(f - 0.5);
+		G_FLOAT(OFS_RETURN) = (int)(f - 0.5f);
 }
 void PF_floor (void)
 {
@@ -1373,7 +1374,7 @@ void PF_aim (void)
 			continue;	// don't aim at teammate
 		for (j=0 ; j<3 ; j++)
 			end[j] = check->v.origin[j]
-			+ 0.5*(check->v.mins[j] + check->v.maxs[j]);
+			+ 0.5f*(check->v.mins[j] + check->v.maxs[j]);
 		VectorSubtract (end, start, dir);
 		VectorNormalize (dir);
 		dist = DotProduct (dir, pr_global_struct->v_forward);
@@ -1509,7 +1510,7 @@ sizebuf_t *WriteDest (void)
 	int		dest;
 	edict_t	*ent;
 
-	dest = G_FLOAT(OFS_PARM0);
+	dest = static_cast<int>(G_FLOAT(OFS_PARM0));
 	switch (dest)
 	{
 	case MSG_BROADCAST:
@@ -1602,7 +1603,7 @@ void PF_makestatic (void)
 	}
 
 // throw the entity away now
-	ED_Free (ent);
+	ent->Free();
 }
 
 //=============================================================================

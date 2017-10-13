@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 
 void CL_FinishTimeDemo (void);
+using namespace std::chrono;
 
 /*
 ==============================================================================
@@ -325,16 +326,16 @@ CL_FinishTimeDemo
 void CL_FinishTimeDemo (void)
 {
 	int		frames;
-	float	time;
+	idTime	time;
 	
 	cls.timedemo = false;
 	
 // the first frame didn't count
 	frames = (host_framecount - cls.td_startframe) - 1;
 	time = realtime - cls.td_starttime;
-	if (!time)
-		time = 1;
-	Con_Printf ("%i frames %5.1f seconds %5.1f fps\n", frames, time, frames/time);
+	if (time != idTime::zero())
+		time = 1s;
+	Con_Printf ("%i frames %5.1f seconds %5.1f fps\n", frames, idCast<float>(time), frames/ idCast<float>(time));
 }
 
 /*

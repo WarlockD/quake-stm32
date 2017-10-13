@@ -178,14 +178,14 @@ ENTITY AREA CHECKING
 ===============================================================================
 */
 
-typedef struct areanode_s
+struct areanode_t
 {
 	int		axis;		// -1 = leaf node
 	float	dist;
-	struct areanode_s	*children[2];
+	areanode_t	*children[2];
 	link_t	trigger_edicts;
 	link_t	solid_edicts;
-} areanode_t;
+} ;
 
 #define	AREA_DEPTH	4
 #define	AREA_NODES	32
@@ -224,7 +224,7 @@ areanode_t *SV_CreateAreaNode (int depth, vec3_t mins, vec3_t maxs)
 	else
 		anode->axis = 1;
 	
-	anode->dist = 0.5 * (maxs[anode->axis] + mins[anode->axis]);
+	anode->dist = 0.5f * (maxs[anode->axis] + mins[anode->axis]);
 	VectorCopy (mins, mins1);	
 	VectorCopy (mins, mins2);	
 	VectorCopy (maxs, maxs1);	
@@ -260,12 +260,12 @@ SV_UnlinkEdict
 
 ===============
 */
-void SV_UnlinkEdict (edict_t *ent)
+void edict_t::Unlink() 
 {
-	if (!ent->area.prev)
+	if (!area.prev)
 		return;		// not linked in anywhere
-	RemoveLink (&ent->area);
-	ent->area.prev = ent->area.next = NULL;
+	RemoveLink (&area);
+	area.prev = area.next = nullptr;
 }
 
 
@@ -374,7 +374,7 @@ void SV_LinkEdict (edict_t *ent, qboolean touch_triggers)
 	areanode_t	*node;
 
 	if (ent->area.prev)
-		SV_UnlinkEdict (ent);	// unlink from old position
+		ent->Unlink ();	// unlink from old position
 		
 	if (ent == sv.edicts)
 		return;		// don't add the world
@@ -570,7 +570,7 @@ LINE TESTING IN HULLS
 */
 
 // 1/32 epsilon to keep floating point happy
-#define	DIST_EPSILON	(0.03125)
+#define	DIST_EPSILON	(0.03125f)
 
 /*
 ==================
@@ -638,20 +638,20 @@ qboolean SV_RecursiveHullCheck (hull_t *hull, int num, float p1f, float p2f, vec
 #endif
 
 // put the crosspoint DIST_EPSILON pixels on the near side
-	if (t1 < 0)
+	if (t1 < 0.0f)
 		frac = (t1 + DIST_EPSILON)/(t1-t2);
 	else
 		frac = (t1 - DIST_EPSILON)/(t1-t2);
-	if (frac < 0)
-		frac = 0;
-	if (frac > 1)
-		frac = 1;
+	if (frac < 0.0f)
+		frac = 0.0f;
+	if (frac > 1.0f)
+		frac = 1.0f;
 		
 	midf = p1f + (p2f - p1f)*frac;
 	for (i=0 ; i<3 ; i++)
 		mid[i] = p1[i] + frac*(p2[i] - p1[i]);
 
-	side = (t1 < 0);
+	side = (t1 < 0.0f);
 
 // move up to the node
 	if (!SV_RecursiveHullCheck (hull, node->children[side], p1f, midf, p1, mid, trace) )
@@ -691,8 +691,8 @@ qboolean SV_RecursiveHullCheck (hull_t *hull, int num, float p1f, float p2f, vec
 	while (SV_HullPointContents (hull, hull->firstclipnode, mid)
 	== CONTENTS_SOLID)
 	{ // shouldn't really happen, but does occasionally
-		frac -= 0.1;
-		if (frac < 0)
+		frac -= 0.1f;
+		if (frac < 0.0f)
 		{
 			trace->fraction = midf;
 			VectorCopy (mid, trace->endpos);

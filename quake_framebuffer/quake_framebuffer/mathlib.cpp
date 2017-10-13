@@ -29,7 +29,7 @@ int nanmask = 255<<23;
 
 /*-----------------------------------------------------------------*/
 
-#define DEG2RAD( a ) ( a * M_PI ) / 180.0F
+#define DEG2RAD( a ) ( a * static_cast<float>(M_PI) ) / 180.0F
 
 void ProjectPointOnPlane( vec3_t dst, const vec3_t p, const vec3_t normal )
 {
@@ -128,10 +128,10 @@ void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, 
 	memset( zrot, 0, sizeof( zrot ) );
 	zrot[0][0] = zrot[1][1] = zrot[2][2] = 1.0F;
 
-	zrot[0][0] = cos( DEG2RAD( degrees ) );
-	zrot[0][1] = sin( DEG2RAD( degrees ) );
-	zrot[1][0] = -sin( DEG2RAD( degrees ) );
-	zrot[1][1] = cos( DEG2RAD( degrees ) );
+	zrot[0][0] = Q_cos( DEG2RAD( degrees ) );
+	zrot[0][1] = Q_sin( DEG2RAD( degrees ) );
+	zrot[1][0] = -Q_sin( DEG2RAD( degrees ) );
+	zrot[1][1] = Q_cos( DEG2RAD( degrees ) );
 
 	R_ConcatRotations( m, zrot, tmpmat );
 	R_ConcatRotations( tmpmat, im, rot );
@@ -155,7 +155,7 @@ float	anglemod(float a)
 	else
 		a += 360*( 1 + (int)(-a/360) );
 #endif
-	a = (360.0/65536) * ((int)(a*(65536/360.0)) & 65535);
+	a = (360.0f / 65536.0f) * static_cast<float>(static_cast<int>(a*(65536.0f / 360.0f)) & 65535);
 	return a;
 }
 
@@ -287,14 +287,15 @@ void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 {
 	float		angle;
 	float		sr, sp, sy, cr, cp, cy;
-	
-	angle = angles[YAW] * (M_PI*2 / 360);
+	static constexpr float m_ratio = static_cast<float>(M_PI * 2 / 360);
+
+	angle = angles[YAW] * m_ratio;
 	sy = sin(angle);
 	cy = cos(angle);
-	angle = angles[PITCH] * (M_PI*2 / 360);
+	angle = angles[PITCH] * m_ratio;
 	sp = sin(angle);
 	cp = cos(angle);
-	angle = angles[ROLL] * (M_PI*2 / 360);
+	angle = angles[ROLL] * m_ratio;
 	sr = sin(angle);
 	cr = cos(angle);
 

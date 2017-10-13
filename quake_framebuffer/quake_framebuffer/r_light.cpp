@@ -37,7 +37,7 @@ void R_AnimateLight (void)
 //
 // light animations
 // 'm' is normal light, 'a' is no light, 'z' is double bright
-	i = (int)(cl.time*10);
+	i = (int)(idCast<float>(cl.time)*10);
 	for (j=0 ; j<MAX_LIGHTSTYLES ; j++)
 	{
 		if (!cl_lightstyle[j].length)

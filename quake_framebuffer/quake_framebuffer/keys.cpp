@@ -501,14 +501,14 @@ Key_WriteBindings
 Writes lines containing "bind key value"
 ============
 */
-void Key_WriteBindings (FILE *f)
+void Key_WriteBindings (idFileHandle f)
 {
 	int		i;
 
 	for (i=0 ; i<256 ; i++)
 		if (keybindings[i])
 			if (*keybindings[i])
-				fprintf (f, "bind \"%s\" \"%s\"\n", Key_KeynumToString(i), keybindings[i]);
+				Sys_FilePrintF (f, "bind \"%s\" \"%s\"\n", Key_KeynumToString(i), keybindings[i]);
 }
 
 
