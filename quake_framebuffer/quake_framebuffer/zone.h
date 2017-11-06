@@ -86,6 +86,7 @@ Zone block
 #define _QUAKE_ZONE_H_
 
 #include "quakedef.h"
+#include "common.h"
 
 #include <string>
 #include <sstream>
@@ -104,9 +105,9 @@ void Z_CheckHeap(void);
 
 
 void *Hunk_Alloc(size_t size);		// returns 0 filled memory
-void *Hunk_AllocName(int size, char *name);
+void *Hunk_AllocName(int size, const quake::string_view& name);
 
-void *Hunk_HighAllocName(size_t size, char *name);
+void *Hunk_HighAllocName(size_t size, const quake::string_view& name);
 
 int	Hunk_LowMark(void);
 void Hunk_FreeToLowMark(int mark);
@@ -118,10 +119,10 @@ void *Hunk_TempAlloc(size_t size);
 
 void Hunk_Check(void);
 
-typedef struct cache_user_s
+struct cache_user_t
 {
 	void	*data;
-} cache_user_t;
+} ;
 
 void Cache_Flush(void);
 
@@ -131,7 +132,7 @@ void *Cache_Check(cache_user_t *c);
 
 void Cache_Free(cache_user_t *c);
 
-void *Cache_Alloc(cache_user_t *c, int size, const char *name);
+void *Cache_Alloc(cache_user_t *c, int size, const quake::string_view& name);
 // Returns NULL if all purgable data was tossed and there still
 // wasn't enough room.
 
@@ -159,8 +160,8 @@ public:
 	ZAllocator() {}
 	ZAllocator(const ZAllocator&) {}
 
-	pointer   allocate(size_type n, const void * = 0) { return Z_Malloc(n); }
-	void      deallocate(void* p, size_type) { (void)n; Z_Free(p); }
+	pointer   allocate(size_type n, const void * = 0) { return (T*)Z_Malloc(n); }
+	void      deallocate(void* p, size_type n) { (void)n; Z_Free(p); }
 
 
 	pointer           address(reference x) const { return &x; }
@@ -178,6 +179,46 @@ public:
 
 	template <class U>
 	ZAllocator& operator=(const ZAllocator<U>&) { return *this; }
+};
+// carful with this,
+template <typename  T>
+class HAllocator
+{
+public:
+	using std_allocator = std::allocator<T>;
+	using size_type = size_t;
+	using difference_type = ptrdiff_t;
+	using value_type = T;
+	using pointer = value_type*;
+	using const_pointer = const value_type*;
+	using reference = value_type&;
+	using const_reference = const value_type&;
+
+
+	HAllocator() : _mark(Hunk_LowMark()) {}
+	HAllocator(const HAllocator&) {}
+	~HAllocator() { Hunk_FreeToLowMark(_mark); }
+	pointer   allocate(size_type n, const void * pptr = 0) { return (T*)Hunk_AllocName(n, "halloc"); }
+	void      deallocate(void* p, size_type n) { (void)n; }
+
+
+	pointer           address(reference x) const { return &x; }
+	const_pointer     address(const_reference x) const { return &x; }
+	ZAllocator<T>&  operator=(const ZAllocator&) { return *this; }
+	void              construct(pointer p, const T& val) { new ((T*)p) T(val); }
+	void              destroy(pointer p) { p->~T(); }
+	size_type         max_size() const { return size_t(-1); }
+
+	template <class U>
+	struct rebind { typedef HAllocator<U> other; };
+
+	template <class U>
+	HAllocator(const HAllocator<U>&) {}
+
+	template <class U>
+	HAllocator& operator=(const HAllocator<U>&) { return *this; }
+private:
+	int _mark;
 };
 template <typename  T>
 class CacheAllocator
@@ -261,8 +302,13 @@ private:
 	tracker_t* _cache;
 };
 
+namespace quake {
+	using string = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
+	using stringstream = std::basic_stringstream<char, std::char_traits<char>, ZAllocator<char>>;
+}
 // some basic wrappers to use the doom memory system
 using ZString = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
+using HString = std::basic_string<char, std::char_traits<char>, HAllocator<char>>;
 using CacheString = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
 using CacheStringStream = std::basic_stringstream<char, std::char_traits<char>, CacheAllocator<char>>;
 using ZStringStream = std::basic_stringstream<char, std::char_traits<char>, ZAllocator<char>>;

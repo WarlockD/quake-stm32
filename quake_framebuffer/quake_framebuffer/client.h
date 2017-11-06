@@ -18,6 +18,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // client.h
+#ifndef _QUAKE_CLIENT_H_
+#define _QUAKE_CLIENT_H_
+
+#include "common.h"
 
 typedef struct
 {
@@ -103,6 +107,7 @@ ca_dedicated, 		// a dedicated server with no ability to start a client
 ca_disconnected, 	// full screen console with no connection
 ca_connected		// valid netcon, talking to a server
 } cactive_t;
+#include <fstream>
 
 //
 // the client_static_t structure is persistant through an arbitrary number
@@ -126,7 +131,7 @@ typedef struct
 	qboolean	demoplayback;
 	qboolean	timedemo;
 	int			forcetrack;			// -1 = use normal cd track
-	FILE		*demofile;
+	std::fstream demofile;
 	int			td_lastframe;		// to meter out one message a frame
 	int			td_startframe;		// host_framecount at start
 	idTime		td_starttime;		// realtime at second frame of timedemo
@@ -293,14 +298,14 @@ void	CL_DecayLights (void);
 
 void CL_Init (void);
 
-void CL_EstablishConnection (char *host);
+void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[]);
 void CL_Signon1 (void);
 void CL_Signon2 (void);
 void CL_Signon3 (void);
 void CL_Signon4 (void);
 
 void CL_Disconnect (void);
-void CL_Disconnect_f (void);
+void CL_Disconnect_f (cmd_source_t source, size_t argc, const quake::string_view args[]);
 void CL_NextDemo (void);
 
 #define			MAX_VISEDICTS	256
@@ -336,7 +341,7 @@ void CL_BaseMove (usercmd_t *cmd);
 
 
 float CL_KeyState (kbutton_t *key);
-char *Key_KeynumToString (int keynum);
+const char *Key_KeynumToString (int keynum);
 
 //
 // cl_demo.c
@@ -344,10 +349,10 @@ char *Key_KeynumToString (int keynum);
 void CL_StopPlayback (void);
 int CL_GetMessage (void);
 
-void CL_Stop_f (void);
-void CL_Record_f (void);
-void CL_PlayDemo_f (void);
-void CL_TimeDemo_f (void);
+void CL_Stop_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void CL_Record_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void CL_TimeDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
 
 //
 // cl_parse.c
@@ -358,7 +363,7 @@ void CL_NewTranslation (int slot);
 //
 // view
 //
-void V_StartPitchDrift (void);
+void V_StartPitchDrift();
 void V_StopPitchDrift (void);
 
 void V_RenderView (void);
@@ -373,3 +378,5 @@ void V_SetContentsColor (int contents);
 //
 void CL_InitTEnts (void);
 void CL_SignonReply (void);
+
+#endif

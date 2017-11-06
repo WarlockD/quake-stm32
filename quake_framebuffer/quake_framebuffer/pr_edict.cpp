@@ -22,10 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /*
 	Some side notes on the original Quake.  I havn't looked at Quake2 yet but they do ALOT of string copies.  First its copyied to com_token, THEN to another buff
 	THEN another buffer for vector_t for the Q_atof.  Thats just WAY to much because ware are directly moving it to the dictionary
-	So I made a class c alled idStrRef that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
+	So I made a class c alled quake::string_view that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
 	that crazy copying.
 
-	Just watch it as if the file is unloaded all the idStrRef's suddenly become invalid
+	Just watch it as if the file is unloaded all the quake::string_view's suddenly become invalid
 */
 #include "quakedef.h"
 
@@ -46,7 +46,7 @@ unsigned short		pr_crc;
 
 
 ddef_t *ED_FieldAtOfs (int ofs);
-qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& s);
+qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
 cvar_t	gamecfg = {"gamecfg", "0"};
@@ -191,7 +191,7 @@ ddef_t *ED_FieldAtOfs (int ofs)
 ED_FindField
 ============
 */
-ddef_t *ED_FindField (const idStrRef& name)
+ddef_t *ED_FindField (const quake::string_view& name)
 {
 	ddef_t		*def;
 	for (int i =0 ; i<progs->numfielddefs ; i++)
@@ -209,7 +209,7 @@ ddef_t *ED_FindField (const idStrRef& name)
 ED_FindGlobal
 ============
 */
-ddef_t *ED_FindGlobal (const idStrRef& name)
+ddef_t *ED_FindGlobal (const quake::string_view& name)
 {
 	ddef_t		*def;
 	int			i;
@@ -229,7 +229,7 @@ ddef_t *ED_FindGlobal (const idStrRef& name)
 ED_FindFunction
 ============
 */
-dfunction_t *ED_FindFunction (const idStrRef& name)
+dfunction_t *ED_FindFunction (const quake::string_view& name)
 {
 	dfunction_t		*func;
 	int				i;
@@ -244,7 +244,7 @@ dfunction_t *ED_FindFunction (const idStrRef& name)
 }
 
 
-eval_t *GetEdictFieldValue(edict_t *ed, const idStrRef& field)
+eval_t *GetEdictFieldValue(edict_t *ed, const quake::string_view& field)
 {
 	ddef_t			*def = NULL;
 	int				i;
@@ -265,7 +265,7 @@ eval_t *GetEdictFieldValue(edict_t *ed, const idStrRef& field)
 	if (field.size() < MAX_FIELD_LEN)
 	{
 		gefvCache[rep].pcache = def;
-		field.copy(gefvCache[rep].field);
+		field.copy(gefvCache[rep].field,sizeof(gefvCache[rep].field));
 		rep ^= 1;
 	}
 
@@ -277,54 +277,6 @@ Done:
 }
 
 
-/*
-============
-PR_ValueString
-
-Returns a string describing *data in a type specific manner
-=============
-*/
-const char *PR_ValueString (idType type, eval_t *val)
-{
-	static char	line[256];
-	ddef_t		*def;
-	dfunction_t	*f;
-	
-	switch (type)
-	{ 
-	case etype_t::ev_string:
-		Q_sprintf (line, "%s", pr_strings + val->string);
-		break;
-	case etype_t::ev_entity:	
-		Q_sprintf (line, "entity %i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
-		break;
-	case etype_t::ev_function:
-		f = pr_functions + val->function;
-		Q_sprintf (line, "%s()", pr_strings + f->s_name);
-		break;
-	case etype_t::ev_field:
-		def = ED_FieldAtOfs ( val->_int );
-		Q_sprintf (line, ".%s", pr_strings + def->s_name);
-		break;
-	case etype_t::ev_void:
-		Q_sprintf (line, "void");
-		break;
-	case etype_t::ev_float:
-		Q_sprintf (line, "%5.1f", val->_float);
-		break;
-	case etype_t::ev_vector:
-		Q_sprintf (line, "'%5.1f %5.1f %5.1f'", val->vector[0], val->vector[1], val->vector[2]);
-		break;
-	case etype_t::ev_pointer:
-		Q_sprintf (line, "pointer");
-		break;
-	default:
-		Q_sprintf (line, "bad type %i", type);
-		break;
-	}
-	
-	return line;
-}
 
 /*
 ============
@@ -334,114 +286,53 @@ Returns a string describing *data in a type specific manner
 Easier to parse than PR_ValueString
 =============
 */
-const char *PR_UglyValueString (idType type, eval_t *val)
-{
-	static char	line[256];
-	ddef_t		*def;
-	dfunction_t	*f;
+class PR_UglyValueString : public quake::stream_output {
+public:
+	PR_UglyValueString(idType type, eval_t *val) : type(type), val(val) {}
+	void text_output(std::ostream& os) const override final {
+		ddef_t		*def;
+		dfunction_t	*f;
 
-	switch (type)
-	{
-	case etype_t::ev_string:
-		Q_sprintf (line, "%s", pr_strings + val->string);
+		switch (type)
+		{
+		case etype_t::ev_string:
+			os << (const char*)(pr_strings + val->string);
+			break;
+		case etype_t::ev_entity:
+			os << (int)(NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+			break;
+		case etype_t::ev_function:
+		{
+			dfunction_t	*f = pr_functions + val->function;
+			os << (const char*)(pr_strings + f->s_name);
+		}
 		break;
-	case etype_t::ev_entity:	
-		Q_sprintf (line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+		case etype_t::ev_field:
+		{
+			ddef_t		*def = ED_FieldAtOfs(val->_int);
+			os << (const char*)(pr_strings + def->s_name);
+		}
 		break;
-	case etype_t::ev_function:
-		f = pr_functions + val->function;
-		Q_sprintf (line, "%s", pr_strings + f->s_name);
-		break;
-	case etype_t::ev_field:
-		def = ED_FieldAtOfs ( val->_int );
-		Q_sprintf (line, "%s", pr_strings + def->s_name);
-		break;
-	case etype_t::ev_void:
-		Q_sprintf (line, "void");
-		break;
-	case etype_t::ev_float:
-		Q_sprintf (line, "%f", val->_float);
-		break;
-	case etype_t::ev_vector:
-		Q_sprintf (line, "%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
-		break;
-	default:
-		Q_sprintf (line, "bad type %i", type);
-		break;
+		case etype_t::ev_void:
+			os << "void";
+			break;
+		case etype_t::ev_float:
+			os << (float)val->_float;
+			break;
+		case etype_t::ev_vector:
+			os << (float)val->vector[0] << ' ' << (float)val->vector[1] << ' ' << (float)val->vector[2];
+			break;
+		default:
+			os << "bad type " << (int)(etype_t)type;
+			break;
+		}
 	}
-	
-	return line;
-}
-// hack, fix this latter, check buffer size etc
-static void PadString(char* s, const size_t count) {
-	size_t i = Q_strlen(s);
-	s += i;
-	for (s; i < count; i++) *s++ = ' ';
-	*s++ = ' ';
-	*s++ = '\0';
-}
-/*
-============
-PR_GlobalString
+private:
+	idType type;
+	eval_t *val;
+};
 
-Returns a string with a description and the contents of a global,
-padded to 20 field width
-============
-*/
-char *PR_GlobalString (int ofs)
-{
-	int		i;
-	ddef_t	*def;
-	void	*val;
-	static char	line[128];
-	
-	val = (void *)&pr_globals[ofs];
-	def = ED_GlobalAtOfs(ofs);
-	if (!def)
-		Q_sprintf (line,"%i(???)", ofs);
-	else
-	{
-		const char* s = PR_ValueString (def->type, (eval_t*)val);
-		Q_sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
-	}
-	// WHY, seriously WHY use strcat when you got the length already?
-	// I am just keeping this to shame John Carmack
-	// am I going to have to go line by line on this thing?  
-	// Granted this was in the 90's and its not like eveyone knew how to build a parser...
-	// meh
-	// ... wait a sec, you can do this in sprintf?   Was it back in the day, printf wasn't that good?
-	i = Q_strlen(line);
-#if 0
-	for ( ; i<20 ; i++)
-		Q_strcat (line," ");
-	Q_strcat (line," ");
-#else
-	PadString(line, 20);
-#endif
-	return line;
-}
 
-char *PR_GlobalStringNoContents (int ofs)
-{
-	int		i;
-	ddef_t	*def;
-	static char	line[128];
-	
-	def = ED_GlobalAtOfs(ofs);
-	if (!def)
-		Q_sprintf (line,"%i(???)", ofs);
-	else
-		Q_sprintf (line,"%i(%s)", ofs, pr_strings + def->s_name);
-#if 0
-	i = Q_strlen(line);
-	for ( ; i<20 ; i++)
-		Q_strcat (line," ");
-	Q_strcat (line," ");
-#else
-	PadString(line, 20);
-#endif
-	return line;
-}
 
 
 /*
@@ -461,11 +352,11 @@ void edict_t::Print()
 	auto ed = this;
 	if (ed->free)
 	{
-		Con_Printf ("FREE\n");
+		quake::con << "FREE" << std::endl;
 		return;
 	}
-
-	Con_Printf("\nEDICT %i:\n", NUM_FOR_EDICT(ed));
+	quake::con << std::endl;
+	quake::con << "EDICT " << NUM_FOR_EDICT(ed) << ':' << std::endl;
 	for (int i=1 ; i<progs->numfielddefs ; i++)
 	{
 		d = &pr_fielddefs[i];
@@ -485,10 +376,7 @@ void edict_t::Print()
 		if (j == type_size)
 			continue;
 	
-		Con_Printf ("%s",name);
-		auto l = Q_strlen (name);
-		while (l++ < 15) Con_Printf (" ");
-		Con_Printf ("%s\n", PR_ValueString(d->type, (eval_t *)v));		
+		quake::con << std::left << std::setw(15) << name << quake::PR_ValueString(d->type, (eval_t *)v) << std::endl;	
 	}
 }
 
@@ -499,7 +387,7 @@ ED_Write
 For savegames
 =============
 */
-void ED_Write (FILE *f, edict_t *ed)
+void ED_Write (std::ostream& f, edict_t *ed)
 {
 	ddef_t	*d;
 	int		*v;
@@ -507,37 +395,30 @@ void ED_Write (FILE *f, edict_t *ed)
 	char	*name;
 	idType	type;
 
-	fprintf (f, "{\n");
-
-	if (ed->free)
+	f << '{' << std::endl;
+	if (!ed->free)
 	{
-		fprintf (f, "}\n");
-		return;
+		for (size_t i = 1; i < (size_t)progs->numfielddefs; i++)
+		{
+			d = &pr_fielddefs[i];
+			name = pr_strings + d->s_name;
+			if (name[strlen(name) - 2] == '_')
+				continue;	// skip _x, _y, _z vars
+
+			v = (int *)((char *)&ed->v + d->ofs * 4);
+
+			// if the value is still all 0, skip the field
+
+			type = d->type;
+			for (j = 0; j < type.size(); j++)
+				if (v[j])
+					break;
+			if (j == type.size())
+				continue;
+			f << '"' << name << "\" \"" << PR_UglyValueString(d->type, (eval_t *)v) << '"' << std::endl;
+		}
 	}
-	
-	for (size_t i=1 ; i< (size_t)progs->numfielddefs ; i++)
-	{
-		d = &pr_fielddefs[i];
-		name = pr_strings + d->s_name;
-		if (name[strlen(name)-2] == '_')
-			continue;	// skip _x, _y, _z vars
-			
-		v = (int *)((char *)&ed->v + d->ofs*4);
-
-	// if the value is still all 0, skip the field
-
-		type = d->type;
-		for (j=0 ; j< type.size() ; j++)
-			if (v[j])
-				break;
-		if (j == type.size())
-			continue;
-	
-		fprintf (f,"\"%s\" ",name);
-		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type, (eval_t *)v));		
-	}
-
-	fprintf (f, "}\n");
+	f << ')' << std::endl;
 }
 
 void ED_PrintNum (int ent)
@@ -552,7 +433,7 @@ ED_PrintEdicts
 For debugging, prints all the entities in the current server
 =============
 */
-void ED_PrintEdicts (void)
+void ED_PrintEdicts()
 {
 	int		i;
 	
@@ -568,11 +449,11 @@ ED_PrintEdict_f
 For debugging, prints a single edicy
 =============
 */
-void ED_PrintEdict_f (void)
+void ED_PrintEdict_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int		i;
 	
-	i = Q_atoi (Cmd_Argv(1));
+	i = Q_atoi (argv[1]);
 	if (i >= sv.num_edicts)
 	{
 		Con_Printf("Bad edict number\n");
@@ -588,7 +469,7 @@ ED_Count
 For debugging
 =============
 */
-void ED_Count (void)
+void ED_Count(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int		i;
 	edict_t	*ent;
@@ -631,12 +512,11 @@ FIXME: need to tag constants, doesn't really work
 ED_WriteGlobals
 =============
 */
-void ED_WriteGlobals (FILE *f)
+void ED_WriteGlobals (std::ostream& f)
 {
 	ddef_t		*def;
 	idType		type;
-
-	fprintf (f,"{\n");
+	f << '{' << std::endl;
 	for (int i=0 ; i<progs->numglobaldefs ; i++)
 	{
 		def = &pr_globaldefs[i];
@@ -647,13 +527,12 @@ void ED_WriteGlobals (FILE *f)
 		case etype_t::ev_string:
 		case etype_t::ev_float:
 		case etype_t::ev_entity:
-			char* name = pr_strings + def->s_name;
-			fprintf(f, "\"%s\" ", name);
-			fprintf(f, "\"%s\"\n", PR_UglyValueString(type, (eval_t *)&pr_globals[def->ofs]));
+			const char* name = pr_strings + def->s_name;
+			f << '"' << name << "\" \"" << PR_UglyValueString(type, (eval_t *)&pr_globals[def->ofs]) << '"' << std::endl;
 		}
 		break;
 	}
-	fprintf (f,"}\n");
+	f << '}' << std::endl;
 }
 
 /*
@@ -661,36 +540,33 @@ void ED_WriteGlobals (FILE *f)
 ED_ParseGlobals
 =============
 */
-void ED_ParseGlobals (const char * data)
+void ED_ParseGlobals (COM_Parser& parser)
 {
-	idStrRef keyname;
-	idStrRef value;
-	ddef_t	*key;
-	COM_Parser parser(data);
-
 	while (1)
 	{	
-		if (!parser.Next(keyname))
+		auto keyname = parser.Next();
+		if (keyname == COM_Parser::Eof)
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
-		if (keyname[0] == '}')
+		if (keyname  == '}')
 			break;
 
-		if (!parser.Next(value))
+		auto value = parser.Next();
+		if (value == COM_Parser::Eof)
 			Sys_Error("ED_ParseEntity: closing brace without data");
 
-		if (value[0] == '}')
+		if (value == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 
-		key = ED_FindGlobal (keyname);
+		ddef_t	* key = ED_FindGlobal (keyname.text());
 		if (!key)
 		{
 			Con_Printf ("'%s' is not a global\n", keyname);
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)pr_globals, key, value))
+		if (!ED_ParseEpair ((void *)pr_globals, key, value.text()))
 			Host_Error ("ED_ParseGlobals: parse error");
 	}
 }
@@ -703,7 +579,7 @@ void ED_ParseGlobals (const char * data)
 ED_NewString
 =============
 */
-char *ED_NewString (const idStrRef& string)
+char *ED_NewString (const quake::string_view& string)
 {
 	char	*new_ptr, *new_p;
 	int		i,l;
@@ -738,7 +614,7 @@ Can parse either fields or globals
 returns false if error
 =============
 */
-qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& value)
+qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value)
 {
 	int		i;
 	char	string[128];
@@ -752,15 +628,15 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& value)
 	switch (type)
 	{
 	case etype_t::ev_string:
-		*(string_t *)d = ED_NewString (s) - pr_strings;
+		*(string_t *)d = ED_NewString (value) - pr_strings;
 		break;
 		
 	case etype_t::ev_float:
-		assert(value.to_float(*(float *)d) > 0);
+		*(float *)d = Q_atof(value);
 		break;
 		
 	case etype_t::ev_vector:
-		value.copy(string);
+		value.copy(string,sizeof(string));
 		v = string;
 		w = string;
 		for (i=0 ; i<3 ; i++)
@@ -774,7 +650,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& value)
 		break;
 		
 	case etype_t::ev_entity:
-		value.copy(string);
+		value.copy(string,sizeof(string));
 		*(int *)d = EDICT_TO_PROG(EDICT_NUM(atoi (string)));
 		break;
 		
@@ -782,7 +658,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& value)
 		def = ED_FindField (value);
 		if (!def)
 		{
-			Con_Printf ("Can't find field %s\n", s);
+			quake::con << "Can't find field " << value << std::endl;
 			return false;
 		}
 		*(int *)d = G_INT(def->ofs);
@@ -792,7 +668,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const idStrRef& value)
 		func = ED_FindFunction (value);
 		if (!func)
 		{
-			Con_Printf ("Can't find function %s\n", s);
+			quake::con << "Can't find function " << value << std::endl;
 			return false;
 		}
 		*(func_t *)d = func - pr_functions;
@@ -813,18 +689,16 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
-const char *ED_ParseEdict(const char *data, edict_t *ent)
+void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 {
-	buffer_t<128> buf;
 	ddef_t		*key;
 	qboolean	anglehack;
 	qboolean	init;
-	idStrRef	keyname;
-	idStrRef	value;
+	
 	int			n;
 
 	init = false;
-	COM_Parser parser(data);
+	//COM_Parser parser(data);
 
 	// clear it
 	if (ent != sv.edicts)	// hack
@@ -833,14 +707,17 @@ const char *ED_ParseEdict(const char *data, edict_t *ent)
 	// go through all the dictionary pairs
 	while (1)
 	{
-		if (!parser.Next(keyname))
+		auto keytoken = parser.Next();
+		if (keytoken == COM_Parser::Eof)
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
-		if (keyname[0] == '}') break;
+		if (keytoken == '}') break;
 		// anglehack is to allow QuakeEd to write single scalar angles
 		// and allow them to be turned into vectors. (FIXME...)
 		anglehack = false;
+		assert(keytoken == COM_Parser::Symbol);
 
+		quake::string_view	keyname = keytoken.text();
 		if (keyname == "angles")
 		{
 			keyname =  "angles";
@@ -854,9 +731,9 @@ const char *ED_ParseEdict(const char *data, edict_t *ent)
 		// this shouldn't happen with the parser
 		assert(keyname.back() != ' ');
 
-
+		auto value = parser.Next();
 		// parse value	
-		if (!parser.Next(value) || value[0] == '}')
+		if (value == COM_Parser::Eof || value == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		init = true;
@@ -876,15 +753,14 @@ const char *ED_ParseEdict(const char *data, edict_t *ent)
 
 		if (anglehack)
 		{
-			buf.clear();
-			buf.append("0 ");
-			buf.append(keyname.data(),keyname.size());
-			buf.append(" 0");
-			if (!ED_ParseEpair((void *)&ent->v, key, buf))
+			quake::fixed_string_stream<128> buf;
+			assert(value == COM_Parser::Number);
+			buf << "0 " << keyname << " 0";
+			if (!ED_ParseEpair((void *)&ent->v, key, buf.str()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 		else {
-			if (!ED_ParseEpair((void *)&ent->v, key, keyname))
+			if (!ED_ParseEpair((void *)&ent->v, key, value.text()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 
@@ -893,8 +769,6 @@ const char *ED_ParseEdict(const char *data, edict_t *ent)
 
 	if (!init)
 		ent->free = true;
-
-	return data;
 }
 
 
@@ -923,25 +797,23 @@ void ED_LoadFromFile (const char *data)
 	inhibit = 0;
 	pr_global_struct->time = sv.time;
 	COM_Parser parser(data);
-	idStrRef token;
 
 // parse ents
 	while (1)
 	{
 // parse the opening brace	
-		if (!parser.Next(token)) break;
+		auto token = parser.Next();
+		if (token == COM_Parser::Eof) break;
 
-		if (token[0] != '{') {
-			
-			Sys_Error("ED_LoadFromFile: found %s when expecting {", token.begin());
+		if (token != '{') {
+			Sys_Error("ED_LoadFromFile:  expecting {");
 		}
-
 
 		if (!ent)
 			ent = EDICT_NUM(0);
 		else
 			ent = ED_Alloc ();
-		data = ED_ParseEdict (data, ent);
+		ED_ParseEdict (parser, ent);
 
 // remove things from different skill levels or deathmatch
 		if (deathmatch.value)
@@ -974,7 +846,8 @@ void ED_LoadFromFile (const char *data)
 		}
 
 	// look for the spawn function
-		func = ED_FindFunction ( pr_strings + ent->v.classname );
+		quake::string_view ref(pr_strings + ent->v.classname);
+		func = ED_FindFunction (ref);
 
 		if (!func)
 		{
@@ -1083,7 +956,7 @@ PR_Init
 void PR_Init (void)
 {
 	Cmd_AddCommand ("edict", ED_PrintEdict_f);
-	Cmd_AddCommand ("edicts", ED_PrintEdicts);
+	Cmd_AddCommand ("edicts", (xcommand_t)ED_PrintEdicts);
 	Cmd_AddCommand ("edictcount", ED_Count);
 	Cmd_AddCommand ("profile", PR_Profile_f);
 	Cvar_RegisterVariable (&nomonsters);

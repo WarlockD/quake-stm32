@@ -22,19 +22,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "net_vcr.h"
 
-extern int vcrFile;
+sys_file vcrFile;
 
 // This is the playback portion of the VCR.  It reads the file produced
 // by the recorder and plays it back to the host.  The recording contains
 // everything necessary (events, timestamps, and data) to duplicate the game
 // from the viewpoint of everything above the network layer.
 
-static struct
+struct next_t
 {
 	idTime	time;
 	int		op;
 	long	session;
-}	next;
+} next;
 
 int VCR_Init (void)
 {
@@ -49,13 +49,13 @@ int VCR_Init (void)
 	net_drivers[0].Close = VCR_Close;
 	net_drivers[0].Shutdown = VCR_Shutdown;
 
-	Sys_FileRead(vcrFile, &next, sizeof(next));
+	vcrFile.read(&next, sizeof(next));
 	return 0;
 }
 
 void VCR_ReadNext (void)
 {
-	if (Sys_FileRead(vcrFile, &next, sizeof(next)) == 0)
+	if (vcrFile.read( &next, sizeof(next)) == 0)
 	{
 		next.op = 255;
 		Sys_Error ("=== END OF PLAYBACK===\n");
@@ -82,15 +82,15 @@ int VCR_GetMessage (qsocket_t *sock)
 	if (host_time != next.time || next.op != VCR_OP_GETMESSAGE || next.session != *(long *)(&sock->driverdata))
 		Sys_Error ("VCR missmatch");
 
-	Sys_FileRead(vcrFile, &ret, sizeof(int));
+	vcrFile.read( &ret, sizeof(int));
 	if (ret != 1)
 	{
 		VCR_ReadNext ();
 		return ret;
 	}
 
-	Sys_FileRead(vcrFile, &net_message.cursize, sizeof(int));
-	Sys_FileRead(vcrFile, net_message.data, net_message.cursize);
+	vcrFile.read( &net_message.cursize, sizeof(int));
+	vcrFile.read( net_message.data, net_message.cursize);
 
 	VCR_ReadNext ();
 
@@ -105,7 +105,7 @@ int VCR_SendMessage (qsocket_t *sock, sizebuf_t *data)
 	if (host_time != next.time || next.op != VCR_OP_SENDMESSAGE || next.session != *(long *)(&sock->driverdata))
 		Sys_Error ("VCR missmatch");
 
-	Sys_FileRead(vcrFile, &ret, sizeof(int));
+	vcrFile.read( &ret, sizeof(int));
 
 	VCR_ReadNext ();
 
@@ -120,7 +120,7 @@ qboolean VCR_CanSendMessage (qsocket_t *sock)
 	if (host_time != next.time || next.op != VCR_OP_CANSENDMESSAGE || next.session != *(long *)(&sock->driverdata))
 		Sys_Error ("VCR missmatch");
 
-	Sys_FileRead(vcrFile, &ret, sizeof(int));
+	vcrFile.read( &ret, sizeof(int));
 
 	VCR_ReadNext ();
 
@@ -138,7 +138,7 @@ void VCR_SearchForHosts (qboolean xmit)
 }
 
 
-qsocket_t *VCR_Connect (char *host)
+qsocket_t *VCR_Connect (const char *host)
 {
 	return NULL;
 }
@@ -160,7 +160,7 @@ qsocket_t *VCR_CheckNewConnections (void)
 	sock = NET_NewQSocket ();
 	*(long *)(&sock->driverdata) = next.session;
 
-	Sys_FileRead (vcrFile, sock->address, NET_NAMELEN);
+	vcrFile.read( sock->address, NET_NAMELEN);
 	VCR_ReadNext ();
 
 	return sock;

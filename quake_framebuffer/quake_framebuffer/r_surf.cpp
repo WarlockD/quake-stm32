@@ -224,7 +224,7 @@ texture_t *R_TextureAnimation (texture_t *base)
 	if (!base->anim_total)
 		return base;
 
-	reletive = (int)(idCast<float>(cl.time)*10) % base->anim_total;
+	reletive = (int)(idCast<float>(cl.time)*10.0f) % base->anim_total;
 
 	count = 0;	
 	while (base->anim_min > reletive || base->anim_max <= reletive)

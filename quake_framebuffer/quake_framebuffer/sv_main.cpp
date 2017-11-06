@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sv_main.c -- server main program
 
 #include "quakedef.h"
+#include "cmd.h"
+
 using namespace std::chrono;
 server_t		sv;
 server_static_t	svs;
@@ -998,9 +1000,12 @@ void SV_SendReconnect (void)
 	
 	if (cls.state != ca_dedicated)
 #ifdef QUAKE2
-		Cbuf_InsertText ("reconnect\n");
+		Cbuf_InsertText("reconnect\n");
 #else
-		Cmd_ExecuteString ("reconnect\n", src_command);
+	{
+		Cmd_Tokenizer tokenizer;
+		tokenizer.execute("reconnect\n", src_command);
+	}
 #endif
 }
 
@@ -1045,7 +1050,7 @@ extern idTime		scr_centertime_off;
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
 #else
-void SV_SpawnServer (char *server)
+void SV_SpawnServer (const char *server)
 #endif
 {
 

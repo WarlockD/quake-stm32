@@ -39,8 +39,8 @@ char		my_tcpip_address[NET_NAMELEN];
 
 void (*GetComPortConfig) (int portNumber, int *port, int *irq, int *baud, qboolean *useModem);
 void (*SetComPortConfig) (int portNumber, int port, int irq, int baud, qboolean useModem);
-void (*GetModemConfig) (int portNumber, char *dialType, char *clear, char *init, char *hangup);
-void (*SetModemConfig) (int portNumber, char *dialType, char *clear, char *init, char *hangup);
+void (*GetModemConfig) (int portNumber, const char *dialType, const char *clear, const char *init, const char *hangup);
+void (*SetModemConfig) (int portNumber, const char *dialType, const char *clear, const char *init, const char *hangup);
 
 static qboolean	listening = false;
 
@@ -64,6 +64,7 @@ int messagesReceived = 0;
 int unreliableMessagesSent = 0;
 int unreliableMessagesReceived = 0;
 
+extern sys_file vcrFile;
 cvar_t	net_messagetimeout = {"net_messagetimeout","300"};
 cvar_t	hostname = {"hostname", "UNNAMED"};
 
@@ -81,7 +82,8 @@ cvar_t	config_modem_hangup = {"_config_modem_hangup", "AT H", true};
 cvar_t	idgods = {"idgods", "0"};
 #endif
 
-int	vcrFile = -1;
+
+sys_file svcrFile;
 qboolean recording = false;
 
 // these two macros are to make the code more readable
@@ -173,15 +175,15 @@ void NET_FreeQSocket(qsocket_t *sock)
 }
 
 
-static void NET_Listen_f (void)
+static void NET_Listen_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	if (Cmd_Argc () != 2)
+	if (argc != 2)
 	{
 		Con_Printf ("\"listen\" is \"%u\"\n", listening ? 1 : 0);
 		return;
 	}
 
-	listening = Q_atoi(Cmd_Argv(1)) ? true : false;
+	listening = Q_atoi(argv[1]) ? true : false;
 
 	for (net_driverlevel=0 ; net_driverlevel<net_numdrivers; net_driverlevel++)
 	{
@@ -192,11 +194,11 @@ static void NET_Listen_f (void)
 }
 
 
-static void MaxPlayers_f (void)
+static void MaxPlayers_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int 	n;
 
-	if (Cmd_Argc () != 2)
+	if (argc != 2)
 	{
 		Con_Printf ("\"maxplayers\" is \"%u\"\n", svs.maxclients);
 		return;
@@ -208,7 +210,7 @@ static void MaxPlayers_f (void)
 		return;
 	}
 
-	n = Q_atoi(Cmd_Argv(1));
+	n = Q_atoi(argv[1]);
 	if (n < 1)
 		n = 1;
 	if (n > svs.maxclientslimit)
@@ -231,17 +233,17 @@ static void MaxPlayers_f (void)
 }
 
 
-static void NET_Port_f (void)
+static void NET_Port_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int 	n;
 
-	if (Cmd_Argc () != 2)
+	if (argc != 2)
 	{
 		Con_Printf ("\"port\" is \"%u\"\n", net_hostport);
 		return;
 	}
 
-	n = Q_atoi(Cmd_Argv(1));
+	n = Q_atoi(argv[1]);
 	if (n < 1 || n > 65534)
 	{
 		Con_Printf ("Bad value, must be between 1 and 65534\n");
@@ -291,13 +293,11 @@ static void PrintSlistTrailer(void)
 		Con_Printf("No Quake servers found.\n\n");
 }
 
-
-void NET_Slist_f (void)
-{
+void NET_Slist() {
 	if (slistInProgress)
 		return;
 
-	if (! slistSilent)
+	if (!slistSilent)
 	{
 		Con_Printf("Looking for Quake servers...\n");
 		PrintSlistHeader();
@@ -310,6 +310,10 @@ void NET_Slist_f (void)
 	SchedulePollProcedure(&slistPollProcedure, 100ms);
 
 	hostCacheCount = 0;
+}
+void NET_Slist_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+{
+	NET_Slist();
 }
 
 
@@ -366,7 +370,7 @@ NET_Connect
 int hostCacheCount = 0;
 hostcache_t hostcache[HOSTCACHESIZE];
 
-qsocket_t *NET_Connect (char *host)
+qsocket_t *NET_Connect (quake::string_view host)
 {
 	qsocket_t		*ret;
 	int				n;
@@ -374,10 +378,8 @@ qsocket_t *NET_Connect (char *host)
 
 	SetNetTime();
 
-	if (host && *host == 0)
-		host = NULL;
 
-	if (host)
+	if (!host.empty())
 	{
 		if (Q_strcasecmp (host, "local") == 0)
 		{
@@ -398,13 +400,13 @@ qsocket_t *NET_Connect (char *host)
 		}
 	}
 
-	slistSilent = host ? true : false;
-	NET_Slist_f ();
+	slistSilent = !host.empty();
+	NET_Slist();
 
 	while(slistInProgress)
 		NET_Poll();
 
-	if (host == NULL)
+	if (host.empty())
 	{
 		if (hostCacheCount != 1)
 			return NULL;
@@ -425,20 +427,21 @@ JustDoIt:
 	{
 		if (net_drivers[net_driverlevel].initialized == false)
 			continue;
-		ret = dfunc.Connect (host);
+		quake::fixed_string<32> str = host;
+		ret = dfunc.Connect (str.c_str());
 		if (ret)
 			return ret;
 	}
 
-	if (host)
+	if (host.empty())
 	{
-		Con_Printf("\n");
+		quake::con << std::endl;
 		PrintSlistHeader();
 		PrintSlist();
 		PrintSlistTrailer();
 	}
 	
-	return NULL;
+	return nullptr;
 }
 
 
@@ -475,8 +478,8 @@ qsocket_t *NET_CheckNewConnections (void)
 				vcrConnect.time = host_time;
 				vcrConnect.op = VCR_OP_CONNECT;
 				vcrConnect.session = (long)ret;
-				Sys_FileWrite (vcrFile, &vcrConnect, sizeof(vcrConnect));
-				Sys_FileWrite (vcrFile, ret->address, NET_NAMELEN);
+				vcrFile.write( &vcrConnect, sizeof(vcrConnect));
+				vcrFile.write(ret->address, NET_NAMELEN);
 			}
 			return ret;
 		}
@@ -487,7 +490,7 @@ qsocket_t *NET_CheckNewConnections (void)
 		vcrConnect.time = host_time;
 		vcrConnect.op = VCR_OP_CONNECT;
 		vcrConnect.session = 0;
-		Sys_FileWrite (vcrFile, &vcrConnect, sizeof(vcrConnect));
+		vcrFile.write( &vcrConnect, sizeof(vcrConnect));
 	}
 
 	return NULL;
@@ -584,8 +587,8 @@ int	NET_GetMessage (qsocket_t *sock)
 			vcrGetMessage.session = (long)sock;
 			vcrGetMessage.ret = ret;
 			vcrGetMessage.len = net_message.cursize;
-			Sys_FileWrite (vcrFile, &vcrGetMessage, 24);
-			Sys_FileWrite (vcrFile, net_message.data, net_message.cursize);
+			vcrFile.write(&vcrGetMessage, 24);
+			vcrFile.write(net_message.data, net_message.cursize);
 		}
 	}
 	else
@@ -596,7 +599,7 @@ int	NET_GetMessage (qsocket_t *sock)
 			vcrGetMessage.op = VCR_OP_GETMESSAGE;
 			vcrGetMessage.session = (long)sock;
 			vcrGetMessage.ret = ret;
-			Sys_FileWrite (vcrFile, &vcrGetMessage, 20);
+			vcrFile.write( &vcrGetMessage, 20);
 		}
 	}
 
@@ -647,7 +650,7 @@ int NET_SendMessage (qsocket_t *sock, sizebuf_t *data)
 		vcrSendMessage.op = VCR_OP_SENDMESSAGE;
 		vcrSendMessage.session = (long)sock;
 		vcrSendMessage.r = r;
-		Sys_FileWrite (vcrFile, &vcrSendMessage, 20);
+		vcrFile.write( &vcrSendMessage, 20);
 	}
 	
 	return r;
@@ -678,7 +681,7 @@ int NET_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 		vcrSendMessage.op = VCR_OP_SENDMESSAGE;
 		vcrSendMessage.session = (long)sock;
 		vcrSendMessage.r = r;
-		Sys_FileWrite (vcrFile, &vcrSendMessage, 20);
+		vcrFile.write(&vcrSendMessage, 20);
 	}
 	
 	return r;
@@ -713,7 +716,7 @@ qboolean NET_CanSendMessage (qsocket_t *sock)
 		vcrSendMessage.op = VCR_OP_CANSENDMESSAGE;
 		vcrSendMessage.session = (long)sock;
 		vcrSendMessage.r = r;
-		Sys_FileWrite (vcrFile, &vcrSendMessage, 20);
+		vcrFile.write( &vcrSendMessage, 20);
 	}
 	
 	return r;
@@ -808,31 +811,32 @@ void NET_Init (void)
 	int			controlSocket;
 	qsocket_t	*s;
 
-	if (COM_CheckParm("-playback"))
+	if (host_parms.COM_CheckParm("-playback"))
 	{
 		net_numdrivers = 1;
 		net_drivers[0].Init = VCR_Init;
 	}
 
-	if (COM_CheckParm("-record"))
+	if (host_parms.COM_CheckParm("-record"))
 		recording = true;
 
-	i = COM_CheckParm ("-port");
+	i = host_parms.COM_CheckParm ("-port");
 	if (!i)
-		i = COM_CheckParm ("-udpport");
+		i = host_parms.COM_CheckParm ("-udpport");
 	if (!i)
-		i = COM_CheckParm ("-ipxport");
+		i = host_parms.COM_CheckParm ("-ipxport");
 
 	if (i)
 	{
-		if (i < com_argc-1)
-			DEFAULTnet_hostport = Q_atoi (com_argv[i+1]);
+		i++;
+		if (i < host_parms.argc)
+			DEFAULTnet_hostport = Q_atoi (host_parms.argv[i+1]);
 		else
 			Sys_Error ("NET_Init: you must specify a number after -port");
 	}
 	net_hostport = DEFAULTnet_hostport;
 
-	if (COM_CheckParm("-listen") || cls.state == ca_dedicated)
+	if (host_parms.COM_CheckParm("-listen") || cls.state == ca_dedicated)
 		listening = true;
 	net_numsockets = svs.maxclientslimit;
 	if (cls.state != ca_dedicated)
@@ -915,10 +919,10 @@ void		NET_Shutdown (void)
 		}
 	}
 
-	if (vcrFile != -1)
+	if (vcrFile.is_open())
 	{
 		Con_Printf ("Closing vcrfile.\n");
-		Sys_FileClose(vcrFile);
+		vcrFile.close();
 	}
 }
 

@@ -108,7 +108,9 @@ void D_DrawSkyScans8 (espan_t *pspan)
 			{
 			// calculate s and t at last pixel in span,
 			// calculate s and t steps across span by division
-				spancountminus1 = (float)(spancount - 1);
+				// ok why is this float?
+				//spancountminus1 = (float)(spancount - 1); // old
+				spancountminus1 = spancount - 1;
 
 				if (spancountminus1 > 0)
 				{

@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //===============
 //   TYPES
 //===============
+#ifndef _QUAKE_WAD_H_
+#define  _QUAKE_WAD_H_
+
 
 #define	CMP_NONE		0
 #define	CMP_LZSS		1
@@ -36,40 +39,69 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	TYP_SOUND		67
 #define	TYP_MIPTEX		68
 
-typedef struct
+struct qpic_t
 {
-	int			width, height;
+	int32_t		width, height;
 	byte		data[4];			// variably sized
-} qpic_t;
+} ;
 
 
-
-typedef struct
+#pragma pack(push,1)
+struct wadinfo_t
 {
 	char		identification[4];		// should be WAD2 or 2DAW
-	int			numlumps;
-	int			infotableofs;
-} wadinfo_t;
+	int32_t		numlumps;
+	int32_t		infotableofs;
+} ;
 
-typedef struct
+struct lumpinfo_t
 {
-	int			filepos;
-	int			disksize;
-	int			size;					// uncompressed
+	int32_t		filepos;
+	int32_t		disksize;
+	int32_t		size;					// uncompressed
 	char		type;
 	char		compression;
 	char		pad1, pad2;
 	char		name[16];				// must be null terminated
-} lumpinfo_t;
+} ;
+#pragma pack(pop)
 
+#if 0
 extern	int			wad_numlumps;
 extern	lumpinfo_t	*wad_lumps;
 extern	byte		*wad_base;
+#endif
+// turned into a class for now
+class WadFile {
+public:
+	WadFile()  {}
 
-void	W_LoadWadFile (char *filename);
-void	W_CleanupName (char *in, char *out);
-lumpinfo_t	*W_GetLumpinfo (char *name);
-void	*W_GetLumpName (char *name);
+	template<typename T=void>
+	T* find(const char* name) {
+		return (T *)(wad_base + findinfo(name)->filepos);
+	}
+	template<typename T=void>
+	T* find(size_t num) {
+		if (num >= wad_lumps.size())
+			Sys_Error("W_GetLumpNum: bad number: %i", num);
+		return (T *)(wad_base + wad_lumps[num].filepos);
+	}
+
+	void load(const char* filename);
+	static WadFile s_wadfile;
+private:
+	lumpinfo_t* findinfo(const quake::string_view& name);
+	std::unordered_map<quake::symbol, lumpinfo_t	*> wad_lookup;
+	idHunkArray<lumpinfo_t> wad_lumps;
+	uint8_t* wad_base;
+};
+
+
+void W_LoadWadFile (const char * filename);
+void	*W_GetLumpName (const char *name);
 void	*W_GetLumpNum (int num);
 
-void SwapPic (qpic_t *pic);
+
+
+
+#endif

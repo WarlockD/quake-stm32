@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sys_null.h -- null system driver to aid porting efforts
 
 #include "quakedef.h"
+#include "zone.h"
 #include "errno.h"
 
 #include <assert.h>
@@ -30,9 +31,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <GLFW\glfw3.h>
 #include <assert.h>
 #include <sys\stat.h>
+#include <io.h>  
+#include <fcntl.h>  
 
 GLFWwindow* glfw_window = NULL;
 qboolean isDedicated = false;
+
+void Sys_WriteConsole(const char* text) {
+	std::cout << text;
+	std::cout.flush();
+	OutputDebugStringA(text);
+}
+void Sys_WriteConsole(const char* text, size_t size) {
+	quake::fixed_string<128> str;
+	str.append(text, size);
+	Sys_WriteConsole(str.c_str());
+}
+
+void Sys_WriteError(const char* text) {
+	std::cerr << text;
+	std::cerr.flush();
+	OutputDebugStringA(text);
+}
 
 /*
 ===============================================================================
@@ -42,114 +62,92 @@ FILE IO
 ===============================================================================
 */
 
-#define MAX_HANDLES             10
-FILE    *sys_handles[MAX_HANDLES];
 
-int             findhandle (void)
-{
-	int             i;
-	
-	for (i=1 ; i<MAX_HANDLES ; i++)
-		if (!sys_handles[i])
-			return i;
-	Sys_Error ("out of handles");
-	return -1;
+struct sys_file_handle {
+	int handle;
+	//char filename[1];
+};
+
+sys_file::sys_file() : _handle((void*)-1) {}
+sys_file::~sys_file() { if (_handle== (void*)-1) close(); }
+sys_file::sys_file(sys_file&& move) : _handle(move._handle) {
+	move._handle = (void*)-1;
 }
 
-/*
-================
-filelength
-================
-*/
-int filelength (FILE *f)
-{
-	int             pos;
-	int             end;
-
-	pos = ftell (f);
-	fseek (f, 0, SEEK_END);
-	end = ftell (f);
-	fseek (f, pos, SEEK_SET);
-
-	return end;
-}
-
-int Sys_FileOpenRead (const char * path, idFileHandle *hndl)
-{
-	FILE    *f;
-	int             i;
-	
-	i = findhandle ();
-
-	f = fopen(path, "rb");
-	if (!f)
-	{
-		*hndl = -1;
-		return -1;
+bool sys_file::open(const char* filename, std::ios_base::openmode mode) {
+	int imode = _O_RANDOM;
+	assert((mode & (ios_base::in | ios_base::out)) != (ios_base::in | ios_base::out));
+	if (mode & ios_base::binary) imode |= _O_BINARY ; else imode |= _O_TEXT;
+	if (mode & ios_base::out) imode |= _O_WRONLY | _O_CREAT; else imode |= _O_RDONLY;
+	if (mode & ios_base::ate) imode |= _O_APPEND;
+	int handle = _open(filename, imode, _S_IREAD | _S_IWRITE);
+	if (handle == -1) {
+	//	setstate(ios_base::badbit);
+		// check errno for why
+		quake::con << "Could not open '" << filename << "', error " << strerror(errno) << std::endl;
+		return false; 
 	}
-	sys_handles[i] = f;
-	*hndl = i;
-	
-	return filelength(f);
+//	clear();
+	_handle = (void*)handle;
+	return true;
 }
-int Sys_FilevPrintF(idFileHandle handle, const char* fmt, va_list va)
-{
-	return vfprintf(sys_handles[handle], fmt, va);
+
+size_t sys_file::read(void* dest, size_t count) {
+	int r = _read((int)_handle, dest, count);
+	if (r == -1) {
+	//	setstate(rdstate() | ios_base::failbit);
+		Sys_Error("sys_file: read error");
+		return 0;
+	}
+	else if (r == 0) {
+	//	setstate(rdstate() | ios_base::eofbit);
+	}
+	return (size_t)r;
 }
-int Sys_FilePrintF(idFileHandle handle, const char* fmt, ...)
-{
-	va_list va;
-	va_start(va, fmt);
-	int r = Sys_FilevPrintF(handle, fmt, va);
-	va_end(va);
+size_t sys_file::write(const void* src, size_t count) {
+	int r = _write((int)_handle, src, count);
+	if (r == -1) {
+	//	setstate(rdstate() | ios_base::failbit);
+		Sys_Error("sys_file: write error");
+		return 0;
+	}
+	return (size_t)r;
+}
+
+void sys_file::close() {
+	if ((int)_handle != -1) _close((int)_handle);
+//	clear();
+	_handle = (void*)-1;
+}
+size_t sys_file::seek(int32_t offset, ios_base::seekdir dir) {
+	int r = _lseek((int)_handle, offset, dir == ios_base::end ? SEEK_END : dir == ios_base::cur ? SEEK_CUR : SEEK_SET);
+	if (r == -1) {
+	//	setstate(rdstate() | ios_base::failbit);
+		Sys_Error("sys_file: seek error");
+	}
 	return r;
 }
-idFileHandle Sys_FileOpenWrite (const char * path)
-{
-	FILE    *f;
-	int             i;
-	
-	i = findhandle ();
-
-	f = fopen(path, "wb");
-	if (!f)
-		Sys_Error ("Error opening %s: %s", path,strerror(errno));
-	sys_handles[i] = f;
-	
-	return i;
-}
-
-void Sys_FileClose (idFileHandle handle)
-{
-	fclose (sys_handles[handle]);
-	sys_handles[handle] = NULL;
-}
-
-void Sys_FileSeek (idFileHandle handle, int position)
-{
-	fseek (sys_handles[handle], position, SEEK_SET);
-}
-
-int Sys_FileRead (idFileHandle handle, void *dest, int count)
-{
-	return fread (dest, 1, count, sys_handles[handle]);
-}
-
-int Sys_FileWrite (idFileHandle handle, const void * data, int count)
-{
-	return fwrite (data, 1, count, sys_handles[handle]);
-}
-
-int     Sys_FileTime (const char * path)
-{
+bool sys_file::is_open() const { return _handle != (void*)-1; }
+size_t sys_file::file_size() const {
 	struct stat s;
-	FILE    *f;
-	if (stat(path, &s) < 0)  return -1;
-	return static_cast<int>(s.st_mtime);
+	int r = fstat((int)_handle, &s);
+	if(r == -1) Sys_Error("sys_file: file_size error");
+	return s.st_size;
+}
+bool sys_file::FileExist(const char* path) {
+	struct stat s;
+	return stat(path, &s) != -1;
 }
 
-void Sys_mkdir (char *path)
-{
+
+time_t sys_file::FileTime(const char* path) {
+	struct stat s;
+	int r = stat(path, &s);
+		if (r == -1) Sys_Error("sys_file: FileTime error");
+	
+	return s.st_mtime;
+}
+void sys_file::MakeDir(const char* path) {
 	_mkdir(path);
 }
 
@@ -165,30 +163,60 @@ SYSTEM IO
 void Sys_DebugNumber(int y, int val)
 {
 }
-void Sys_DebugLog(const char *file, const char *fmt, ...)
+void Sys_DebugLog(const char *filename, const char *fmt, ...)
 {
 	va_list argptr;
 	static char data[1024];
-	int fd;
 
 	va_start(argptr, fmt);
 	int len = vsprintf(data, fmt, argptr);
 	va_end(argptr);
 	assert(len >0 && len < 1024 - 1);
-	if (file == NULL) {
+	if (filename == NULL) {
 		Sys_Printf("DEBUG: %s", data);
 	}
 	else {
-		//assert(fwrite(data, 1, len, fd) == len);
-		fd = Sys_FileOpenWrite(file);  
-		assert(Sys_FileWrite(fd, data, len) == len);
-		Sys_FileClose(fd);
+		//assert(fwrite(data, 1, len, fd) == len); 
+		sys_file fd(filename,std::ios_base::out | std::ios_base::ate);
+		fd.write(data, len);
+		fd.close();
 	}
 };
 
 
 
-void Sys_Printf(char *fmt, ...)
+namespace quake {
+	quake_console_buffer::quake_console_buffer() { setp(_buffer.data(), _buffer.data() + _buffer.size() - 2); }
+	quake_console_buffer::int_type quake_console_buffer::sync() {
+		std::streamsize n = static_cast<std::streamsize>(pptr() - pbase());
+		if (n > 0) {
+			*pptr() = '\0';
+			Sys_WriteConsole(pbase());
+			Con_Print(pbase());
+			pbump(-n);
+			setp(_buffer.data(), _buffer.data() + _buffer.size() - 2);
+		}
+		return 0;// n != 0 ? EOF : 0;
+	}
+	quake_console_buffer::int_type quake_console_buffer::overflow(int_type ch)
+	{
+		if (ch != EOF)
+		{
+			std::streamsize n = static_cast<std::streamsize>(pptr() - pbase());
+			*pptr() = char_traits::to_char_type(ch);
+			pbump(1);
+			sync();
+		}
+		return char_traits::not_eof(ch);
+	}
+
+	static quake_console_buffer console_buffer;
+	std::ostream con(&console_buffer); // this is the main console out
+}
+
+
+#include <iostream>
+void Sys_Printf(const char *fmt, ...)
 {
 	va_list		argptr;
 	char		text[2048];
@@ -200,8 +228,7 @@ void Sys_Printf(char *fmt, ...)
 
 	if (len <= 0 || len > sizeof(text))
 		Sys_Error("memory overwrite in Sys_Printf");
-	//Con_Print(text);
-	OutputDebugStringA(text);
+	Sys_WriteConsole(text);
 }
 
 void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length)
@@ -241,8 +268,9 @@ void Sys_Init(void)
 
 	//timeBeginPeriod(1);
 }
+void Hunk_Print(bool all);
 
-void Sys_Error(char *error, ...)
+void Sys_Error(const char *error, ...)
 {
 	va_list     argptr;
 	char        string[1024];
@@ -254,7 +282,10 @@ void Sys_Error(char *error, ...)
 	va_end(argptr);
 	Sys_Printf("Error: %s\n", string);
 
+	Hunk_Print(false);
+
 	Host_Shutdown();
+
 	exit(1);
 
 }
@@ -317,19 +348,21 @@ void Sys_LowFPPrecision (void)
 
 //=============================================================================
 
-void main (int argc, char **argv)
+void main (int argc, const char **argv)
 {
 	idTime		time, oldtime, newtime;
-	static quakeparms_t    parms;
+	quakeparms_t    parms;
 
 	parms.memsize = 8*1024*1024;
 	parms.membase = malloc (parms.memsize);
 	parms.basedir = ".";
+	
+	for (int i = 0; i < argc; i++)
+		parms.COM_AddArg(argv[i]);
 
-	COM_InitArgv (argc, argv);
 
-	parms.argc = com_argc;
-	parms.argv = com_argv;
+	//COM_GArgs.InitArgv(argc, argv);
+
 
 	printf ("Host_Init\n");
 	Sys_Init();

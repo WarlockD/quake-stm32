@@ -86,7 +86,7 @@ void Chase_Update (void)
 	dist = DotProduct (stop, forward);
 	if (dist < 1)
 		dist = 1;
-	r_refdef.viewangles[PITCH] = -atan(stop[2] / dist) / M_PI * 180;
+	r_refdef.viewangles[PITCH] = -Q_atan(stop[2] / dist) / static_cast<float>(M_PI) * 1800.f;
 
 	// move towards destination
 	VectorCopy (chase_dest, r_refdef.vieworg);

@@ -20,7 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Z_zone.c
 
 #include "quakedef.h"
-
+static constexpr size_t alignment_bits = sizeof(ptrdiff_t) / 8;
+static inline size_t AllignSize(size_t size) { return  ((size + (alignment_bits-1))&~(alignment_bits - 1)); }
 
 
 #define	DYNAMIC_SIZE	0xc000
@@ -151,10 +152,12 @@ void *Z_TagMalloc (size_t size, int tag)
 // scan through the block list looking for the first free block
 // of sufficient size
 //
+
+
 	size += sizeof(memblock_t);	// account for size of block header
 	size += 4;					// space for memory trash tester
 	size = (size + 7) & ~7;		// align to 8-byte boundary
-	
+
 	base = rover = mainzone->rover;
 	start = base->prev;
 	
@@ -252,12 +255,12 @@ void Z_CheckHeap (void)
 
 #define	HUNK_SENTINAL	0x1df001ed
 
-typedef struct
+struct hunk_t
 {
 	int		sentinal;
 	size_t		size;		// including sizeof(hunk_t), -1 = not allocated
 	char	name[8];
-} hunk_t;
+} ;
 
 byte	*hunk_base;
 size_t		hunk_size;
@@ -279,9 +282,7 @@ Run consistancy and sentinal trahing checks
 */
 void Hunk_Check (void)
 {
-	hunk_t	*h;
-	
-	for (h = (hunk_t *)hunk_base ; (byte *)h != hunk_base + hunk_low_used ; )
+	for (hunk_t	*h = (hunk_t *)hunk_base ; (byte *)h != hunk_base + hunk_low_used ; )
 	{
 		if (h->sentinal != HUNK_SENTINAL)
 			Sys_Error ("Hunk_Check: trahsed sentinal");
@@ -377,13 +378,13 @@ void Hunk_Print (qboolean all)
 	Con_Printf ("%8i total blocks\n", totalblocks);
 	
 }
-
+#define _SCL_SECURE_NO_WARNINGS  
 /*
 ===================
 Hunk_AllocName
 ===================
 */
-void *Hunk_AllocName (int size, char *name)
+void *Hunk_AllocName (int size, const quake::string_view& name)
 {
 	hunk_t	*h;
 	
@@ -394,7 +395,8 @@ void *Hunk_AllocName (int size, char *name)
 	if (size < 0)
 		Sys_Error ("Hunk_Alloc: bad size: %i", size);
 		
-	size = sizeof(hunk_t) + ((size+15)&~15);
+	//size = AllignSize(sizeof(hunk_t) + size);
+	size = sizeof(hunk_t) + ((size + 15)&~15);
 	
 	if ((hunk_size - hunk_low_used - hunk_high_used) < static_cast<int>(size))
 		Sys_Error ("Hunk_Alloc: failed on %i bytes",size);
@@ -408,7 +410,8 @@ void *Hunk_AllocName (int size, char *name)
 	
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	Q_strncpy (h->name, name, 8);
+	name.copy(h->name, sizeof(h->name));
+
 	
 	return (void *)(h+1);
 }
@@ -466,7 +469,7 @@ void Hunk_FreeToHighMark (int mark)
 Hunk_HighAllocName
 ===================
 */
-void *Hunk_HighAllocName (size_t size, char *name)
+void *Hunk_HighAllocName (size_t size, const quake::string_view&  name)
 {
 	hunk_t	*h;
 
@@ -499,7 +502,8 @@ void *Hunk_HighAllocName (size_t size, char *name)
 	memset (h, 0, size);
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	Q_strncpy (h->name, name, 8);
+	name.copy(h->name, sizeof(h->name));
+
 
 	return (void *)(h+1);
 }
@@ -577,7 +581,7 @@ void Cache_Move ( cache_system_t *c)
 	}
 	else
 	{
-//		Con_Printf ("cache_move failed\n");
+		Sys_Error ("cache_move failed\n");
 
 		Cache_Free (c->user);		// tough luck...
 	}
@@ -672,7 +676,7 @@ cache_system_t *Cache_TryAlloc (int size, qboolean nobottom)
 
 	if (!nobottom && cache_head.prev == &cache_head)
 	{
-		if (hunk_size - hunk_high_used - hunk_low_used < size)
+ 		if (hunk_size - hunk_high_used - hunk_low_used < size)
 			Sys_Error ("Cache_TryAlloc: %i is greater then free hunk", size);
 
 		new_ptr = (cache_system_t *) (hunk_base + hunk_low_used);
@@ -743,7 +747,7 @@ Cache_Flush
 Throw everything out, so new data will be demand cached
 ============
 */
-void Cache_Flush (void)
+void Cache_Flush (cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	while (cache_head.next != &cache_head)
 		Cache_Free ( cache_head.next->user );	// reclaim the space
@@ -855,7 +859,7 @@ void *Cache_Check (cache_user_t *c)
 Cache_Alloc
 ==============
 */
-void *Cache_Alloc (cache_user_t *c, int size, const char *name)
+void *Cache_Alloc (cache_user_t *c, int size, const quake::string_view& name)
 {
 	cache_system_t	*cs;
 
@@ -873,7 +877,10 @@ void *Cache_Alloc (cache_user_t *c, int size, const char *name)
 		cs = Cache_TryAlloc (size, false);
 		if (cs)
 		{
-			Q_strncpy (cs->name, name, sizeof(cs->name)-1);
+			assert(name.size()  < 15);
+			std::memcpy(cs->name, name.data(), name.size());
+			cs->name[name.size()] = 0;
+
 			c->data = (void *)(cs+1);
 			cs->user = c;
 			break;
@@ -897,26 +904,27 @@ void *Cache_Alloc (cache_user_t *c, int size, const char *name)
 Memory_Init
 ========================
 */
-void Memory_Init (void *buf, size_t size)
+void Memory_Init(void *buf, size_t size)
 {
-	int p;
+	size_t p;
 	int zonesize = DYNAMIC_SIZE;
+	quake::string_view value;
 
 	hunk_base = (byte*)buf;
 	hunk_size = size;
 	hunk_low_used = 0;
 	hunk_high_used = 0;
-	
-	Cache_Init ();
-	p = COM_CheckParm ("-zone");
-	if (p)
+
+	Cache_Init();
+
+	if ((p = host_parms.COM_CheckParmValue("-zone", value)) != 0)
 	{
-		if (p < com_argc-1)
-			zonesize = Q_atoi (com_argv[p+1]) * 1024;
+		if (!value.empty() && ::isdigit(value[0]))
+			zonesize = Q_atoi(value) * 1024;
 		else
-			Sys_Error ("Memory_Init: you must specify a size in KB after -zone");
+			Sys_Error("Memory_Init: you must specify a size in KB after -zone");
 	}
-	mainzone = (memzone_t*)Hunk_AllocName (zonesize, "zone" );
-	Z_ClearZone (mainzone, zonesize);
+	mainzone = (memzone_t*)Hunk_AllocName(zonesize, "zone");
+	Z_ClearZone(mainzone, zonesize);
 }
 

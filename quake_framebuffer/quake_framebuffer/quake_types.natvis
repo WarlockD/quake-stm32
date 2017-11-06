@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010"> 
+    <Type Name="quake::data_view&lt;*&gt;" Inheritable="false">
+      <DisplayString Condition="_size == 0">empty</DisplayString>
+      <DisplayString Condition="_size != 0"> data = {*_data}, size= {_size} </DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>_size</Size>
+        <ValuePointer>_data</ValuePointer>
+        </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="quake::string_view" Inheritable="true">
+    <DisplayString Condition="_size == 0">empty</DisplayString>
+    <DisplayString Condition="_size > 0">[ size={_size}] {_data,[_size]s8}</DisplayString>
+  </Type>
+
+  <Type Name="quake::fixed_string_buffer" Inheritable="true">
+    <Intrinsic Name="used" Expression="(_IPnext - _IPfirst)"/>
+    <DisplayString Condition="used() == 0">[empty]</DisplayString>
+    <DisplayString Condition="used() > 0">{_buffer,[used()]}</DisplayString>
+    <Expand>
+      <Item Name="[capacity]">_size</Item>
+      <Item Name="[size]">(_sbuf._IPnext - _sbuf._IPfirst)</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="quake::buffer_string_stream" Inheritable="true">
+    <Intrinsic Name="used" Expression="(_sbuf._IPnext - _sbuf._IPfirst)"/>
+    <DisplayString Condition="used() == 0">[empty]</DisplayString>
+    <DisplayString Condition="used() > 0">{_sbuf._buffer,[used()]}</DisplayString>
+    <Expand>
+      <Item Name="[capacity]">_sbuf._size</Item>
+      <Item Name="[size]">(_sbuf._IPnext - _sbuf._IPfirst)</Item>
+    </Expand>
+  </Type>
+  
+  <!--
+  <Type Name="quake::buffer_string_stream"> 
+    <DisplayString>{_data,[_size]}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>_sbuf._data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+-->
+  
+  
+
+</AutoVisualizer>

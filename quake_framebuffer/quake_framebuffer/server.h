@@ -253,5 +253,5 @@ void SV_SaveSpawnparms ();
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot);
 #else
-void SV_SpawnServer (char *server);
+void SV_SpawnServer (const char *server);
 #endif

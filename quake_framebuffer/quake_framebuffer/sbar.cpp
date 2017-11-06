@@ -73,7 +73,7 @@ Sbar_ShowScores
 Tab key down
 ===============
 */
-void Sbar_ShowScores (void)
+void Sbar_ShowScores(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	if (sb_showscores)
 		return;
@@ -88,7 +88,7 @@ Sbar_DontShowScores
 Tab key up
 ===============
 */
-void Sbar_DontShowScores (void)
+void Sbar_DontShowScores(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	sb_showscores = false;
 	sb_updates = 0;
@@ -112,7 +112,7 @@ Sbar_Init
 void Sbar_Init (void)
 {
 	int		i;
-
+	quake::fixed_string<64> va;
 	for (i=0 ; i<10 ; i++)
 	{
 		sb_nums[0][i] = Draw_PicFromWad (va("num_%i",i));
@@ -468,7 +468,7 @@ void Sbar_SoloScoreboard (void)
 	Sbar_DrawString (8, 12, str);
 
 // time
-	long time = std::chrono::duration_cast< std::chrono::seconds>(cl.time).count();
+	auto time = std::chrono::duration_cast<std::chrono::seconds>(cl.time).count();
 	minutes = time / 60;
 	seconds = time - 60 * minutes;
 	tens = seconds / 10;

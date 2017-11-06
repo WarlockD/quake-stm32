@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // draw.h -- these are the only functions outside the refresh allowed
 // to touch the vid buffer
+#ifndef _QUAKE_DRAW_H_
+#define _QUAKE_DRAW_H_
 
 extern	qpic_t		*draw_disc;	// also used on sbar
 
@@ -35,6 +37,9 @@ void Draw_EndDisc (void);
 void Draw_TileClear (int x, int y, int w, int h);
 void Draw_Fill (int x, int y, int w, int h, int c);
 void Draw_FadeScreen (void);
-void Draw_String (int x, int y, char *str);
-qpic_t *Draw_PicFromWad (char *name);
-qpic_t *Draw_CachePic (char *path);
+void Draw_String (int x, int y, const char * str);
+void Draw_String(int x, int y, const quake::string_view& str);
+qpic_t *Draw_PicFromWad (const char *name);
+qpic_t *Draw_CachePic (const char * path);
+
+#endif

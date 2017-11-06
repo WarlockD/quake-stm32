@@ -62,7 +62,7 @@ qboolean	scr_skipupdate;
 
 qboolean	block_drawing;
 
-void SCR_ScreenShot_f (void);
+static void  SCR_ScreenShot_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
 
 /*
 ===============================================================================
@@ -284,7 +284,7 @@ SCR_SizeUp_f
 Keybinding command
 =================
 */
-void SCR_SizeUp_f (void)
+void SCR_SizeUp_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	Cvar_SetValue ("viewsize",scr_viewsize.value+10);
 	vid.recalc_refdef = 1;
@@ -298,8 +298,7 @@ SCR_SizeDown_f
 Keybinding command
 =================
 */
-void SCR_SizeDown_f (void)
-{
+void SCR_SizeDown_f(cmd_source_t source, size_t argc, const quake::string_view argv[]){
 	Cvar_SetValue ("viewsize",scr_viewsize.value-10);
 	vid.recalc_refdef = 1;
 }
@@ -547,7 +546,7 @@ typedef struct
 WritePCXfile 
 ============== 
 */ 
-void WritePCXfile (char *filename, byte *data, int width, int height,
+void WritePCXfile (const char *filename, byte *data, int width, int height,
 	int rowbytes, byte *palette) 
 {
 	int		i, j, length;
@@ -613,28 +612,20 @@ void WritePCXfile (char *filename, byte *data, int width, int height,
 SCR_ScreenShot_f
 ================== 
 */  
-void SCR_ScreenShot_f (void) 
+static void SCR_ScreenShot_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 { 
-	int     i; 
-	char		pcxname[80]; 
-	char		checkname[MAX_OSPATH];
+	quake::fixed_string_stream<MAX_OSPATH> checkname;
 
-// 
-// find a file name to save it to 
-// 
-	strcpy(pcxname,"quake00.pcx");
-		
-	for (i=0 ; i<=99 ; i++) 
-	{ 
-		pcxname[5] = i/10 + '0'; 
-		pcxname[6] = i%10 + '0'; 
-		sprintf (checkname, "%s/%s", com_gamedir, pcxname);
-		if (Sys_FileTime(checkname) == -1)
+	int i;
+	for (i=0 ; i<=99 ; i++) { 
+		checkname.clear();
+		checkname << COM_GameDir() << '/' << "quake" << std::setw(2) << std::setfill('0') << i;
+		if (!sys_file::FileExist(checkname.str().c_str()))
 			break;	// file doesn't exist
 	} 
 	if (i==100) 
 	{
-		Con_Printf ("SCR_ScreenShot_f: Couldn't create a PCX file\n"); 
+		quake::con << "SCR_ScreenShot_f: Couldn't create a PCX file" << std::endl;
 		return;
  	}
 
@@ -644,13 +635,12 @@ void SCR_ScreenShot_f (void)
 	D_EnableBackBufferAccess ();	// enable direct drawing of console to back
 									//  buffer
 
-	WritePCXfile (pcxname, vid.buffer, vid.width, vid.height, vid.rowbytes,
+	WritePCXfile (checkname.str().c_str(), vid.buffer, vid.width, vid.height, vid.rowbytes,
 				  host_basepal);
 
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
 									//  for linear writes all the time
-
-	Con_Printf ("Wrote %s\n", pcxname);
+	quake::con << "Wrote " << checkname.rdbuf() << std::endl;
 } 
 
 

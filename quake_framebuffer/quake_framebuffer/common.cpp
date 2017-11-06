@@ -20,17 +20,75 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // common.c -- misc functions used in client and server
 
 #include "quakedef.h"
-
+#include <cctype>
+#include <unordered_set>
 
 // time commm
 template<typename T>
 static bool AreEqual(T f1, T f2, T fe = std::numeric_limits<T>::epsilon()) {
 	return (std::fabs(f1 - f2) <= fe * std::fmax(fabs(f1), fabs(f2)));
 }
+
+static quake::fixed_string<MAX_OSPATH> com_cachedir;
+static quake::fixed_string<MAX_OSPATH> com_gamedir;
+
+// ustl stuff
+
+
+namespace quake {
+	const char* printf_buffer::operator()(const char* fmt, ...) {
+		va_list va;
+		va_start(va, fmt);
+		int len = Q_vsnprintf(data(), size(), fmt, va);
+		va_end(va);
+		if (len <= 0) return nullptr;
+		return c_str();
+	}
+	/// \brief Attaches the object to pointer \p p of size \p n.
+	///
+	/// If \p p is nullptr and \p n is non-zero, bad_alloc is thrown and current
+	/// state remains unchanged.
+	///
+	void cmemlink::link(const void* p, size_type n)
+	{
+		if (!p && n)
+			throw std::exception();
+		unlink();
+		relink(p, n);
+	}
+
+	/// Compares to memory block pointed by l. Size is compared first.
+	bool cmemlink::operator== (const cmemlink& l) const noexcept
+	{
+		return l._size == _size &&
+			(l._data == _data || 0 == memcmp(l._data, _data, _size));
+	}
+
+
+	/// Fills the linked block with the given pattern.
+	/// \arg start   Offset at which to start filling the linked block
+	/// \arg p       Pointer to the pattern.
+	/// \arg elSize  Size of the pattern.
+	/// \arg elCount Number of times to write the pattern.
+	/// Total number of bytes written is \p elSize * \p elCount.
+	///
+	void memlink::fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount) noexcept
+	{
+		assert(data() || !elCount || !elSize);
+		assert(cstart >= begin() && cstart + elSize * elCount <= end());
+		iterator start = const_cast<iterator>(cstart);
+		if (elSize == 1)
+			std::fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
+		else while (elCount--)
+			start = std::copy_n(const_iterator(p), elSize, start);
+	}
+
+
+
+}
 #ifdef USE_CUSTOM_IDTIME
 //https://stackoverflow.com/questions/4548004/how-to-correctly-and-standardly-compare-floats
 template<typename T>
-
 
 idTime::idTime() : _time(0.0f) {}
 idTime::idTime(float f) : _time(f) {}
@@ -54,15 +112,13 @@ idTime idTime::UilliSeconds(int msec) { return idTime(static_cast<float>(msec) *
 
 #define NUM_SAFE_ARGVS  7
 
-static char     *largv[MAX_NUM_ARGVS + NUM_SAFE_ARGVS + 1];
-static char     *argvdummy = " ";
 
 static char     *safeargvs[NUM_SAFE_ARGVS] =
 	{"-stdvid", "-nolan", "-nosound", "-nocdaudio", "-nojoy", "-nomouse", "-dibonly"};
 
 cvar_t  registered = {"registered","0"};
 cvar_t  cmdline = {"cmdline","0", false, true};
-
+static char _com_gamedir[MAX_QPATH];
 qboolean        com_modified;   // set true if using non-id files
 
 qboolean		proghack;
@@ -77,9 +133,7 @@ void COM_InitFilesystem (void);
 #define PAK0_COUNT              339
 #define PAK0_CRC                32981
 
-char	com_token[1024];
-int		com_argc;
-char	**com_argv;
+
 
 #define CMDLINE_LENGTH	256
 char	com_cmdline[CMDLINE_LENGTH];
@@ -311,7 +365,11 @@ int Q_strncmp (const char * s1, const char * s2, size_t count)
 	
 	return -1;
 }
-
+#if 0
+bool Q_strncasecmp(const quake::string_view& a, const quake::string_view& b) {
+		return a.size() == b.size() && std::equal(b.begin(), b.end(), a.begin(), [](char l, char r) { return ::tolower(l) == ::tolower(r); });
+}
+#endif
 int Q_strncasecmp (const char * s1, const char * s2, size_t n)
 {
 	int             c1, c2;
@@ -341,10 +399,20 @@ int Q_strncasecmp (const char * s1, const char * s2, size_t n)
 	
 	return -1;
 }
-
+int Q_strcasecmp(const quake::string_view& s1, const char * s2) {
+	int c2 = -1;
+	for(auto c1 : s1) {
+		int c2 = *s2++; ;
+		if (c2 == '\0' || std::tolower(c1) != std::tolower(c2)) return -1;
+	}
+	return *s2 == '\0' ? 0 : -1;
+}
 int Q_strcasecmp (const char * s1, const char * s2)
 {
 	return Q_strncasecmp (s1, s2, 99999);
+}
+int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2) {
+	return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(), [](char c1, char c2) { return std::tolower(c1) == std::tolower(c2);  }) ? 0 : -1;
 }
 static const char* SkipWhiteSpace(const char* data)  {
 	while (1) {
@@ -355,18 +423,11 @@ static const char* SkipWhiteSpace(const char* data)  {
 		}
 		break;
 	}
+	return data;
 }
 
 
-bool idStrRef::equal(const char* rstr) const {
-	for (size_t n = 0; n <= _size && (rstr[n] == _str[n]) ; n++) {
-		if (n == _size) return true;
-	}
-	return false;
-}
-bool idStrRef::equal(const idStrRef& str) const {
-	return _size == str._size && Q_memcmp(_str, str._str, _size) == 0;
-}
+
 static inline int toHex(int c) { 
 	if (c >= '0' && c <= '9')
 		return c - '0';
@@ -377,76 +438,58 @@ static inline int toHex(int c) {
 	else return -1; 
 }
 
-int idStrRef::to_int(int& i, size_t offset) const {
-	assert(0);
-	return 0; // not implmented yet
-
-}
-int idStrRef::to_float(float& val, size_t offset ) const {
-	// streight copy from Q_atf
-	if (offset >= _size) return -1;
-	const char* str = SkipWhiteSpace(_str + offset);
+int	Q_atoi(const quake::string_view& str) {
+	size_t pos=0;
 	int             sign;
-	int             c;
 
-
-	if (*str == '-') {
+	if (str[pos] == '-')
+	{
 		sign = -1;
-		str++;
+		pos++;
 	}
-	else
+	else {
 		sign = 1;
+	}
 
-	//
+	// check for character
+	if (str[pos] == '\'')
+		return sign * str[1];
+
+	int val = 0;
 	// check for hex
-	//
 	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
 	{
-		str += 2;
-		int ivalue = 0, itotal = 0;
-		while ((ivalue = toHex(*str++)) != -1)
-			itotal = (itotal * 16) + ivalue;
-		size_t len = str - _str;
-		if (len == 2 || (len == 3 && sign < 0)) return 0; // no numbers after the 0x, bad number
-		val = itotal * sign;
-		return (int)len;
-	}
-
-	//
-	// check for character
-	//
-	if (str[0] == '\'') // ahh for charaters humm
-	{
-		val = sign * str[1];
-		return 2;
-	}
-
-	//
-	// assume decimal
-	//
-	int             decimal = -1, total;
-	for (total = 0; (*str >= '0' && *str <= '9') || *str == '.'; total++)
-	{
-		if (*str == '.') { // man I see a parsing error here
-			decimal = total;
-			continue;
+		pos = 2;
+		while (pos < str.size())
+		{
+			int c = str[pos++];
+			if (c >= '0' && c <= '9')
+				val = (val << 4) + c - '0';
+			else if (c >= 'a' && c <= 'f')
+				val = (val << 4) + c - 'a' + 10;
+			else if (c >= 'A' && c <= 'F')
+				val = (val << 4) + c - 'A' + 10;
+			else
+				return val*sign;
 		}
+	}
+	// assume decimal
+	while (pos < str.size())
+	{
+		int c = str[pos++];
+		if (c <'0' || c > '9')
+			return val*sign;
 		val = val * 10 + c - '0';
 	}
-	assert(decimal != 0); // hummmmmmmmm
-
-	if (decimal > 0) {
-		while (total > decimal)
-		{
-			val /= 10;
-			total--;
-		}
-	}
-
-	val *= sign;
-	return (int)(str - _str);
+	assert(0); // bad number
+	return 0;
 }
-
+float Q_atof(const quake::string_view& str) {
+	char* ptr;
+	float ret = strtof(str.data(), &ptr);
+	assert(str.data() < ptr);
+	return ret;
+}
 int Q_atoi (const char * str)
 {
 	int             val;
@@ -504,11 +547,13 @@ int Q_atoi (const char * str)
 	
 	return 0;
 }
-
+quake::string_view COM_GameDir() {
+	return com_gamedir;
+}
 
 float Q_atof (const char * str)
 {
-	double			val;
+	float			val;
 	int             sign;
 	int             c;
 	int             decimal, total;
@@ -548,7 +593,7 @@ float Q_atof (const char * str)
 //
 	if (str[0] == '\'')
 	{
-		return sign * str[1];
+		return static_cast<float>(sign * str[1]);
 	}
 	
 //
@@ -731,7 +776,7 @@ void MSG_WriteFloat (sizebuf_t *sb, float f)
 	SZ_Write (sb, &dat.l, 4);
 }
 
-void MSG_WriteString (sizebuf_t *sb, char *s)
+void MSG_WriteString (sizebuf_t *sb, const char *s)
 {
 	if (!s)
 		SZ_Write (sb, "", 1);
@@ -874,12 +919,12 @@ char *MSG_ReadString (void)
 
 float MSG_ReadCoord (void)
 {
-	return MSG_ReadShort() * (1.0/8);
+	return MSG_ReadShort() * (1.0f/8.0f);
 }
 
 float MSG_ReadAngle (void)
 {
-	return MSG_ReadChar() * (360.0/256);
+	return MSG_ReadChar() * (360.0f/256.0f);
 }
 
 
@@ -891,177 +936,79 @@ void SZ_Alloc (sizebuf_t *buf, int startsize)
 	if (startsize < 256)
 		startsize = 256;
 	buf->data = (byte*)Hunk_AllocName (startsize, "sizebuf");
-	buf->maxsize = startsize;
-	buf->cursize = 0;
+buf->maxsize = startsize;
+buf->cursize = 0;
 }
 
 
-void SZ_Free (sizebuf_t *buf)
+void SZ_Free(sizebuf_t *buf)
 {
-//      Z_Free (buf->data);
-//      buf->data = NULL;
-//      buf->maxsize = 0;
+	//      Z_Free (buf->data);
+	//      buf->data = NULL;
+	//      buf->maxsize = 0;
 	buf->cursize = 0;
 }
 
-void SZ_Clear (sizebuf_t *buf)
+void SZ_Clear(sizebuf_t *buf)
 {
 	buf->cursize = 0;
 }
 
-void *SZ_GetSpace (sizebuf_t *buf, int length)
+void *SZ_GetSpace(sizebuf_t *buf, int length)
 {
 	void    *data;
-	
+
 	if (buf->cursize + length > buf->maxsize)
 	{
 		if (!buf->allowoverflow)
-			Sys_Error ("SZ_GetSpace: overflow without allowoverflow set");
-		
+			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
+
 		if (length > buf->maxsize)
-			Sys_Error ("SZ_GetSpace: %i is > full buffer size", length);
-			
+			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
+
 		buf->overflowed = true;
-		Con_Printf ("SZ_GetSpace: overflow");
-		SZ_Clear (buf); 
+		Con_Printf("SZ_GetSpace: overflow");
+		SZ_Clear(buf);
 	}
 
 	data = buf->data + buf->cursize;
 	buf->cursize += length;
-	
+
 	return data;
 }
 
-void SZ_Write (sizebuf_t *buf, void *data, int length)
+void SZ_Write(sizebuf_t *buf, const void *data, int length)
 {
-	Q_memcpy (SZ_GetSpace(buf,length),data,length);         
+	Q_memcpy(SZ_GetSpace(buf, length), data, length);
 }
 
-void SZ_Print (sizebuf_t *buf, char *data)
-{
-	int             len;
-	
-	len = Q_strlen(data)+1;
 
-// byte * cast to keep VC++ happy
-	if (buf->data[buf->cursize-1])
-		Q_memcpy ((byte *)SZ_GetSpace(buf, len),data,len); // no trailing 0
+
+void SZ_Print(sizebuf_t *buf, const  quake::string_view& data)
+{
+	size_t 	len = data.size() + 1;
+	if (buf->data[buf->cursize - 1])
+		Q_memcpy((byte *)SZ_GetSpace(buf, len), data.data(), len); // no trailing 0
 	else
-		Q_memcpy ((byte *)SZ_GetSpace(buf, len-1)-1,data,len); // write over trailing 0
+		Q_memcpy((byte *)SZ_GetSpace(buf, len - 1) - 1, data.data(), len); // write over trailing 0
 }
 
-
-//============================================================================
-
-
-/*
-============
-COM_SkipPath
-============
-*/
-const char *COM_SkipPath (const char *pathname)
-{
-	const char    *last;
-	
-	last = pathname;
-	while (*pathname)
-	{
-		if (*pathname=='/' || *pathname == '\\')
-			last = pathname+1;
-		pathname++;
-	}
-	return last;
-}
-char *COM_SkipPath(char *pathname) { return const_cast<char*>(COM_SkipPath(const_cast<const char*>(pathname))); }
-/*
-============
-COM_StripExtension
-============
-*/
-void COM_StripExtension (const char *in, char *out)
-{
-	while (*in && *in != '.')
-		*out++ = *in++;
-	*out = 0;
-}
-
-/*
-============
-COM_FileExtension
-============
-*/
-char *COM_FileExtension (char *in)
-{
-	static char exten[8];
-	int             i;
-
-	while (*in && *in != '.')
-		in++;
-	if (!*in)
-		return "";
-	in++;
-	for (i=0 ; i<7 && *in ; i++,in++)
-		exten[i] = *in;
-	exten[i] = 0;
-	return exten;
-}
-
-/*
-============
-COM_FileBase
-============
-*/
-void COM_FileBase (const char *in, char *out, size_t out_size)
-{
-	const char *s, *s2;
-	
-	s = in + Q_strlen(in) - 1;
-	
-	while (s != in && *s != '.')
-		s--;
-	
-	for (s2 = s ; *s2 && (*s2 != '/' && *s2 != '\\'); s2--);
-	
-	size_t len = s - s2;
-	assert(out_size > len);
-
-	if (len < 2)
-		Q_strcpy (out,"?model?");
+void SZ_Print(sizebuf_t *buf, char c) {
+	if (buf->data[buf->cursize - 1])
+		*((byte *)SZ_GetSpace(buf, 2)) = c; // no trailing 0
 	else
-	{
-		s--;
-		Q_strncpy (out,s2+1, len);
-		out[s-s2] = 0;
-	}
+		*(((byte *)SZ_GetSpace(buf, 1)) - 1) = c; // no trailing 0
 }
 
 
-/*
-==================
-COM_DefaultExtension
-==================
-*/
-void COM_DefaultExtension (char *path, const char *extension)
-{
-	char    *src;
-//
-// if path doesn't have a .EXT, append extension
-// (extension should include the .)
-//
-	src = path + Q_strlen(path) - 1;
 
-	while ((*src != '/' || *src != '\\') && src != path)
-	{
-		if (*src == '.')
-			return;                 // it has an extension
-		src--;
-	}
 
-	Q_strcat (path, extension);
-}
+
+
+
 
 inline static bool isComPunc(int c) {
-	return (c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':';
+	return c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':';
 }
 /*
 ==============
@@ -1071,97 +1018,59 @@ Parse a token out of a string
 ==============
 */
 // switched to more state based
-bool COM_Parser::Next(idStrRef& token) {
-	if (_data == nullptr || _data == _end) return false;
-	skip_whitespace();
+COM_Parser::COM_Token COM_Parser::Next() {
+	COM_Token token;
 	size_t len = 0;
-	switch (*_data) {
-	case '\0': 
-		assert(0);
-		return false;  // nothing left to parse	or error?
-	case '\"':
-		len++;
-		while (_data[len] != '\"' && &_data[len] < _end) len++;
-		token = idStrRef(_data, len - 2);
-		++len; // skip the '\"'
+	int c;
+	while (!_data.empty()) {
+		int c = _data[len++];
+		switch (c) {
+		case '"':
+			while (len < _data.size() && _data[len] != '\"') len++;
+			token = COM_Token(Kind::Symbol, _data.substr(1U, len - 2));
+			len++; // skip the '\"'
+			break;
+		case '/':
+			if (_mode & IgnoreComments) {
+				while (len < _data.size() && _data[len] != '\n') len++;
+				_data.remove_prefix(len);
+				len = 0; // go back to check the line feed
+				continue;
+			} else
+				token = COM_Token(c);
+			break;
+		case '\n':
+			if (_mode & IgnoreNewLine) continue;
+			token = COM_Token(Kind::LineFeed);
+			break;
+		case ' ': case '\t': case '\r': case '\f':
+			while (len < _data.size() && _data[len] == ' ' && _data[len] == '\t') len++;
+			_data.remove_prefix(len);
+			len = 0; // go back to check the line feed
+			continue;
+		default:
+			while (len < _data.size()  && _data[len] > 32) len++;
+			c = std::isdigit(c) ? (int)Kind::Number : std::isalpha(c) ? (int)Kind::Symbol : c;
+			token = COM_Token(c, _data.substr(0, len));
+		};
 		break;
-		// is this really needed?  its not in quake world
-	default:
-		if (isComPunc(*_data))
-			len = 1;
-		else {
-			// parse a regular word
-			while (!isComPunc(_data[len]) && _data[len] > 32 && &_data[len] < _end) len++;
-		}
+	}
+	if(len > 0) _data.remove_prefix(len);
+	return token;
+#if 0
+	while (_data.size() < len && _data[len++] > 32);
 
-	};
-	token = idStrRef(_data, len);
-	if (&_data[len] < _end) _data += len;
-	return true;
-}
-void COM_Parser::skip_whitespace() {
-	_data = SkipWhiteSpace(_data);
-}
-void COM_File_Parser::fill_buffer() {
-	if (_size == 0) {
-		auto len = Sys_FileRead(_handle, _buffer, sizeof(_buffer));
-		if (len <= 0) {
-			// error or end of file
-			Close();
-		}
-		else {
-			_size = static_cast<size_t>(len);
-			_data = _buffer;
-			_end = _buffer + _size;
-		}
+	if (len > 0) {
+		COM_Token token = COM_Token(Kind::Symbol, quake::string_view(_data.data(), len));
+		_data.remove_prefix(len + 2);
+		return token;
 	}
-}
-bool COM_File_Parser::Next(idStrRef& token) {
-	while (isOpen()) {
-		if (COM_Parser::Next(token)) return true;
-		fill_buffer();
-	}
-	return false;
-}
-bool COM_File_Parser::Open(const char* filename)  {
-	Close();
-	if (Sys_FileOpenRead(filename, &_handle)) {
-		fill_buffer();
-		return true;
-	}
-	else {
-		_handle = 0; 
-		return false;
-	}
-}
-void COM_File_Parser::Close() {
-	if (_handle != 0) {
-		Sys_FileClose(_handle);
-		_handle = idFileHandle();
-	}
-}
-/*
-================
-COM_CheckParm
+	else return false;
 
-Returns the position (1 to argc-1) in the program's argument list
-where the given parameter apears, or 0 if not present
-================
-*/
-int COM_CheckParm (const char * parm)
-{
-	int             i;
-	
-	for (i=1 ; i<com_argc ; i++)
-	{
-		if (!com_argv[i])
-			continue;               // NEXTSTEP sometimes clears appkit vars.
-		if (!Q_strcmp (parm,com_argv[i]))
-			return i;
-	}
-		
-	return 0;
+#endif
+	return token;
 }
+
 
 /*
 ================
@@ -1175,14 +1084,13 @@ being registered.
 */
 void COM_CheckRegistered (void)
 {
-	int             h;
 	unsigned short  check[128];
-	int                     i;
+	size_t                     i;
 
-	COM_OpenFile("gfx/pop.lmp", &h);
+	auto h = COM_OpenFile("gfx/pop.lmp",i);
 	static_registered = 0;
 
-	if (h == -1)
+	if (!h)
 	{
 #if WINDED
 	Sys_Error ("This dedicated server requires a full registered copy of Quake");
@@ -1192,10 +1100,8 @@ void COM_CheckRegistered (void)
 			Sys_Error ("You must have the registered version to use modified games");
 		return;
 	}
+	h->read((char*)check, sizeof(check));
 
-	Sys_FileRead (h, check, sizeof(check));
-	COM_CloseFile (h);
-	
 	for (i=0 ; i<128 ; i++)
 		if (pop[i] != (unsigned short)BigShort (check[i]))
 			Sys_Error ("Corrupted data file.");
@@ -1207,75 +1113,8 @@ void COM_CheckRegistered (void)
 }
 
 
-void COM_Path_f (void);
+void COM_Path_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
 
-
-/*
-================
-COM_InitArgv
-================
-*/
-void COM_InitArgv (int argc, char **argv)
-{
-	qboolean        safe;
-	int             i, j, n;
-
-// reconstitute the command line for the cmdline externally visible cvar
-	n = 0;
-
-	for (j=0 ; (j<MAX_NUM_ARGVS) && (j< argc) ; j++)
-	{
-		i = 0;
-
-		while ((n < (CMDLINE_LENGTH - 1)) && argv[j][i])
-		{
-			com_cmdline[n++] = argv[j][i++];
-		}
-
-		if (n < (CMDLINE_LENGTH - 1))
-			com_cmdline[n++] = ' ';
-		else
-			break;
-	}
-
-	com_cmdline[n] = 0;
-
-	safe = false;
-
-	for (com_argc=0 ; (com_argc<MAX_NUM_ARGVS) && (com_argc < argc) ;
-		 com_argc++)
-	{
-		largv[com_argc] = argv[com_argc];
-		if (!Q_strcmp ("-safe", argv[com_argc]))
-			safe = true;
-	}
-
-	if (safe)
-	{
-	// force all the safe-mode switches. Note that we reserved extra space in
-	// case we need to add these, so we don't need an overflow check
-		for (i=0 ; i<NUM_SAFE_ARGVS ; i++)
-		{
-			largv[com_argc] = safeargvs[i];
-			com_argc++;
-		}
-	}
-
-	largv[com_argc] = argvdummy;
-	com_argv = largv;
-
-	if (COM_CheckParm ("-rogue"))
-	{
-		rogue = true;
-		standard_quake = false;
-	}
-
-	if (COM_CheckParm ("-hipnotic"))
-	{
-		hipnotic = true;
-		standard_quake = false;
-	}
-}
 
 
 /*
@@ -1283,7 +1122,7 @@ void COM_InitArgv (int argc, char **argv)
 COM_Init
 ================
 */
-void COM_Init (char *basedir)
+void COM_Init (const char *basedir)
 {
 	byte    swaptest[2] = {1,0};
 
@@ -1360,56 +1199,286 @@ QUAKE FILESYSTEM
 =============================================================================
 */
 
+namespace quake {
+
+	bool operator==(const symbol& l, const string_view& r) {
+		if (l.size() != r.size()) return false;
+		for (size_t i = 0; i < l.size(); i++)
+			if (std::tolower(l[i]) != std::tolower(r[i])) return false;
+		return true;
+	}
+	std::ostream& operator<<(std::ostream& os, const string_view& sv) {
+		os.write(sv.data(), sv.size());
+		return os;
+	}
+
+	std::ostream& operator<<(std::ostream& os, const symbol& sv) {
+		// can't just write a name, have to make sure its lowercase
+		for (auto c : sv) os << (char)std::tolower(c);
+		return os;
+	}
+
+	static  std::streambuf::pos_type STREAM_ERROR_RETURN = std::streambuf::pos_type(std::streambuf::off_type(-1)); 
+	stream_buffer::pos_type stream_buffer::_seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode) {
+			if (!_file.is_open())
+				return pos_type(off_type(-1));
+
+
+
+			off_type new_off = 0;
+			switch (dir) {
+			case std::ios_base::beg:
+				new_off = off;
+				break;
+			case std::ios_base::cur:
+				new_off += off;
+				break;
+			case std::ios_base::end:
+				new_off = _length + off;
+				break;
+			}
+
+			if (new_off < 0 || new_off >= _length) return pos_type(off_type(-1));
+			_current = _file.seek(new_off + _offset);
+			if (_mode & std::ios_base::in) {
+				setg(nullptr, nullptr, nullptr);
+			}
+			else if (_mode & std::ios_base::out) {
+				sync();
+				setp(nullptr, nullptr, nullptr);
+			}
+			else
+				return STREAM_ERROR_RETURN;
+
+			if (_offset !=   0) {
+				if (_current >= (_offset + _length)) {
+					Sys_Error("file_read_stream_buffer: past override");
+					return STREAM_ERROR_RETURN;
+				}
+				_current -= _offset;
+			}
+			return pos_type(_current);
+	}
+	stream_buffer::pos_type stream_buffer::seekpos(pos_type pos, std::ios_base::openmode which)  { return _seekoff(pos, std::ios_base::beg, which); }
+	std::streampos stream_buffer::seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which) { return _seekoff(off, way, which); }
+	bool stream_buffer::open(const char* filename, std::ios_base::openmode mode) {
+		_offset = 0; _length = 0; 
+		_current = 0;
+		setg(nullptr, nullptr, nullptr); // flush buffer
+		setp(nullptr, nullptr, nullptr); // flush buffer
+		if (_file.open(filename, mode)) {
+			_length = _file.file_size();
+			return true;
+		} return false;
+	}
+	void stream_buffer::close() {
+		sync();
+		_file.close();
+	}
+	int stream_buffer::sync()  {
+		if (_mode & std::ios_base::out && pptr() >  pbase()) {
+			size_t size = pptr() - pbase();
+			_current += _file.write(pbase(), size);
+			setp(_buffer.data(), _buffer.data(), _buffer.data()+ _buffer.size()); // flush buffer
+		}
+		return 0;
+	}
+	void stream_buffer::set_offset(off_type offset, off_type length) {
+		sync();
+		_offset = offset; _length = length; _current = 0;
+		_file.seek(_offset);
+		setg(nullptr, nullptr, nullptr); // flush buffer
+	}
+	stream_buffer::int_type stream_buffer::underflow()  {
+		// only reason to get here is if the buffer is empty
+		if (_current >= _length) return -1;
+		size_t size = std::min(_buffer.size(), size_t(_length - _current));
+		_current+= _file.read(_buffer.data(), size);
+		setg(_buffer.data(), _buffer.data(), _buffer.data() + size); // flush buffer
+		return traits_type::to_int_type(_buffer[0]);
+	}
+	stream_buffer::int_type stream_buffer::overflow(int_type c) {
+		sync();
+		return this->sputc(c);
+	}
+
+};
+
 int     com_filesize;
 
 
 //
 // in memory
 //
-
-typedef struct
+#if 0
+struct packfile_t
 {
 	char    name[MAX_QPATH];
-	int             filepos, filelen;
-} packfile_t;
+	int     filepos, filelen;
+} ;
 
-typedef struct pack_s
+struct pack_t
 {
 	char    filename[MAX_OSPATH];
 	int             handle;
 	int             numfiles;
-	packfile_t      *files;
-} pack_t;
-
+	packfile_t		files[1]; // ,make it one continuious load
+	//packfile_t      *files;
+} ;
+#endif
 //
 // on disk
 //
-typedef struct
+struct dpackfile_t
 {
 	char    name[56];
-	int             filepos, filelen;
-} dpackfile_t;
+	int      filepos, filelen;
+} ;
 
-typedef struct
+struct dpackheader_t
 {
 	char    id[4];
 	int             dirofs;
 	int             dirlen;
-} dpackheader_t;
+} ;
 
 #define MAX_FILES_IN_PACK       2048
 
-char    com_cachedir[MAX_OSPATH];
-char    com_gamedir[MAX_OSPATH];
 
-typedef struct searchpath_s
+
+struct pack_t;
+struct search_value_t {
+	pack_t* handler;
+	int offset;
+	int length;
+	char filename[MAX_QPATH];
+	quake::ifstream& getstream();
+	operator quake::string_view() const { return (const char*)filename; }
+};
+
+
+struct pack_t {
+	int file_count;
+	quake::ifstream handler;
+	char filename[MAX_OSPATH];
+	search_value_t files[1];
+	operator quake::string_view() const { return (const char*)filename; }
+	static void operator delete(void*) {} // itsloaded as a hunk
+};
+
+quake::ifstream& search_value_t::getstream() {
+	assert(handler);
+	auto& stream = handler->handler;
+
+	if (!stream.is_open()) {
+		stream.open(handler->filename);// | std::ios_base::binary);
+		if (!stream.is_open()) Sys_Error("Cannot open pack file!");
+	}
+	stream.set_offset(offset, length);
+	return stream;
+}
+#include <unordered_set>
+
+
+using pack_ptr_t = std::unique_ptr<pack_t>;
+using filename_ptr_t = std::unique_ptr<std::string>;
+using unordered_map_t = std::unordered_map<quake::string_view, std::reference_wrapper<search_value_t>>;
+static unordered_map_t com_packfilesearch;
+static std::unordered_set<std::string> com_searchpaths;
+
+
+static std::unordered_map<quake::string_view, std::unique_ptr<pack_t>> com_packfiles;
+static void AddSearchPath(const quake::string_view& dir) {
+#if 0
+	char* cptr = (char*)Hunk_Alloc(sizeof(searchpath_t) + dir.size());
+	searchpath_t* ptr = new(cptr) searchpath_t;
+	dir.copy(ptr->_filename, dir.size());
+	ptr->_filename[dir.size()] = '\0';
+	ptr->next = com_searchpaths;
+	com_searchpaths = ptr;
+	return ptr;
+#else
+	com_searchpaths.emplace(dir.data(),dir.size());
+
+#endif
+}
+/*
+=================
+COM_LoadPackFile
+
+Takes an explicit (not game tree related) path to a pak file.
+
+Loads the header and directory, adding the files at the beginning
+of the list so they override previous pack files.
+=================
+*/
+static bool COM_LoadPackFile(const quake::string_view& packfile)
 {
-	char    filename[MAX_OSPATH];
-	pack_t  *pack;          // only one of filename / pack will be used
-	struct searchpath_s *next;
-} searchpath_t;
+	dpackheader_t   header;
+	//dpackfile_t             info[MAX_FILES_IN_PACK];
+	unsigned short          crc;
+	quake::fixed_string_stream<MAX_OSPATH> c_helper;
 
-searchpath_t    *com_searchpaths;
+	if (com_packfiles.find(packfile) != com_packfiles.end()) return true; // already loaded
+	c_helper << packfile;
+	sys_file file(c_helper.str().c_str());
+	if (!file.is_open())
+	{
+		Con_Printf("Couldn't open %s\n", packfile);
+		return false;
+	}
+	file.read((char*)&header, sizeof(header));
+
+	if (header.id[0] != 'P' || header.id[1] != 'A'
+		|| header.id[2] != 'C' || header.id[3] != 'K')
+		Sys_Error("%s is not a packfile", packfile);
+	header.dirofs = LittleLong(header.dirofs);
+	header.dirlen = LittleLong(header.dirlen);
+
+	size_t numpackfiles = header.dirlen / sizeof(dpackfile_t);
+
+	if (numpackfiles > MAX_FILES_IN_PACK)
+		Sys_Error("%s has %i files", packfile, numpackfiles);
+
+	if (numpackfiles != PAK0_COUNT)
+		com_modified = true;    // not the original file
+
+	file.seek(header.dirofs);
+
+	// crc the directory to check for modifications
+	CRC_Init(&crc);
+	pack_t* pack = new((pack_t*)Hunk_AllocName(sizeof(pack_t) + (numpackfiles - 1) * sizeof(search_value_t), "packfile")) pack_t;
+	packfile.copy(pack->filename, sizeof(pack->filename));
+	pack->file_count = numpackfiles;
+
+	com_packfiles.emplace(pack->filename, pack);
+	for (int i = 0; i < numpackfiles; i++) {
+		search_value_t& psearch = pack->files[i];
+		dpackfile_t pfile;
+		file.read((char*)&pfile, sizeof(dpackfile_t));
+		CRC_ProcessStruct(&crc, &pfile);
+		pfile.filepos = LittleLong(pfile.filepos);
+		pfile.filelen = LittleLong(pfile.filelen);
+		assert(pfile.name[55] == 0);
+		::strncpy(psearch.filename, pfile.name, sizeof(psearch.filename) - 1);
+		psearch.length = pfile.filelen;
+		psearch.offset = pfile.filepos;
+		psearch.handler = pack;
+
+		quake::string_view filename(psearch.filename);
+
+
+		if (com_packfilesearch.find(filename) != com_packfilesearch.end()) {
+			quake::con << "dup pack file: '" << filename << "'" << std::endl;
+		}
+		else
+			com_packfilesearch.emplace(filename, std::ref(pack->files[i]));
+	}
+	file.close();
+	quake::con << "Added packfile " << packfile << " (" << numpackfiles << " files)" << std::endl;
+	return true;
+}
+
 
 /*
 ============
@@ -1417,19 +1486,11 @@ COM_Path_f
 
 ============
 */
-void COM_Path_f (void)
+void COM_Path_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	searchpath_t    *s;
-	
 	Con_Printf ("Current search path:\n");
-	for (s=com_searchpaths ; s ; s=s->next)
-	{
-		if (s->pack)
-		{
-			Con_Printf ("%s (%i files)\n", s->pack->filename, s->pack->numfiles);
-		}
-		else
-			Con_Printf ("%s\n", s->filename);
+	for (const auto& it : com_packfilesearch) {
+		quake::con << it.second.get().filename << std::endl;
 	}
 }
 
@@ -1440,23 +1501,22 @@ COM_WriteFile
 The filename will be prefixed by the current game directory
 ============
 */
-void COM_WriteFile (const char * filename, const void * data, int len)
+void COM_WriteFile (const quake::string_view& filename, const void * data, int len)
 {
-	int             handle;
-	char    name[MAX_OSPATH];
-	
-	sprintf (name, "%s/%s", com_gamedir, filename);
+	quake::fixed_string_stream<MAX_OSPATH> name;
 
-	handle = Sys_FileOpenWrite (name);
-	if (handle == -1)
+	name << com_gamedir << '/' << filename;
+
+	quake::ofstream file(name.str().c_str());
+	if (file.bad())
 	{
-		Sys_Printf ("COM_WriteFile: failed on %s\n", name);
-		return;
+		quake::con << "COM_WriteFile: failed on " << name.str() << std::endl;
 	}
-	
-	Sys_Printf ("COM_WriteFile: %s\n", name);
-	Sys_FileWrite (handle, data, len);
-	Sys_FileClose (handle);
+	else {
+		quake::con << "COM_WriteFile: " << name.str() << std::endl;
+		file.write((const char*)data, len);
+		file.close();
+	}
 }
 
 
@@ -1467,17 +1527,15 @@ COM_CreatePath
 Only used for CopyFile
 ============
 */
-void    COM_CreatePath (char *path)
+void    COM_CreatePath(const char *path)
 {
-	char    *ofs;
-	
-	for (ofs = path+1 ; *ofs ; ofs++)
-	{
-		if (*ofs == '/')
+	ZString ofs = path;
+	for (size_t i = 1; i < ofs.size(); i++) {
+		if (ofs[i] == '/')
 		{       // create the directory
-			*ofs = 0;
-			Sys_mkdir (path);
-			*ofs = '/';
+			ofs[i] = 0;
+			sys_file::MakeDir(ofs.data());
+			ofs[i] = '/';
 		}
 	}
 }
@@ -1491,29 +1549,12 @@ Copies a file over from the net to the local cache, creating any directories
 needed.  This is for the convenience of developers using ISDN from home.
 ===========
 */
-void COM_CopyFile (char *netpath, char *cachepath)
+void COM_CopyFile (const char *netpath, const char *cachepath)
 {
-	int             in, out;
-	int             remaining, count;
-	char    buf[4096];
-	
-	remaining = Sys_FileOpenRead (netpath, &in);            
-	COM_CreatePath (cachepath);     // create directories up to the cache file
-	out = Sys_FileOpenWrite (cachepath);
-	
-	while (remaining)
-	{
-		if (remaining < sizeof(buf))
-			count = remaining;
-		else
-			count = sizeof(buf);
-		Sys_FileRead (in, buf, count);
-		Sys_FileWrite (out, buf, count);
-		remaining -= count;
-	}
-
-	Sys_FileClose (in);
-	Sys_FileClose (out);    
+	quake::ifstream in(netpath);
+	quake::ofstream out(cachepath);
+	out << in.rdbuf();
+	out.flush();
 }
 
 /*
@@ -1524,115 +1565,52 @@ Finds the file in the search path.
 Sets com_filesize and one of handle or file
 ===========
 */
-int COM_FindFile (const char *filename, int *handle, FILE **file)
+
+
+static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 {
-	searchpath_t    *search;
-	char            netpath[MAX_OSPATH];
-	char            cachepath[MAX_OSPATH];
-	pack_t          *pak;
-	int                     i;
-	int                     findtime, cachetime;
-
+	quake::fixed_string_stream<MAX_OSPATH>   cachepath;
+	quake::fixed_string_stream<MAX_OSPATH>   netpath;
+#if 0
 	if (file && handle)
-		Sys_Error ("COM_FindFile: both handle and file set");
+		Sys_Error("COM_FindFile: both handle and file set");
 	if (!file && !handle)
-		Sys_Error ("COM_FindFile: neither handle or file set");
-		
-//
-// search through the path, one element at a time
-//
-	search = com_searchpaths;
-	if (proghack)
-	{	// gross hack to use quake 1 progs with quake 2 maps
-		if (!strcmp(filename, "progs.dat"))
-			search = search->next;
-	}
-
-	for ( ; search ; search = search->next)
-	{
-	// is the element a pak file?
-		if (search->pack)
-		{
-		// look through all the pak file elements
-			pak = search->pack;
-			for (i=0 ; i<pak->numfiles ; i++)
-				if (!strcmp (pak->files[i].name, filename))
-				{       // found it!
-					Sys_Printf ("PackFile: %s : %s\n",pak->filename, filename);
-					if (handle)
-					{
-						*handle = pak->handle;
-						Sys_FileSeek (pak->handle, pak->files[i].filepos);
-					}
-					else
-					{       // open a new file on the pakfile
-						*file = fopen (pak->filename, "rb");
-						if (*file)
-							fseek (*file, pak->files[i].filepos, SEEK_SET);
-					}
-					com_filesize = pak->files[i].filelen;
-					return com_filesize;
-				}
-		}
-		else
-		{               
-	// check a file in the directory tree
-			if (!static_registered)
-			{       // if not a registered version, don't ever go beyond base
-				if ( strchr (filename, '/') || strchr (filename,'\\'))
-					continue;
-			}
-			
-			Q_sprintf (netpath, "%s/%s",search->filename, filename);
-			
-			findtime = Sys_FileTime (netpath);
-			if (findtime == -1)
-				continue;
-				
-		// see if the file needs to be updated in the cache
-			if (!com_cachedir[0])
-				Q_strcpy (cachepath, netpath);
-			else
-			{	
-#if defined(_WIN32)
-				if ((strlen(netpath) < 2) || (netpath[1] != ':'))
-					Q_sprintf (cachepath,"%s%s", com_cachedir, netpath);
-				else
-					Q_sprintf (cachepath,"%s%s", com_cachedir, netpath+2);
-#else
-				sprintf (cachepath,"%s%s", com_cachedir, netpath);
+		Sys_Error("COM_FindFile: neither handle or file set");
 #endif
-
-				cachetime = Sys_FileTime (cachepath);
-			
-				if (cachetime < findtime)
-					COM_CopyFile (netpath, cachepath);
-				strcpy (netpath, cachepath);
-			}	
-
-			Sys_Printf ("FindFile: %s\n",netpath);
-			com_filesize = Sys_FileOpenRead (netpath, &i);
-			if (handle)
-				*handle = i;
-			else
-			{
-				Sys_FileClose (i);
-				*file = fopen (netpath, "rb");
-			}
-			return com_filesize;
-		}
-		
+	//
+	// search through the path, one element at a time
+	//
+	auto& it = com_packfilesearch.find(filename);
+	if (it != com_packfilesearch.end()) { // its a pack file
+		auto& pfile = it->second.get();		
+		quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
+		return &pfile.getstream();
 	}
-	
-	Sys_Printf ("FindFile: can't find %s\n", filename);
-	
-	if (handle)
-		*handle = -1;
-	else
-		*file = NULL;
-	com_filesize = -1;
-	return -1;
+	else { // not a pack file
+		// hack for now
+		static quake::ifstream temp_file;
+		temp_file.close();
+		for (const auto& path : com_searchpaths) {
+			netpath.clear();
+			netpath << path << '/' << filename;
+			temp_file.open(netpath.str().c_str());
+			if (temp_file.is_open()) return &temp_file;
+#if 0
+			findtime = Sys_FileTime(netpath.data());
+			if (findtime == -1) continue;
+			quake::con << "FindFile: " << netpath << std::endl;
+			//int handle;
+			//com_filesize = Sys_FileOpenRead(netpath.data(), &handle);
+			return &id_ifstream(netpath.data());
+#endif
+		}
+	}
+	quake::con << "FindFile: can't find " << filename;
+
+	return nullptr;
 }
+
+
 
 
 /*
@@ -1644,43 +1622,23 @@ returns a handle and a length
 it may actually be inside a pak file
 ===========
 */
-int COM_OpenFile (const char * filename, int *handle)
+std::istream* COM_OpenFile(const quake::string_view& filename, size_t& length)
 {
-	return COM_FindFile (filename, handle, NULL);
-}
-
-/*
-===========
-COM_FOpenFile
-
-If the requested file is inside a packfile, a new FILE * will be opened
-into the file.
-===========
-*/
-int COM_FOpenFile (const char * filename, FILE **file)
-{
-	return COM_FindFile (filename, NULL, file);
-}
-
-/*
-============
-COM_CloseFile
-
-If it is a pak file handle, don't really close it
-============
-*/
-void COM_CloseFile (int h)
-{
-	searchpath_t    *s;
-	
-	for (s = com_searchpaths ; s ; s=s->next)
-		if (s->pack && s->pack->handle == h)
-			return;
-			
-	Sys_FileClose (h);
+	auto ret = COM_FindFile (filename);
+	if (ret == nullptr) return nullptr;
+	length = ret->file_length();
+	return ret;
 }
 
 
+
+enum class AllocType {
+	Hunk,
+	Temp,
+	Zmalloc,
+	Cache,
+	Stack
+};
 /*
 ============
 COM_LoadFile
@@ -1692,22 +1650,18 @@ Allways appends a 0 byte.
 cache_user_t *loadcache;
 byte    *loadbuf;
 int             loadsize;
-byte *COM_LoadFile (const char *path, int usehunk)
+
+static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 {
-	int             h;
-	byte    *buf;
-	char    base[32];
-	int             len;
-
-	buf = NULL;     // quiet compiler warning
-
+	byte    *buf = nullptr;  // quiet compiler warning
+	size_t len;
 // look for it in the filesystem or pack files
-	len = COM_OpenFile (path, &h);
-	if (h == -1)
-		return NULL;
-	
+	auto is = COM_FindFile(path);
+	if (is == nullptr)
+		return nullptr;
+	len = is->file_length();
 // extract the filename base name for hunk tag
-	COM_FileBase (path, base);
+	auto base = COM_FileBase (path);
 	
 	if (usehunk == 1)
 		buf = (byte*)Hunk_AllocName (len+1, base);
@@ -1733,31 +1687,43 @@ byte *COM_LoadFile (const char *path, int usehunk)
 	((byte *)buf)[len] = 0;
 
 	Draw_BeginDisc ();
-	Sys_FileRead (h, buf, len);                     
-	COM_CloseFile (h);
+	// ok debug this thing
+#if 0
+	for (size_t i = 0; i < len; i++) {
+		int c = is->get();
+		assert(c >= 0);
+		buf[i] = (uint8_t)c;
+	}
+#else
+	is->read((char*)buf, len);
+#endif
+	//std::ios_base
+
+	//assert(is->good());
+//	is->close();
 	Draw_EndDisc ();
 
 	return buf;
 }
 
-byte *COM_LoadHunkFile (const char * path)
+byte *COM_LoadHunkFile (const quake::string_view& path)
 {
 	return COM_LoadFile (path, 1);
 }
 
-byte *COM_LoadTempFile (const char * path)
+byte *COM_LoadTempFile (const quake::string_view& path)
 {
 	return COM_LoadFile (path, 2);
 }
 
-void COM_LoadCacheFile (const char * path, struct cache_user_s *cu)
+void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu)
 {
 	loadcache = cu;
 	COM_LoadFile (path, 3);
 }
 
 // uses temp hunk if larger than bufsize
-byte *COM_LoadStackFile (const char * path, void *buffer, int bufsize)
+byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize)
 {
 	byte    *buf;
 	
@@ -1766,77 +1732,6 @@ byte *COM_LoadStackFile (const char * path, void *buffer, int bufsize)
 	buf = COM_LoadFile (path, 4);
 	
 	return buf;
-}
-
-/*
-=================
-COM_LoadPackFile
-
-Takes an explicit (not game tree related) path to a pak file.
-
-Loads the header and directory, adding the files at the beginning
-of the list so they override previous pack files.
-=================
-*/
-pack_t *COM_LoadPackFile (char *packfile)
-{
-	dpackheader_t   header;
-	int                             i;
-	packfile_t              *newfiles;
-	int                             numpackfiles;
-	pack_t                  *pack;
-	int                             packhandle;
-	dpackfile_t             info[MAX_FILES_IN_PACK];
-	unsigned short          crc;
-
-	if (Sys_FileOpenRead (packfile, &packhandle) == -1)
-	{
-//              Con_Printf ("Couldn't open %s\n", packfile);
-		return NULL;
-	}
-	Sys_FileRead (packhandle, (void *)&header, sizeof(header));
-	if (header.id[0] != 'P' || header.id[1] != 'A'
-	|| header.id[2] != 'C' || header.id[3] != 'K')
-		Sys_Error ("%s is not a packfile", packfile);
-	header.dirofs = LittleLong (header.dirofs);
-	header.dirlen = LittleLong (header.dirlen);
-
-	numpackfiles = header.dirlen / sizeof(dpackfile_t);
-
-	if (numpackfiles > MAX_FILES_IN_PACK)
-		Sys_Error ("%s has %i files", packfile, numpackfiles);
-
-	if (numpackfiles != PAK0_COUNT)
-		com_modified = true;    // not the original file
-
-	newfiles = (packfile_t*)Hunk_AllocName (numpackfiles * sizeof(packfile_t), "packfile");
-
-	Sys_FileSeek (packhandle, header.dirofs);
-	Sys_FileRead (packhandle, (void *)info, header.dirlen);
-
-// crc the directory to check for modifications
-	CRC_Init (&crc);
-	for (i=0 ; i<header.dirlen ; i++)
-		CRC_ProcessByte (&crc, ((byte *)info)[i]);
-	if (crc != PAK0_CRC)
-		com_modified = true;
-
-// parse the directory
-	for (i=0 ; i<numpackfiles ; i++)
-	{
-		strcpy (newfiles[i].name, info[i].name);
-		newfiles[i].filepos = LittleLong(info[i].filepos);
-		newfiles[i].filelen = LittleLong(info[i].filelen);
-	}
-
-	pack = (pack_t*)Hunk_Alloc (sizeof (pack_t));
-	strcpy (pack->filename, packfile);
-	pack->handle = packhandle;
-	pack->numfiles = numpackfiles;
-	pack->files = newfiles;
-	
-	Con_Printf ("Added packfile %s (%i files)\n", packfile, numpackfiles);
-	return pack;
 }
 
 
@@ -1848,145 +1743,118 @@ Sets com_gamedir, adds the directory to the head of the path,
 then loads and adds pak1.pak pak2.pak ... 
 ================
 */
-void COM_AddGameDirectory (const char *dir)
+static void COM_AddGameDirectory(const quake::string_view& dir)
 {
-	int                             i;
-	searchpath_t    *search;
-	pack_t                  *pak;
-	char                    pakfile[MAX_OSPATH];
+	AddSearchPath(dir);
 
-	Q_strcpy (com_gamedir, dir);
-
-//
-// add the directory to the search path
-//
-	search = (searchpath_t*)Hunk_Alloc (sizeof(searchpath_t));
-	Q_strcpy (search->filename, dir);
-	search->next = com_searchpaths;
-	com_searchpaths = search;
-
-//
-// add any pak files in the format pak0.pak pak1.pak, ...
-//
-	for (i=0 ; ; i++)
+	//
+	// add any pak files in the format pak0.pak pak1.pak, ...
+	//
+	quake::fixed_string_stream<MAX_OSPATH> path;
+	for (int i = 0; ; i++)
 	{
-		Q_sprintf (pakfile, "%s/pak%i.pak", dir, i);
-		pak = COM_LoadPackFile (pakfile);
-		if (!pak)
-			break;
-		search = (searchpath_t*)Hunk_Alloc (sizeof(searchpath_t));
-		search->pack = pak;
-		search->next = com_searchpaths;
-		com_searchpaths = search;               
+		path.clear();
+		path << dir << "/pak" << i << ".pak";
+		if (!COM_LoadPackFile(path.str())) break;
 	}
 
-//
-// add the contents of the parms.txt file to the end of the command line
-//
-
 }
+
 
 /*
 ================
 COM_InitFilesystem
 ================
 */
-void COM_InitFilesystem (void)
+void COM_InitFilesystem(void)
 {
-	int             i, j;
-	char    basedir[MAX_OSPATH];
-	searchpath_t    *search;
-
-//
-// -basedir <path>
-// Overrides the system supplied base directory (under GAMENAME)
-//
-	i = COM_CheckParm ("-basedir");
-	if (i && i < com_argc-1)
-		Q_strcpy (basedir, com_argv[i+1]);
+	size_t i;
+	
+	quake::fixed_string<MAX_OSPATH> basedir;
+	quake::string_view value;
+	//
+	// -basedir <path>
+	// Overrides the system supplied base directory (under GAMENAME)
+	//
+	if (host_parms.COM_CheckParmValue("-basedir", value) != 0)
+		basedir = value;
 	else
-		Q_strcpy (basedir, host_parms.basedir);
+		basedir = host_parms.basedir;
 
-	j = strlen (basedir);
+	if (!basedir.empty() && (basedir.back() == '\\' || basedir.back() == '/'))
+		basedir.pop_back();
 
-	if (j > 0)
-	{
-		if ((basedir[j-1] == '\\') || (basedir[j-1] == '/'))
-			basedir[j-1] = 0;
-	}
-
-//
-// -cachedir <path>
-// Overrides the system supplied cache directory (NULL or /qcache)
-// -cachedir - will disable caching.
-//
-	i = COM_CheckParm ("-cachedir");
-	if (i && i < com_argc-1)
-	{
-		if (com_argv[i+1][0] == '-')
-			com_cachedir[0] = 0;
-		else
-			strcpy (com_cachedir, com_argv[i+1]);
+	//
+	// -cachedir <path>
+	// Overrides the system supplied cache directory (NULL or /qcache)
+	// -cachedir - will disable caching.
+	//
+	com_cachedir = "";
+	if (host_parms.COM_CheckParmValue("-cachedir", value) != 0) {
+		if (!value.empty() && value[0] != '-')
+			com_cachedir = value;
 	}
 	else if (host_parms.cachedir)
-		strcpy (com_cachedir, host_parms.cachedir);
-	else
-		com_cachedir[0] = 0;
+		com_cachedir = host_parms.cachedir;
+	//
+	// start up with GAMENAME by default (id1)
+	//
 
-//
-// start up with GAMENAME by default (id1)
-//
-	{
-		buffer_t<1024> buffer;
-		COM_AddGameDirectory(buffer.print("%s/" GAMENAME, basedir));
+	if (!basedir.empty() && basedir.back() != '/')
+		basedir.push_back('/');
+	size_t slash_point = basedir.size();
+	basedir.append(GAMENAME);
+	COM_AddGameDirectory(basedir);
 
-		if (COM_CheckParm("-rogue"))
-			COM_AddGameDirectory(buffer.print("%s/rogue", basedir));
-		if (COM_CheckParm("-hipnotic"))
-			COM_AddGameDirectory(buffer.print("%s/hipnotic", basedir));
+	if (host_parms.COM_CheckParm("-rogue")) {
+		basedir.erase(slash_point).append("rogue");
+		COM_AddGameDirectory(basedir);
+	}
+	if (host_parms.COM_CheckParm("-hipnotic")) {
+		basedir.erase(slash_point).append("hipnotic");
+		COM_AddGameDirectory(basedir);
+	}
 
-
-
-		//
-		// -game <gamedir>
-		// Adds basedir/gamedir as an override game
-		//
-		i = COM_CheckParm("-game");
-		if (i && i < com_argc - 1)
+	//
+	// -game <gamedir>
+	// Adds basedir/gamedir as an override game
+	//
+	if (host_parms.COM_CheckParmValue("-game", value) != 0) {
 		{
 			com_modified = true;
-			COM_AddGameDirectory(buffer.print("%s/%s", basedir, com_argv[i + 1]));
+			basedir.erase(slash_point).append(value);
+			COM_AddGameDirectory(basedir);
 		}
 	}
-//
-// -path <dir or packfile> [<dir or packfile>] ...
-// Fully specifies the exact serach path, overriding the generated one
-//
-	i = COM_CheckParm ("-path");
-	if (i)
+	//
+	// -path <dir or packfile> [<dir or packfile>] ...
+	// Fully specifies the exact serach path, overriding the generated one
+	//
+	if ((i = host_parms.COM_CheckParm("-path")) != 0)
 	{
 		com_modified = true;
-		com_searchpaths = NULL;
-		while (++i < com_argc)
-		{
-			if (!com_argv[i] || com_argv[i][0] == '+' || com_argv[i][0] == '-')
+		quake::string_view file_name;
+		for (size_t j = i + 1; i < host_parms.argc; i++) {
+			auto it = host_parms.argv[j];
+			if (!it.empty() || it.at(0) == '+' || it.at(0) == '-') {
+				file_name = it;
 				break;
-			
-			search = (searchpath_t*)Hunk_Alloc (sizeof(searchpath_t));
-			if ( !strcmp(COM_FileExtension(com_argv[i]), "pak") )
-			{
-				search->pack = COM_LoadPackFile (com_argv[i]);
-				if (!search->pack)
-					Sys_Error ("Couldn't load packfile: %s", com_argv[i]);
 			}
-			else
-				strcpy (search->filename, com_argv[i]);
-			search->next = com_searchpaths;
-			com_searchpaths = search;
+
 		}
+		if (COM_FileExtension(file_name) == "pak")
+		{
+			COM_LoadPackFile(file_name);
+#if 0
+			if (!search->pack)
+				quake::con << "Couldn't load packfile: " << *it << std::endl;
+#endif
+		}
+		else
+			AddSearchPath(file_name);
 	}
 
-	if (COM_CheckParm ("-proghack"))
+	if (host_parms.COM_CheckParm("-proghack"))
 		proghack = true;
 }
 

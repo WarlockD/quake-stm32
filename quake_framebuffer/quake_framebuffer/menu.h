@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // the net drivers should just set the apropriate bits in m_activenet,
 // instead of having the menu code look through their internal tables
 //
+#ifndef _QUAKE_MENU_H_
+#define _QUAKE_MENU_H_
+
 #define	MNET_IPX		1
 #define	MNET_TCP		2
 
@@ -33,6 +36,7 @@ extern	int	m_activenet;
 void M_Init (void);
 void M_Keydown (int key);
 void M_Draw (void);
-void M_ToggleMenu_f (void);
+void M_ToggleMenu_f(cmd_source_t source, size_t  argc, const quake::string_view argv[]);
+inline void M_ToggleMenu(void) { M_ToggleMenu_f(src_client, 0, nullptr); }
 
-
+#endif

@@ -143,7 +143,7 @@ cvar_t	v_centermove = {"v_centermove", "0.15", false};
 cvar_t	v_centerspeed = {"v_centerspeed","500"};
 
 
-void V_StartPitchDrift (void)
+void V_StartPitchDrift()
 {
 #if 1
 	if (cl.laststop == cl.time)
@@ -385,12 +385,12 @@ void V_ParseDamage (void)
 V_cshift_f
 ==================
 */
-void V_cshift_f (void)
+void V_cshift_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	cshift_empty.destcolor[0] = atoi(Cmd_Argv(1));
-	cshift_empty.destcolor[1] = atoi(Cmd_Argv(2));
-	cshift_empty.destcolor[2] = atoi(Cmd_Argv(3));
-	cshift_empty.percent = Q_atoi(Cmd_Argv(4));
+	cshift_empty.destcolor[0] = Q_atoi(argv[1]);
+	cshift_empty.destcolor[1] = Q_atoi(argv[2]);
+	cshift_empty.destcolor[2] = Q_atoi(argv[3]);
+	cshift_empty.percent = Q_atoi(argv[4]);
 }
 
 
@@ -401,7 +401,7 @@ V_BonusFlash_f
 When you run over an item, the server sends this command
 ==================
 */
-void V_BonusFlash_f (void)
+void V_BonusFlash_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	cl.cshifts[CSHIFT_BONUS].destcolor[0] = 215;
 	cl.cshifts[CSHIFT_BONUS].destcolor[1] = 186;
@@ -1077,7 +1077,7 @@ void V_Init (void)
 {
 	Cmd_AddCommand ("v_cshift", V_cshift_f);	
 	Cmd_AddCommand ("bf", V_BonusFlash_f);
-	Cmd_AddCommand ("centerview", V_StartPitchDrift);
+	Cmd_AddCommand ("centerview", (xcommand_t)V_StartPitchDrift);
 
 	Cvar_RegisterVariable (&lcd_x);
 	Cvar_RegisterVariable (&lcd_yaw);

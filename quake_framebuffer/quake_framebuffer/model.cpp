@@ -182,13 +182,13 @@ Mod_FindName
 
 ==================
 */
-model_t *Mod_FindName (char *name)
+static model_t *Mod_FindName (const quake::string_view& name)
 {
 	int		i;
 	model_t	*mod;
 	model_t	*avail = NULL;
 
-	if (!name[0])
+	if (name.empty())
 		Sys_Error ("Mod_ForName: NULL name");
 		
 //
@@ -196,7 +196,7 @@ model_t *Mod_FindName (char *name)
 //
 	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
 	{
-		if (!strcmp (mod->name, name) )
+		if (name == mod->name)
 			break;
 		if (mod->needload == NL_UNREFERENCED)
 			if (!avail || mod->type != mod_alias)
@@ -219,7 +219,7 @@ model_t *Mod_FindName (char *name)
 		}
 		else
 			mod_numknown++;
-		strcpy (mod->name, name);
+		name.copy(mod->name, sizeof(mod->name));
 		mod->needload = NL_NEEDS_LOADED;
 	}
 
@@ -232,7 +232,7 @@ Mod_TouchModel
 
 ==================
 */
-void Mod_TouchModel (char *name)
+void Mod_TouchModel (const quake::string_view& name)
 {
 	model_t	*mod;
 	
@@ -288,8 +288,8 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 	
 //
 // allocate a new model
-//
-	COM_FileBase (mod->name, loadname);
+
+	COM_FileBase(quake::string_view(loadname)).copy(mod->name, sizeof(mod->name));
 	
 	loadmodel = mod;
 
@@ -325,7 +325,7 @@ Mod_ForName
 Loads in a model for the given name
 ==================
 */
-model_t *Mod_ForName (char *name, qboolean crash)
+model_t *Mod_ForName (const quake::string_view& name, qboolean crash)
 {
 	model_t	*mod;
 
@@ -1853,7 +1853,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 Mod_Print
 ================
 */
-void Mod_Print (void)
+void Mod_Print(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int		i;
 	model_t	*mod;

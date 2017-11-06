@@ -27,21 +27,22 @@ typedef struct
 // cmd.c private
 #define	MAX_ALIAS_NAME	32
 
-typedef struct cmdalias_s
+struct cmdalias_t
 {
-	struct cmdalias_s	*next;
+	cmdalias_t	*next;
 	char	name[MAX_ALIAS_NAME];
-	char	*value;
-} cmdalias_t;
-typedef struct cmd_function_s
+	quake::fixed_string<64> value;
+} ;
+
+
+struct cmd_function_t
 {
-	struct cmd_function_s	*next;
-	char					*name;
-	xcommand_t				function;
-} cmd_function_t;
+	cmd_function_t	*next;
+	xcommand_t		function;
+	char name[1];
+} ;
 
 
-#define	MAX_ARGS		80
 
 // common.c private
 

@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "quakedef.h"
+#include <fstream>
 using namespace std::chrono;
 
 #if 0
@@ -34,25 +35,26 @@ void (*vid_menudrawfn)(void);
 void (*vid_menukeyfn)(int key);
 enum menu_state_t { m_none, m_main, m_singleplayer, m_load, m_save, m_multiplayer, m_setup, m_net, m_options, m_video, m_keys, m_help, m_quit, m_serialconfig, m_modemconfig, m_lanconfig, m_gameoptions, m_search, m_slist };
 menu_state_t m_state;
+#define EMPTY_ARGS src_client, 0, nullptr
 
-void M_Menu_Main_f (void);
-	void M_Menu_SinglePlayer_f (void);
-		void M_Menu_Load_f (void);
-		void M_Menu_Save_f (void);
-	void M_Menu_MultiPlayer_f (void);
-		void M_Menu_Setup_f (void);
-		void M_Menu_Net_f (void);
-	void M_Menu_Options_f (void);
-		void M_Menu_Keys_f (void);
-		void M_Menu_Video_f (void);
-	void M_Menu_Help_f (void);
-	void M_Menu_Quit_f (void);
-void M_Menu_SerialConfig_f (void);
-	void M_Menu_ModemConfig_f (void);
-void M_Menu_LanConfig_f (void);
-void M_Menu_GameOptions_f (void);
-void M_Menu_Search_f (void);
-void M_Menu_ServerList_f (void);
+void M_Menu_Main_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_SinglePlayer_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Load_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Save_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+	void M_Menu_MultiPlayer_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Setup_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Net_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+	void M_Menu_Options_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Keys_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+		void M_Menu_Video_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+	void M_Menu_Help_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+	void M_Menu_Quit_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_SerialConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+	void M_Menu_ModemConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_LanConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_GameOptions_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_Search_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void M_Menu_ServerList_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
 
 void M_Main_Draw (void);
 	void M_SinglePlayer_Draw (void);
@@ -116,12 +118,12 @@ M_DrawCharacter
 Draws one solid graphics character
 ================
 */
-void M_DrawCharacter (int cx, int line, int num)
+static void M_DrawCharacter (int cx, int line, int num)
 {
 	Draw_Character ( cx + ((vid.width - 320)>>1), line, num);
 }
 
-void M_Print (int cx, int cy, char *str)
+static void M_Print (int cx, int cy, const char *str)
 {
 	while (*str)
 	{
@@ -131,7 +133,15 @@ void M_Print (int cx, int cy, char *str)
 	}
 }
 
-void M_PrintWhite (int cx, int cy, char *str)
+static void M_Print(int cx, int cy, const quake::string_view& str)
+{
+	for (auto c : str) {
+		M_DrawCharacter(cx, cy, c + 128);
+		cx += 8;
+	}
+}
+
+static void M_PrintWhite (int cx, int cy, const char *str)
 {
 	while (*str)
 	{
@@ -141,6 +151,21 @@ void M_PrintWhite (int cx, int cy, char *str)
 	}
 }
 
+static void M_PrintWhite(int cx, int cy, const quake::string_view& str)
+{
+	for (auto c : str) {
+		M_DrawCharacter(cx, cy, c + 128);
+		cx += 8;
+	}
+}
+
+static void M_PrintWhite(int cx, int cy, const ZString& str)
+{
+	for (auto c : str) {
+		M_DrawCharacter(cx, cy, c + 128);
+		cx += 8;
+	}
+}
 void M_DrawTransPic (int x, int y, qpic_t *pic)
 {
 	Draw_TransPic (x + ((vid.width - 320)>>1), y, pic);
@@ -249,7 +274,7 @@ int m_save_demonum;
 M_ToggleMenu_f
 ================
 */
-void M_ToggleMenu_f (void)
+void M_ToggleMenu_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	m_entersound = true;
 
@@ -257,7 +282,7 @@ void M_ToggleMenu_f (void)
 	{
 		if (m_state != m_main)
 		{
-			M_Menu_Main_f ();
+			M_Menu_Main_f (source, argc, argv);
 			return;
 		}
 		key_dest = key_game;
@@ -266,11 +291,11 @@ void M_ToggleMenu_f (void)
 	}
 	if (key_dest == key_console)
 	{
-		Con_ToggleConsole_f ();
+		Con_ToggleConsole_f(source, argc, argv);
 	}
 	else
 	{
-		M_Menu_Main_f ();
+		M_Menu_Main_f(source, argc, argv);
 	}
 }
 
@@ -282,7 +307,7 @@ int	m_main_cursor;
 #define	MAIN_ITEMS	5
 
 
-void M_Menu_Main_f (void)
+void M_Menu_Main_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	if (key_dest != key_menu)
 	{
@@ -306,8 +331,8 @@ void M_Main_Draw (void)
 	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/mainmenu.lmp") );
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-
-	M_DrawTransPic (54, 32 + m_main_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	quake::fixed_string<128> va;
+	M_DrawTransPic (54, 32 + m_main_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
 
@@ -341,23 +366,23 @@ void M_Main_Key (int key)
 		switch (m_main_cursor)
 		{
 		case 0:
-			M_Menu_SinglePlayer_f ();
+			M_Menu_SinglePlayer_f (EMPTY_ARGS);
 			break;
 
 		case 1:
-			M_Menu_MultiPlayer_f ();
+			M_Menu_MultiPlayer_f (EMPTY_ARGS);
 			break;
 
 		case 2:
-			M_Menu_Options_f ();
+			M_Menu_Options_f (EMPTY_ARGS);
 			break;
 
 		case 3:
-			M_Menu_Help_f ();
+			M_Menu_Help_f (EMPTY_ARGS);
 			break;
 
 		case 4:
-			M_Menu_Quit_f ();
+			M_Menu_Quit_f (EMPTY_ARGS);
 			break;
 		}
 	}
@@ -370,7 +395,7 @@ int	m_singleplayer_cursor;
 #define	SINGLEPLAYER_ITEMS	3
 
 
-void M_Menu_SinglePlayer_f (void)
+void M_Menu_SinglePlayer_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_singleplayer;
@@ -389,8 +414,8 @@ void M_SinglePlayer_Draw (void)
 	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/sp_menu.lmp") );
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-
-	M_DrawTransPic (54, 32 + m_singleplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	quake::fixed_string<128> va;
+	M_DrawTransPic (54, 32 + m_singleplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
 
@@ -399,7 +424,7 @@ void M_SinglePlayer_Key (int key)
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Main_f ();
+		M_Menu_Main_f (EMPTY_ARGS);
 		break;
 
 	case K_DOWNARROW:
@@ -431,11 +456,11 @@ void M_SinglePlayer_Key (int key)
 			break;
 
 		case 1:
-			M_Menu_Load_f ();
+			M_Menu_Load_f (EMPTY_ARGS);
 			break;
 
 		case 2:
-			M_Menu_Save_f ();
+			M_Menu_Save_f (EMPTY_ARGS);
 			break;
 		}
 	}
@@ -447,38 +472,41 @@ void M_SinglePlayer_Key (int key)
 int		load_cursor;		// 0 < load_cursor < MAX_SAVEGAMES
 
 #define	MAX_SAVEGAMES		12
-char	m_filenames[MAX_SAVEGAMES][SAVEGAME_COMMENT_LENGTH+1];
-int		loadable[MAX_SAVEGAMES];
+struct save_game_files_t {
+	std::string filename;
+	bool loadable;
+	save_game_files_t() : loadable(false), filename("--- UNUSED SLOT ---") {}
+	save_game_files_t(ZString&& str) : loadable(false), filename(std::move(str)) {}
+};
+
+static save_game_files_t m_filenames[MAX_SAVEGAMES];
+
 
 void M_ScanSaves (void)
 {
-	int		i, j;
-	char	name[MAX_OSPATH];
-	FILE	*f;
+	quake::fixed_string_stream<MAX_OSPATH> name;
 	int		version;
 
-	for (i=0 ; i<MAX_SAVEGAMES ; i++)
+	for (size_t i=0 ; i<MAX_SAVEGAMES ; i++)
 	{
-		strcpy (m_filenames[i], "--- UNUSED SLOT ---");
-		loadable[i] = false;
-		sprintf (name, "%s/s%i.sav", com_gamedir, i);
-		f = fopen (name, "r");
-		if (!f)
-			continue;
-		fscanf (f, "%i\n", &version);
-		fscanf (f, "%79s\n", name);
-		strncpy (m_filenames[i], name, sizeof(m_filenames[i])-1);
+		name << COM_GameDir() << '/' << i << ".sav";
 
-	// change _ back to space
-		for (j=0 ; j<SAVEGAME_COMMENT_LENGTH ; j++)
-			if (m_filenames[i][j] == '_')
-				m_filenames[i][j] = ' ';
-		loadable[i] = true;
-		fclose (f);
+		std::ifstream fs(name.str().c_str()); // fix this sigh
+		if (!fs.is_open()) {
+			m_filenames[i] = save_game_files_t();
+			continue;
+		}
+		else {
+			ZString comment;
+			fs >> version;
+			fs >> comment;
+			std::replace(comment.begin(), comment.end(), '_', ' ');
+			m_filenames[i] = save_game_files_t(std::move(comment));
+		}
 	}
 }
 
-void M_Menu_Load_f (void)
+void M_Menu_Load_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	m_entersound = true;
 	m_state = m_load;
@@ -487,7 +515,7 @@ void M_Menu_Load_f (void)
 }
 
 
-void M_Menu_Save_f (void)
+void M_Menu_Save_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	if (!sv.active)
 		return;
@@ -511,7 +539,7 @@ void M_Load_Draw (void)
 	M_DrawPic ( (320-p->width)/2, 4, p);
 
 	for (i=0 ; i< MAX_SAVEGAMES; i++)
-		M_Print (16, 32 + 8*i, m_filenames[i]);
+		M_Print (16, 32 + 8*i, m_filenames[i].filename.c_str());
 
 // line cursor
 	M_DrawCharacter (8, 32 + load_cursor*8, 12+((int)(idCast<float>(realtime)*4)&1));
@@ -527,7 +555,7 @@ void M_Save_Draw (void)
 	M_DrawPic ( (320-p->width)/2, 4, p);
 
 	for (i=0 ; i<MAX_SAVEGAMES ; i++)
-		M_Print (16, 32 + 8*i, m_filenames[i]);
+		M_Print (16, 32 + 8*i, m_filenames[i].filename.c_str());
 
 // line cursor
 	M_DrawCharacter (8, 32 + load_cursor*8, 12+((int)(idCast<float>(realtime)*4)&1));
@@ -536,15 +564,16 @@ void M_Save_Draw (void)
 
 void M_Load_Key (int k)
 {
+	quake::fixed_string<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_SinglePlayer_f ();
+		M_Menu_SinglePlayer_f (EMPTY_ARGS);
 		break;
 
 	case K_ENTER:
 		S_LocalSound ("misc/menu2.wav");
-		if (!loadable[load_cursor])
+		if (!m_filenames[load_cursor].loadable)
 			return;
 		m_state = m_none;
 		key_dest = key_game;
@@ -554,7 +583,7 @@ void M_Load_Key (int k)
 		SCR_BeginLoadingPlaque ();
 
 	// issue the load command
-		Cbuf_AddText (va ("load s%i\n", load_cursor) );
+		Cbuf_AddText (va ("load s%i\n", load_cursor));
 		return;
 
 	case K_UPARROW:
@@ -578,10 +607,11 @@ void M_Load_Key (int k)
 
 void M_Save_Key (int k)
 {
+	quake::fixed_string<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_SinglePlayer_f ();
+		M_Menu_SinglePlayer_f (EMPTY_ARGS);
 		break;
 
 	case K_ENTER:
@@ -615,7 +645,7 @@ int	m_multiplayer_cursor;
 #define	MULTIPLAYER_ITEMS	3
 
 
-void M_Menu_MultiPlayer_f (void)
+void M_Menu_MultiPlayer_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_multiplayer;
@@ -627,7 +657,7 @@ void M_MultiPlayer_Draw (void)
 {
 	int		f;
 	qpic_t	*p;
-
+	quake::fixed_string<128> va;
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
 	p = Draw_CachePic ("gfx/p_multi.lmp");
 	M_DrawPic ( (320-p->width)/2, 4, p);
@@ -635,7 +665,7 @@ void M_MultiPlayer_Draw (void)
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
 
-	M_DrawTransPic (54, 32 + m_multiplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	M_DrawTransPic (54, 32 + m_multiplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 
 	if (serialAvailable || ipxAvailable || tcpipAvailable)
 		return;
@@ -648,7 +678,7 @@ void M_MultiPlayer_Key (int key)
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Main_f ();
+		M_Menu_Main_f (EMPTY_ARGS);
 		break;
 
 	case K_DOWNARROW:
@@ -669,16 +699,16 @@ void M_MultiPlayer_Key (int key)
 		{
 		case 0:
 			if (serialAvailable || ipxAvailable || tcpipAvailable)
-				M_Menu_Net_f ();
+				M_Menu_Net_f (EMPTY_ARGS);
 			break;
 
 		case 1:
 			if (serialAvailable || ipxAvailable || tcpipAvailable)
-				M_Menu_Net_f ();
+				M_Menu_Net_f (EMPTY_ARGS);
 			break;
 
 		case 2:
-			M_Menu_Setup_f ();
+			M_Menu_Setup_f (EMPTY_ARGS);
 			break;
 		}
 	}
@@ -699,7 +729,7 @@ int		setup_bottom;
 
 #define	NUM_SETUP_CMDS	5
 
-void M_Menu_Setup_f (void)
+void M_Menu_Setup_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_setup;
@@ -752,11 +782,11 @@ void M_Setup_Draw (void)
 void M_Setup_Key (int k)
 {
 	int			l;
-
+	quake::fixed_string<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_MultiPlayer_f ();
+		M_Menu_MultiPlayer_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -802,13 +832,13 @@ forward:
 
 		// setup_cursor == 4 (OK)
 		if (Q_strcmp(cl_name.string, setup_myname) != 0)
-			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname) );
+			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname));
 		if (Q_strcmp(hostname.string, setup_hostname) != 0)
 			Cvar_Set("hostname", setup_hostname);
 		if (setup_top != setup_oldtop || setup_bottom != setup_oldbottom)
-			Cbuf_AddText( va ("color %i %i\n", setup_top, setup_bottom) );
+			Cbuf_AddText( va ("color %i %i\n", setup_top, setup_bottom));
 		m_entersound = true;
-		M_Menu_MultiPlayer_f ();
+		M_Menu_MultiPlayer_f (EMPTY_ARGS);
 		break;
 
 	case K_BACKSPACE:
@@ -889,7 +919,7 @@ char *net_helpMessage [] =
   " Area Network.          "
 };
 
-void M_Menu_Net_f (void)
+void M_Menu_Net_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_net;
@@ -978,7 +1008,8 @@ void M_Net_Draw (void)
 	M_Print (f, 166, net_helpMessage[m_net_cursor*4+3]);
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-	M_DrawTransPic (54, 32 + m_net_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	quake::fixed_string<128> va;
+	M_DrawTransPic (54, 32 + m_net_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
 
@@ -988,7 +1019,7 @@ again:
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_MultiPlayer_f ();
+		M_Menu_MultiPlayer_f (EMPTY_ARGS);
 		break;
 
 	case K_DOWNARROW:
@@ -1009,19 +1040,19 @@ again:
 		switch (m_net_cursor)
 		{
 		case 0:
-			M_Menu_SerialConfig_f ();
+			M_Menu_SerialConfig_f (EMPTY_ARGS);
 			break;
 
 		case 1:
-			M_Menu_SerialConfig_f ();
+			M_Menu_SerialConfig_f (EMPTY_ARGS);
 			break;
 
 		case 2:
-			M_Menu_LanConfig_f ();
+			M_Menu_LanConfig_f (EMPTY_ARGS);
 			break;
 
 		case 3:
-			M_Menu_LanConfig_f ();
+			M_Menu_LanConfig_f (EMPTY_ARGS);
 			break;
 
 		case 4:
@@ -1053,7 +1084,7 @@ again:
 
 int		options_cursor;
 
-void M_Menu_Options_f (void)
+void M_Menu_Options_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_options;
@@ -1248,7 +1279,7 @@ void M_Options_Key (int k)
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_Main_f ();
+		M_Menu_Main_f (EMPTY_ARGS);
 		break;
 
 	case K_ENTER:
@@ -1256,17 +1287,17 @@ void M_Options_Key (int k)
 		switch (options_cursor)
 		{
 		case 0:
-			M_Menu_Keys_f ();
+			M_Menu_Keys_f (EMPTY_ARGS);
 			break;
 		case 1:
 			m_state = m_none;
-			Con_ToggleConsole_f ();
+			Con_ToggleConsole_f (EMPTY_ARGS);
 			break;
 		case 2:
 			Cbuf_AddText ("exec default.cfg\n");
 			break;
 		case 12:
-			M_Menu_Video_f ();
+			M_Menu_Video_f (EMPTY_ARGS);
 			break;
 		default:
 			M_AdjustSliders (1);
@@ -1346,7 +1377,7 @@ char *bindnames[][2] =
 int		keys_cursor;
 int		bind_grab;
 
-void M_Menu_Keys_f (void)
+void M_Menu_Keys_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_keys;
@@ -1354,24 +1385,14 @@ void M_Menu_Keys_f (void)
 }
 
 
-void M_FindKeysForCommand (char *command, int *twokeys)
+void M_FindKeysForCommand(const quake::string_view& command, int *twokeys)
 {
-	int		count;
-	int		j;
-	int		l;
-	char	*b;
-
+	int		count = 0;
 	twokeys[0] = twokeys[1] = -1;
-	l = strlen(command);
-	count = 0;
 
-	for (j=0 ; j<256 ; j++)
+	for (int j = 0; j < 256; j++)
 	{
-		b = keybindings[j];
-		if (!b)
-			continue;
-		if (!strncmp (b, command, l) )
-		{
+		if (!keybindings[j].empty() && keybindings[j].c_str() == command) {
 			twokeys[count] = j;
 			count++;
 			if (count == 2)
@@ -1380,21 +1401,13 @@ void M_FindKeysForCommand (char *command, int *twokeys)
 	}
 }
 
-void M_UnbindCommand (char *command)
+void M_UnbindCommand(const quake::string_view& command)
 {
-	int		j;
-	int		l;
-	char	*b;
-
-	l = strlen(command);
-
-	for (j=0 ; j<256 ; j++)
+	for (int j = 0; j < 256; j++)
 	{
-		b = keybindings[j];
-		if (!b)
-			continue;
-		if (!strncmp (b, command, l) )
-			Key_SetBinding (j, "");
+		if (!keybindings[j].empty() && keybindings[j].c_str() == command) {
+			keybindings[j].clear();
+		}
 	}
 }
 
@@ -1403,7 +1416,7 @@ void M_Keys_Draw (void)
 {
 	int		i, l;
 	int		keys[2];
-	char	*name;
+	const char	*name;
 	int		x, y;
 	qpic_t	*p;
 
@@ -1475,7 +1488,7 @@ void M_Keys_Key (int k)
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_Options_f ();
+		M_Menu_Options_f (EMPTY_ARGS);
 		break;
 
 	case K_LEFTARROW:
@@ -1513,7 +1526,7 @@ void M_Keys_Key (int k)
 //=============================================================================
 /* VIDEO MENU */
 
-void M_Menu_Video_f (void)
+void M_Menu_Video_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_video;
@@ -1539,7 +1552,7 @@ int		help_page;
 #define	NUM_HELP_PAGES	6
 
 
-void M_Menu_Help_f (void)
+void M_Menu_Help_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_help;
@@ -1551,6 +1564,7 @@ void M_Menu_Help_f (void)
 
 void M_Help_Draw (void)
 {
+	quake::fixed_string<128> va;
 	M_DrawPic (0, 0, Draw_CachePic ( va("gfx/help%i.lmp", help_page)) );
 }
 
@@ -1560,7 +1574,7 @@ void M_Help_Key (int key)
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Main_f ();
+		M_Menu_Main_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -1633,7 +1647,7 @@ char *quitMessage [] =
 };
 #endif
 
-void M_Menu_Quit_f (void)
+void M_Menu_Quit_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	if (m_state == m_quit)
 		return;
@@ -1668,7 +1682,7 @@ void M_Quit_Key (int key)
 	case 'Y':
 	case 'y':
 		key_dest = key_console;
-		Host_Quit_f ();
+		Host_Quit_f (EMPTY_ARGS);
 		break;
 
 	default:
@@ -1737,7 +1751,7 @@ int		serialConfig_irq ;
 int		serialConfig_baud;
 char	serialConfig_phone[16];
 
-void M_Menu_SerialConfig_f (void)
+void M_Menu_SerialConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	int		n;
 	int		port;
@@ -1784,6 +1798,7 @@ void M_SerialConfig_Draw (void)
 	int		basex;
 	char	*startJoin;
 	char	*directModem;
+	quake::fixed_string<128> va;
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
 	p = Draw_CachePic ("gfx/p_multi.lmp");
@@ -1848,11 +1863,11 @@ void M_SerialConfig_Draw (void)
 void M_SerialConfig_Key (int key)
 {
 	int		l;
-
+	quake::fixed_string<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Net_f ();
+		M_Menu_Net_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -1942,7 +1957,7 @@ forward:
 		{
 			(*SetComPortConfig) (0, ISA_uarts[serialConfig_comport-1], serialConfig_irq, serialConfig_baudrate[serialConfig_baud], SerialConfig);
 
-			M_Menu_ModemConfig_f ();
+			M_Menu_ModemConfig_f (EMPTY_ARGS);
 			break;
 		}
 
@@ -1959,7 +1974,7 @@ forward:
 
 		if (StartingGame)
 		{
-			M_Menu_GameOptions_f ();
+			M_Menu_GameOptions_f (EMPTY_ARGS);
 			break;
 		}
 
@@ -2021,7 +2036,7 @@ char	modemConfig_clear [16];
 char	modemConfig_init [32];
 char	modemConfig_hangup [16];
 
-void M_Menu_ModemConfig_f (void)
+void M_Menu_ModemConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_modemconfig;
@@ -2074,11 +2089,11 @@ void M_ModemConfig_Draw (void)
 void M_ModemConfig_Key (int key)
 {
 	int		l;
-
+	quake::fixed_string<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_SerialConfig_f ();
+		M_Menu_SerialConfig_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -2121,7 +2136,7 @@ void M_ModemConfig_Key (int key)
 		{
 			(*SetModemConfig) (0, va ("%c", modemConfig_dialing), modemConfig_clear, modemConfig_init, modemConfig_hangup);
 			m_entersound = true;
-			M_Menu_SerialConfig_f ();
+			M_Menu_SerialConfig_f (EMPTY_ARGS);
 		}
 		break;
 
@@ -2192,7 +2207,7 @@ int 	lanConfig_port;
 char	lanConfig_portname[6];
 char	lanConfig_joinname[22];
 
-void M_Menu_LanConfig_f (void)
+void M_Menu_LanConfig_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_lanconfig;
@@ -2216,6 +2231,7 @@ void M_Menu_LanConfig_f (void)
 
 void M_LanConfig_Draw (void)
 {
+	quake::fixed_string<128> va;
 	qpic_t	*p;
 	int		basex;
 	char	*startJoin;
@@ -2276,11 +2292,12 @@ void M_LanConfig_Draw (void)
 void M_LanConfig_Key (int key)
 {
 	int		l;
+	quake::fixed_string<128> va;
 
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Net_f ();
+		M_Menu_Net_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -2309,10 +2326,10 @@ void M_LanConfig_Key (int key)
 		{
 			if (StartingGame)
 			{
-				M_Menu_GameOptions_f ();
+				M_Menu_GameOptions_f (EMPTY_ARGS);
 				break;
 			}
-			M_Menu_Search_f();
+			M_Menu_Search_f(EMPTY_ARGS);
 			break;
 		}
 
@@ -2322,7 +2339,7 @@ void M_LanConfig_Key (int key)
 			m_return_onerror = true;
 			key_dest = key_game;
 			m_state = m_none;
-			Cbuf_AddText ( va ("connect \"%s\"\n", lanConfig_joinname) );
+			Cbuf_AddText ( va ("connect \"%s\"\n", lanConfig_joinname));
 			break;
 		}
 
@@ -2536,7 +2553,7 @@ int maxplayers;
 qboolean m_serverInfoMessage = false;
 idTime m_serverInfoMessageTime;
 
-void M_Menu_GameOptions_f (void)
+void M_Menu_GameOptions_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_gameoptions;
@@ -2555,6 +2572,7 @@ int		gameoptions_cursor;
 void M_GameOptions_Draw (void)
 {
 	using namespace std::chrono;
+	quake::fixed_string<128> va;
 	qpic_t	*p;
 	int		x;
 
@@ -2782,10 +2800,11 @@ void M_NetStart_Change (int dir)
 
 void M_GameOptions_Key (int key)
 {
+	quake::fixed_string<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
-		M_Menu_Net_f ();
+		M_Menu_Net_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -2823,15 +2842,15 @@ void M_GameOptions_Key (int key)
 			if (sv.active)
 				Cbuf_AddText ("disconnect\n");
 			Cbuf_AddText ("listen 0\n");	// so host_netport will be re-examined
-			Cbuf_AddText ( va ("maxplayers %u\n", maxplayers) );
+			Cbuf_AddText ( va ("maxplayers %u\n", maxplayers));
 			SCR_BeginLoadingPlaque ();
 
 			if (hipnotic)
-				Cbuf_AddText ( va ("map %s\n", hipnoticlevels[hipnoticepisodes[startepisode].firstLevel + startlevel].name) );
+				Cbuf_AddText ( va ("map %s\n", hipnoticlevels[hipnoticepisodes[startepisode].firstLevel + startlevel].name));
 			else if (rogue)
-				Cbuf_AddText ( va ("map %s\n", roguelevels[rogueepisodes[startepisode].firstLevel + startlevel].name) );
+				Cbuf_AddText ( va ("map %s\n", roguelevels[rogueepisodes[startepisode].firstLevel + startlevel].name));
 			else
-				Cbuf_AddText ( va ("map %s\n", levels[episodes[startepisode].firstLevel + startlevel].name) );
+				Cbuf_AddText ( va ("map %s\n", levels[episodes[startepisode].firstLevel + startlevel].name));
 
 			return;
 		}
@@ -2847,7 +2866,8 @@ void M_GameOptions_Key (int key)
 qboolean	searchComplete = false;
 idTime		searchCompleteTime;
 
-void M_Menu_Search_f (void)
+void NET_Slist_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
+void M_Menu_Search_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	key_dest = key_menu;
 	m_state = m_search;
@@ -2855,7 +2875,7 @@ void M_Menu_Search_f (void)
 	slistSilent = true;
 	slistLocal = false;
 	searchComplete = false;
-	NET_Slist_f();
+	NET_Slist_f(source,argc,argv);
 
 }
 
@@ -2885,7 +2905,7 @@ void M_Search_Draw (void)
 
 	if (hostCacheCount)
 	{
-		M_Menu_ServerList_f ();
+		M_Menu_ServerList_f (EMPTY_ARGS);
 		return;
 	}
 
@@ -2893,7 +2913,7 @@ void M_Search_Draw (void)
 	if ((realtime - searchCompleteTime) < 3s)
 		return;
 
-	M_Menu_LanConfig_f ();
+	M_Menu_LanConfig_f (EMPTY_ARGS);
 }
 
 
@@ -2907,7 +2927,7 @@ void M_Search_Key (int key)
 int		slist_cursor;
 qboolean slist_sorted;
 
-void M_Menu_ServerList_f (void)
+void M_Menu_ServerList_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_menu;
 	m_state = m_slist;
@@ -2963,14 +2983,15 @@ void M_ServerList_Draw (void)
 
 void M_ServerList_Key (int k)
 {
+	quake::fixed_string<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
-		M_Menu_LanConfig_f ();
+		M_Menu_LanConfig_f (EMPTY_ARGS);
 		break;
 
 	case K_SPACE:
-		M_Menu_Search_f ();
+		M_Menu_Search_f (EMPTY_ARGS);
 		break;
 
 	case K_UPARROW:
@@ -2996,7 +3017,7 @@ void M_ServerList_Key (int k)
 		slist_sorted = false;
 		key_dest = key_game;
 		m_state = m_none;
-		Cbuf_AddText ( va ("connect \"%s\"\n", hostcache[slist_cursor].cname) );
+		Cbuf_AddText ( va ("connect \"%s\"\n", hostcache[slist_cursor].cname));
 		break;
 
 	default:

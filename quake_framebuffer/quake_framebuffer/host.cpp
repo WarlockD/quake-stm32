@@ -33,6 +33,7 @@ Memory is cleared / released when a server or client begins, not when they end.
 
 */
 using namespace std::chrono;
+extern sys_file vcrFile;
 quakeparms_t host_parms;
 
 qboolean	host_initialized;		// true if into command execution
@@ -159,28 +160,24 @@ void	Host_FindMaxClients (void)
 	int		i;
 
 	svs.maxclients = 1;
-		
-	i = COM_CheckParm ("-dedicated");
-	if (i)
+	quake::string_view value;
+
+	if (host_parms.COM_CheckParmValue("-dedicated", value))
 	{
-		cls.state = ca_dedicated;
-		if (i != (com_argc - 1))
-		{
-			svs.maxclients = Q_atoi (com_argv[i+1]);
-		}
+		if (!value.empty())
+			svs.maxclients = Q_atoi (value);
 		else
 			svs.maxclients = 8;
 	}
 	else
 		cls.state = ca_disconnected;
 
-	i = COM_CheckParm ("-listen");
-	if (i)
+	if (host_parms.COM_CheckParmValue("-listen", value))
 	{
 		if (cls.state == ca_dedicated)
 			Sys_Error ("Only one of -dedicated or -listen can be specified");
-		if (i != (com_argc - 1))
-			svs.maxclients = Q_atoi (com_argv[i+1]);
+		if (!value.empty())
+			svs.maxclients = Q_atoi(value);
 		else
 			svs.maxclients = 8;
 	}
@@ -249,9 +246,11 @@ void Host_WriteConfiguration (void)
 // config.cfg cvars
 	if (host_initialized & !isDedicated)
 	{
-		auto f = Sys_FileOpenWrite(va("%s/config.cfg", com_gamedir));
+		quake::fixed_string<256> va;
+		quake::ofstream f(va("%s/config.cfg", COM_GameDir));
+
 		//f = fopen (va("%s/config.cfg",com_gamedir), "w");
-		if (!f)
+		if (f.bad())
 		{
 			Con_Printf ("Couldn't write config.cfg.\n");
 			return;
@@ -259,7 +258,7 @@ void Host_WriteConfiguration (void)
 		
 		Key_WriteBindings (f);
 		Cvar_WriteVariables (f);
-		Sys_FileClose(f);
+		f.close();
 	}
 }
 
@@ -763,7 +762,7 @@ void Host_Frame (idTime time)
 //============================================================================
 
 
-extern int vcrFile;
+
 #define	VCR_SIGNATURE	0x56435231
 // "VCR1"
 
@@ -771,36 +770,34 @@ void Host_InitVCR (quakeparms_t *parms)
 {
 	int		i, len, n;
 	char	*p;
-	
-	if (COM_CheckParm("-playback"))
-	{
-		if (com_argc != 2)
-			Sys_Error("No other parameters allowed with -playback\n");
+	int arg_count;
+	ZVector<char> buffer;
 
-		Sys_FileOpenRead("quake.vcr", &vcrFile);
-		if (vcrFile == -1)
+	if (host_parms.COM_CheckParm("-playback"))
+	{
+		if (host_parms.argc != 2)
+			Sys_Error("No other parameters allowed with -playback\n");
+		vcrFile.open("quake.vcr", std::ios_base::in | std::ios_base::binary);
+		if (!vcrFile.is_open())
 			Sys_Error("playback file not found\n");
 
-		Sys_FileRead (vcrFile, &i, sizeof(int));
+		vcrFile.read(&i, sizeof(int));
 		if (i != VCR_SIGNATURE)
 			Sys_Error("Invalid signature in vcr file\n");
-
-		Sys_FileRead (vcrFile, &com_argc, sizeof(int));
-
-		com_argv = (char**)Z_Malloc(com_argc * sizeof(char *));
-		com_argv[0] = parms->argv[0];
-		for (i = 0; i < com_argc; i++)
+		vcrFile.read(&arg_count, sizeof(int));
+		host_parms.COM_ClearArgs();
+		
+		host_parms.COM_AddArg("Playback"); // filler for file name
+		for (size_t i = 0; i < (size_t)arg_count; i++)
 		{
-			Sys_FileRead (vcrFile, &len, sizeof(int));
-			p = (char*)Z_Malloc(len);
-			Sys_FileRead (vcrFile, p, len);
-			com_argv[i+1] = p;
+			vcrFile.read(&len, sizeof(int));
+			buffer.resize(len);
+			vcrFile.read(buffer.data(), len);
+			buffer[len] = 0;
+			host_parms.COM_AddArg(buffer.data());
 		}
-		com_argc++; /* add one for arg[0] */
-		parms->argc = com_argc;
-		parms->argv = com_argv;
 	}
-
+#if 0
 	if ( (n = COM_CheckParm("-record")) != 0)
 	{
 		vcrFile = Sys_FileOpenWrite("quake.vcr");
@@ -823,7 +820,8 @@ void Host_InitVCR (quakeparms_t *parms)
 			Sys_FileWrite(vcrFile, com_argv[i], len);
 		}
 	}
-	
+#endif
+	// lazy
 }
 
 /*
@@ -839,7 +837,7 @@ void Host_Init (quakeparms_t *parms)
 	else
 		minimum_memory = MINIMUM_MEMORY_LEVELPAK;
 
-	if (COM_CheckParm ("-minmemory"))
+	if (parms->COM_CheckParm ("-minmemory"))
 		parms->memsize = minimum_memory;
 
 	host_parms = *parms;
@@ -847,10 +845,8 @@ void Host_Init (quakeparms_t *parms)
 	if (parms->memsize < minimum_memory)
 		Sys_Error ("Only %4.1f megs of memory available, can't execute game", parms->memsize / (float)0x100000);
 
-	com_argc = parms->argc;
-	com_argv = parms->argv;
 
-	Memory_Init (parms->membase, parms->memsize);
+	Memory_Init (parms->membase, parms->memsize); // in main.c ugh
 	Cbuf_Init ();
 	Cmd_Init ();	
 	V_Init ();

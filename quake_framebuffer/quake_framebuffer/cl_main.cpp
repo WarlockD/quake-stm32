@@ -96,6 +96,7 @@ Sends a disconnect message to the server
 This is also called on Host_Error, so it shouldn't cause any errors
 =====================
 */
+void 	CL_Stop();
 void CL_Disconnect (void)
 {
 // stop sounds (especially looping!)
@@ -110,7 +111,7 @@ void CL_Disconnect (void)
 	else if (cls.state == ca_connected)
 	{
 		if (cls.demorecording)
-			CL_Stop_f ();
+			CL_Stop();
 
 		Con_DPrintf ("Sending clc_disconnect\n");
 		SZ_Clear (&cls.message);
@@ -128,7 +129,7 @@ void CL_Disconnect (void)
 	cls.signon = 0;
 }
 
-void CL_Disconnect_f (void)
+void CL_Disconnect_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	CL_Disconnect ();
 	if (sv.active)
@@ -145,7 +146,7 @@ CL_EstablishConnection
 Host should be either "local" or a net address to be passed on
 =====================
 */
-void CL_EstablishConnection (char *host)
+void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	if (cls.state == ca_dedicated)
 		return;
@@ -153,7 +154,7 @@ void CL_EstablishConnection (char *host)
 	if (cls.demoplayback)
 		return;
 
-	CL_Disconnect ();
+	CL_Disconnect_f (source,argc,argv);
 
 	cls.netcon = NET_Connect (host);
 	if (!cls.netcon)
@@ -174,9 +175,9 @@ An svc_signonnum has been received, perform a client side setup
 */
 void CL_SignonReply (void)
 {
-	char 	str[8192];
+	//char 	str[8192];
 
-Con_DPrintf ("CL_SignonReply: %i\n", cls.signon);
+	quake::con << "CL_SignonReply: " << cls.signon << std::endl;
 
 	switch (cls.signon)
 	{
@@ -186,15 +187,26 @@ Con_DPrintf ("CL_SignonReply: %i\n", cls.signon);
 		break;
 		
 	case 2:		
-		MSG_WriteByte (&cls.message, clc_stringcmd);
-		MSG_WriteString (&cls.message, va("name \"%s\"\n", cl_name.string));
-	
-		MSG_WriteByte (&cls.message, clc_stringcmd);
-		MSG_WriteString (&cls.message, va("color %i %i\n", ((int)cl_color.value)>>4, ((int)cl_color.value)&15));
-	
-		MSG_WriteByte (&cls.message, clc_stringcmd);
-		sprintf (str, "spawn %s", cls.spawnparms);
-		MSG_WriteString (&cls.message, str);
+	{
+		quake::fixed_string_stream<256> ss;
+
+		MSG_WriteByte(&cls.message, clc_stringcmd);
+		ss.rdbuf()->clear();
+		ss << "name \"" << cl_name.string << std::endl;
+		MSG_WriteString(&cls.message, ss.str().c_str());
+
+		MSG_WriteByte(&cls.message, clc_stringcmd);
+
+		ss.rdbuf()->clear();
+		ss << "color " << ((int)cl_color.value >> 4) << ' ' << ((int)cl_color.value & 15) << std::endl;
+		MSG_WriteString(&cls.message, ss.str().c_str());
+
+		MSG_WriteByte(&cls.message, clc_stringcmd);
+
+		ss.rdbuf()->clear();
+		ss << "spawn " << cls.spawnparms << std::endl;
+		MSG_WriteString(&cls.message, ss.str().c_str());
+	}
 		break;
 		
 	case 3:	
@@ -218,7 +230,6 @@ Called to play the next demo in the demo loop
 */
 void CL_NextDemo (void)
 {
-	char	str[1024];
 
 	if (cls.demonum == -1)
 		return;		// don't play demos
@@ -230,14 +241,13 @@ void CL_NextDemo (void)
 		cls.demonum = 0;
 		if (!cls.demos[cls.demonum][0])
 		{
-			Con_Printf ("No demos listed with startdemos\n");
+			quake::con << "No demos listed with startdemos" << std::endl;
 			cls.demonum = -1;
 			return;
 		}
 	}
-
-	sprintf (str,"playdemo %s\n", cls.demos[cls.demonum]);
-	Cbuf_InsertText (str);
+	quake::fixed_string_stream<256> ss;
+	ss << "playdemo " << cls.demos[cls.demonum] << std::endl;
 	cls.demonum++;
 }
 
@@ -246,7 +256,7 @@ void CL_NextDemo (void)
 CL_PrintEntities_f
 ==============
 */
-void CL_PrintEntities_f (void)
+void CL_PrintEntities_f (cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	entity_t	*ent;
 	int			i;
@@ -258,7 +268,8 @@ void CL_PrintEntities_f (void)
 		{
 			Con_Printf ("EMPTY\n");
 			continue;
-		}
+		} 
+		// need to change the formating for using quake::con but ugh
 		Con_Printf ("%s:%2i  (%5.1f,%5.1f,%5.1f) [%5.1f %5.1f %5.1f]\n"
 		,ent->model->name,ent->frame, ent->origin[0], ent->origin[1], ent->origin[2], ent->angles[0], ent->angles[1], ent->angles[2]);
 	}
@@ -547,7 +558,7 @@ void CL_RelinkEntities (void)
 			AngleVectors (ent->angles, fv, rv, uv);
 			 
 			VectorMA (dl->origin, 18, fv, dl->origin);
-			dl->radius = 200 + (rand()&31);
+			dl->radius = 200.0f + static_cast<float>((rand()&31));
 			dl->minlight = 32;
 			dl->die = cl.time + 100ms;
 		}
@@ -556,14 +567,14 @@ void CL_RelinkEntities (void)
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
 			dl->origin[2] += 16;
-			dl->radius = 400 + (rand()&31);
+			dl->radius = 400.0f + static_cast<float>((rand() & 31));
 			dl->die = cl.time + 1ms;
 		}
 		if (ent->effects & EF_DIMLIGHT)
 		{			
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
-			dl->radius = 200 + (rand()&31);
+			dl->radius = 200.0f + static_cast<float>((rand() & 31));
 			dl->die = cl.time + 1ms;
 		}
 #ifdef QUAKE2

@@ -123,7 +123,7 @@ private:
 
 #else
 struct cvar_t {
-	char* name;
+	const char* name;
 	char* string;
 	float value;
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
@@ -135,32 +135,32 @@ void 	Cvar_RegisterVariable (cvar_t *variable);
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
-void 	Cvar_Set (const char *var_name, char *value);
+void 	Cvar_Set (const quake::string_view& var_name, const quake::string_view& value);
 // equivelant to "<name> <variable>" typed at the console
 
-void	Cvar_SetValue (const char *var_name, float value);
+void	Cvar_SetValue (const quake::string_view& var_name, float value);
 // expands value to a string and calls Cvar_Set
 
-float	Cvar_VariableValue (const char *var_name);
+float	Cvar_VariableValue (const quake::string_view& var_name);
 // returns 0 if not defined or non numeric
 
-char	*Cvar_VariableString (const char *var_name);
+quake::string_view Cvar_VariableString (const quake::string_view &var_name);
 // returns an empty string if not defined
 
-char 	*Cvar_CompleteVariable (const char *partial);
+quake::string_view Cvar_CompleteVariable (const quake::string_view & partial);
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 
-qboolean Cvar_Command (void);
+//qboolean Cvar_Command (size_t argc, const quake::string_view argv[]);
 // called by Cmd_ExecuteString when Cmd_Argv(0) doesn't match a known
 // command.  Returns true if the command was a variable reference that
 // was handled. (print or change)
 
-void 	Cvar_WriteVariables (idFileHandle f);
+void 	Cvar_WriteVariables (std::ostream& f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
-cvar_t *Cvar_FindVar (const char *var_name);
+cvar_t *Cvar_FindVar (const quake::string_view& var_name);
 
 
 extern	cvar_t	registered;

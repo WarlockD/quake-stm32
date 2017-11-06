@@ -64,14 +64,14 @@ qboolean	con_initialized;
 
 int			con_notifylines;		// scan lines to clear for notify lines
 
-extern void M_Menu_Main_f (void);
+extern void M_Menu_Main_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
 
 /*
 ================
 Con_ToggleConsole_f
 ================
 */
-void Con_ToggleConsole_f (void)
+void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_view  argv[])
 {
 	if (key_dest == key_console)
 	{
@@ -83,7 +83,7 @@ void Con_ToggleConsole_f (void)
 		}
 		else
 		{
-			M_Menu_Main_f ();
+			M_Menu_Main_f (source,argc, argv);
 		}
 	}
 	else
@@ -98,7 +98,7 @@ void Con_ToggleConsole_f (void)
 Con_Clear_f
 ================
 */
-void Con_Clear_f (void)
+void Con_Clear_f(cmd_source_t source, size_t argc, const quake::string_view  argv[])
 {
 	if (con_text)
 		Q_memset (con_text, ' ', CON_TEXTSIZE);
@@ -126,7 +126,7 @@ Con_MessageMode_f
 */
 extern qboolean team_message;
 
-void Con_MessageMode_f (void)
+void Con_MessageMode_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_message;
 	team_message = false;
@@ -138,7 +138,7 @@ void Con_MessageMode_f (void)
 Con_MessageMode2_f
 ================
 */
-void Con_MessageMode2_f (void)
+void Con_MessageMode2_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	key_dest = key_message;
 	team_message = true;
@@ -214,20 +214,16 @@ Con_Init
 void Con_Init (void)
 {
 #define MAXGAMEDIRLEN	1000
-	char	temp[MAXGAMEDIRLEN+1];
-	char	*t2 = "/qconsole.log";
+	const char	*t2 = "qconsole.log";
 
-	con_debuglog = COM_CheckParm("-condebug");
+	con_debuglog = host_parms.COM_CheckParm("-condebug");
 
 	if (con_debuglog)
 	{
-		if (Q_strlen (com_gamedir) < (MAXGAMEDIRLEN - Q_strlen (t2)))
-		{
-			Q_sprintf (temp, "%s%s", com_gamedir, t2);
-			unlink (temp);
-		}
+			quake::fixed_string_stream<MAXGAMEDIRLEN + 1> temp;
+			temp << COM_GameDir << '/' << t2;
+			unlink (temp.str().c_str());
 	}
-
 	con_text = (char*)Hunk_AllocName (CON_TEXTSIZE, "context");
 	Q_memset (con_text, ' ', CON_TEXTSIZE);
 	con_linewidth = -1;
@@ -257,8 +253,11 @@ void Con_Linefeed (void)
 {
 	con_x = 0;
 	con_current++;
-	Q_memset (&con_text[(con_current%con_totallines)*con_linewidth]
-	, ' ', con_linewidth);
+	if (con_text) {
+		Q_memset(&con_text[(con_current%con_totallines)*con_linewidth]
+			, ' ', con_linewidth);
+	}
+
 }
 
 /*
@@ -272,6 +271,7 @@ If no console is visible, the notify window will pop up.
 */
 void Con_Print (const char *txt)
 {
+	if (!con_text) return; // sanity?
 	int		y;
 	int		c, l;
 	static int	cr;
@@ -346,6 +346,7 @@ void Con_Print (const char *txt)
 	}
 }
 void Con_Print(const char *txt, size_t size) {
+	if (!con_text) return; // sanity?
 	int		y;
 	int		c, l;
 	static int	cr;
@@ -448,6 +449,7 @@ Handles cursor positioning, line wrapping, etc
 ================
 */
 #define	MAXPRINTMSG	4096
+void Sys_WriteConsole(const char* text);
 // FIXME: make a buffer size safe vsprintf?
 void Con_Printf (const char *fmt, ...)
 {
@@ -460,11 +462,17 @@ void Con_Printf (const char *fmt, ...)
 	va_end (argptr);
 	
 // also echo to debugging console
-	Sys_Printf ("%s", msg);	// also echo to debugging console
+	//Sys_Printf ("%s", msg);	// also echo to debugging console
+	Sys_WriteConsole(msg);
 
 // log all messages to file
-	if (con_debuglog)
-		Con_DebugLog(va("%s/qconsole.log",com_gamedir), "%s", msg);
+	if (con_debuglog) {
+		quake::fixed_string_stream<128> va;
+		va << COM_GameDir() << "/qconsole.log";
+
+		Con_DebugLog(va.str().c_str(), "%s", msg);
+	}
+
 
 	if (!con_initialized)
 		return;

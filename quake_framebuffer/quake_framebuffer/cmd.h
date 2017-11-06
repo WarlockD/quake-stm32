@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cmd.h -- Command buffer and command execution
 
 //===========================================================================
+#ifndef _QUAKE_CMD_H_
+#define _QUAKE_CMD_H_
+
+#include "common.h"
 
 /*
 
@@ -38,11 +42,11 @@ The game starts with a Cbuf_AddText ("exec quake.rc\n"); Cbuf_Execute ();
 void Cbuf_Init (void);
 // allocates an initial text buffer that will grow as needed
 
-void Cbuf_AddText (char *text);
+void Cbuf_AddText (const quake::string_view&  text);
 // as new commands are generated from the console or keybindings,
 // the text is added to the end of the command buffer.
 
-void Cbuf_InsertText (char *text);
+void Cbuf_InsertText (const quake::string_view&  text);
 // when a command wants to issue other commands immediately, the text is
 // inserted at the beginning of the buffer, before any remaining unexecuted
 // commands.
@@ -66,8 +70,6 @@ not apropriate.
 
 */
 
-typedef void (*xcommand_t) (void);
-
 typedef enum
 {
 	src_client,		// came in over a net connection as a clc_stringcmd
@@ -75,47 +77,70 @@ typedef enum
 	src_command		// from the command buffer
 } cmd_source_t;
 
-extern	cmd_source_t	cmd_source;
+class Cmd_Tokenizer {
+	static constexpr size_t MAX_ARGS = 80;
+	cmd_source_t _cmd_source;
+	ZVector<quake::string_view> _args;
+public:
+	const quake::string_view* data() const { return _args.data(); }
+
+	Cmd_Tokenizer(cmd_source_t source= cmd_source_t::src_command) : _cmd_source(source) { _args.reserve(20); }
+	Cmd_Tokenizer(cmd_source_t source, COM_Parser& parser) :_cmd_source( source){ _args.reserve(20); tokenizie(parser); }
+	Cmd_Tokenizer(cmd_source_t source, const quake::string_view& text) :_cmd_source( source){ _args.reserve(20); tokenizie(text); }
+	size_t size() const { return _args.size(); }
+	const quake::string_view& operator[](size_t i) const { return _args[i]; }
+	void tokenizie(COM_Parser& parser);
+	void tokenizie(const quake::string_view& text);
+	bool operator==(const quake::string_view& name) const { return !_args.empty() && _args[0].size() == name.size() && Q_strncasecmp(_args[0].data(), name.data(), name.size()) == 0; }
+	bool operator!=(const quake::string_view& name) const { return !(*this == name); }
+	cmd_source_t source() const { return _cmd_source; }
+	void execute(const quake::string_view& text, cmd_source_t src);
+};
+
+typedef void (*xcommand_t) (cmd_source_t source, size_t argc, const quake::string_view args[]);
+
+
+
 
 void	Cmd_Init (void);
 
-void	Cmd_AddCommand (char *cmd_name, xcommand_t function);
+void	Cmd_AddCommand (const quake::string_view& cmd_name, xcommand_t function);
 // called by the init functions of other parts of the program to
 // register commands and functions to call for them.
 // The cmd_name is referenced later, so it should not be in temp memory
 
-qboolean Cmd_Exists (char *cmd_name);
+qboolean Cmd_Exists (const quake::string_view& cmd_name);
 // used by the cvar code to check for cvar / command name overlap
 
-char 	*Cmd_CompleteCommand (char *partial);
+quake::string_view Cmd_CompleteCommand (const quake::string_view& partial);
 // attempts to match a partial command for automatic command line completion
 // returns NULL if nothing fits
 
-int		Cmd_Argc (void);
-char	*Cmd_Argv (int arg);
-char	*Cmd_Args (void);
+
+
 // The functions that execute commands get their parameters with these
 // functions. Cmd_Argv () will return an empty string, not a NULL
 // if arg > argc, so string operations are allways safe.
 
-int Cmd_CheckParm (char *parm);
+int Cmd_CheckParm (const quake::string_view& parm);
 // Returns the position (1 to argc-1) in the command's argument list
 // where the given parameter apears, or 0 if not present
 
-void Cmd_TokenizeString (char *text);
+
 // Takes a null terminated string.  Does not need to be /n terminated.
 // breaks the string up into arg tokens.
 
-void	Cmd_ExecuteString (char *text, cmd_source_t src);
+//void	Cmd_ExecuteString (const quake::string_view& text, cmd_source_t src);
 // Parses a single line of text into arguments and tries to execute it.
 // The text can come from the command buffer, a remote client, or stdin.
 
-void	Cmd_ForwardToServer (void);
+void	Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_view args[]);
 // adds the current command line as a clc_stringcmd to the client message.
 // things like godmode, noclip, etc, are commands directed to the server,
 // so when they are typed in at the console, they will need to be forwarded.
 
-void	Cmd_Print (char *text);
+void	Cmd_Print (const quake::string_view& text);
 // used by command functions to send output to either the graphics console or
 // passed as a print message to the client
 
+#endif

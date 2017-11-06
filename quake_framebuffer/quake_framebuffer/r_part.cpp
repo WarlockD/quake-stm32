@@ -48,11 +48,11 @@ void R_InitParticles (void)
 {
 	int		i;
 
-	i = COM_CheckParm ("-particles");
+	i = host_parms.COM_CheckParm ("-particles");
 
 	if (i)
 	{
-		r_numparticles = (int)(Q_atoi(com_argv[i+1]));
+		r_numparticles = Q_atoi(host_parms.argv[i+1]);
 		if (r_numparticles < ABSOLUTE_MIN_PARTICLES)
 			r_numparticles = ABSOLUTE_MIN_PARTICLES;
 	}
@@ -194,18 +194,17 @@ void R_ClearParticles (void)
 }
 
 
-void R_ReadPointFile_f (void)
+void R_ReadPointFile_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	FILE	*f;
 	vec3_t	org;
 	int		r;
 	int		c;
 	particle_t	*p;
 	char	name[MAX_OSPATH];
-	
+	size_t file_length;
 	Q_sprintf (name,"maps/%s.pts", sv.name);
 
-	COM_FOpenFile (name, &f);
+	auto f = COM_OpenFile (name, file_length);
 	if (!f)
 	{
 		Con_Printf ("couldn't open %s\n", name);
@@ -214,9 +213,15 @@ void R_ReadPointFile_f (void)
 	
 	Con_Printf ("Reading %s...\n", name);
 	c = 0;
-	for ( ;; )
+	while(f->good())
 	{
-		r = fscanf (f,"%f %f %f\n", &org[0], &org[1], &org[2]);
+
+		*f >> org[0];
+		assert(f->good());
+		*f >> org[1];
+		assert(f->good());
+		*f >> org[2];
+		assert(f->good());
 		if (r != 3)
 			break;
 		c++;
@@ -237,8 +242,6 @@ void R_ReadPointFile_f (void)
 		VectorCopy (vec3_origin, p->vel);
 		VectorCopy (org, p->org);
 	}
-
-	fclose (f);
 	Con_Printf ("%i points read\n", c);
 }
 

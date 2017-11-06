@@ -279,7 +279,7 @@ void CL_ParseServerInfo (void)
 			Con_Printf ("Server sent too many sound precaches\n");
 			return;
 		}
-		strcpy (sound_precache[numsounds], str);
+		Q_strcpy (sound_precache[numsounds], str);
 		S_TouchSound (str);
 	}
 
@@ -956,8 +956,10 @@ void CL_ParseServerMessage (void)
 			SCR_CenterPrint (MSG_ReadString ());			
 			break;
 
-		case svc_sellscreen:
-			Cmd_ExecuteString ("help", src_command);
+		case svc_sellscreen: {
+			Cmd_Tokenizer tokenizer;
+			tokenizer.execute("help", src_command);
+		}
 			break;
 		}
 	}

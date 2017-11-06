@@ -35,10 +35,10 @@ surfcache_t                     *sc_rover, *sc_base;
 int     D_SurfaceCacheForRes (int width, int height)
 {
 	int             size, pix;
-
-	if (COM_CheckParm ("-surfcachesize"))
+	quake::string_view value;
+	if (host_parms.COM_CheckParmValue ("-surfcachesize", value))
 	{
-		size = Q_atoi(com_argv[COM_CheckParm("-surfcachesize")+1]) * 1024;
+		size = Q_atoi(value) * 1024;
 		return size;
 	}
 	

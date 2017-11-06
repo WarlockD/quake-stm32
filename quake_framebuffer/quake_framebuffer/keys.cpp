@@ -39,18 +39,18 @@ keydest_t	key_dest;
 
 int		key_count;			// incremented every key event
 
-char	*keybindings[256];
+quake::fixed_string<64> keybindings[256];
 qboolean	consolekeys[256];	// if true, can't be rebound while in console
 qboolean	menubound[256];	// if true, can't be rebound while in menu
 int		keyshift[256];		// key to map to if shift held down in console
 int		key_repeats[256];	// if > 1, it is autorepeating
 qboolean	keydown[256];
 
-typedef struct
+struct keyname_t
 {
-	char	*name;
+	const char	*name;
 	int		keynum;
-} keyname_t;
+} ;
 
 keyname_t keynames[] =
 {
@@ -158,7 +158,6 @@ Interactive line editing and console scrollback
 */
 void Key_Console (int key)
 {
-	char	*cmd;
 	
 	if (key == K_ENTER)
 	{
@@ -177,13 +176,13 @@ void Key_Console (int key)
 
 	if (key == K_TAB)
 	{	// command completion
-		cmd = Cmd_CompleteCommand (key_lines[edit_line]+1);
-		if (!cmd)
+		quake::string_view cmd = Cmd_CompleteCommand (key_lines[edit_line]+1);
+		if (cmd.empty())
 			cmd = Cvar_CompleteVariable (key_lines[edit_line]+1);
-		if (cmd)
+		if (!cmd.empty())
 		{
-			Q_strcpy (key_lines[edit_line]+1, cmd);
-			key_linepos = Q_strlen(cmd)+1;
+			cmd.copy(key_lines[edit_line] + 1,sizeof(key_lines[edit_line]) - 1);
+			key_linepos = cmd.size() + 1;
 			key_lines[edit_line][key_linepos] = ' ';
 			key_linepos++;
 			key_lines[edit_line][key_linepos] = 0;
@@ -338,13 +337,13 @@ the given string.  Single ascii characters return themselves, while
 the K_* names are matched up.
 ===================
 */
-int Key_StringToKeynum (const char * str)
+int Key_StringToKeynum (const quake::string_view& str)
 {
 	keyname_t	*kn;
 	
-	if (!str || !str[0])
+	if (str.empty())
 		return -1;
-	if (!str[1])
+	if (str.size() == 1)
 		return str[0];
 
 	for (kn=keynames ; kn->name ; kn++)
@@ -364,7 +363,7 @@ given keynum.
 FIXME: handle quote special (general escape sequence?)
 ===================
 */
-char *Key_KeynumToString (int keynum)
+const char *Key_KeynumToString (int keynum)
 {
 	keyname_t	*kn;	
 	static	char	tinystr[2];
@@ -391,27 +390,12 @@ char *Key_KeynumToString (int keynum)
 Key_SetBinding
 ===================
 */
-void Key_SetBinding (int keynum, char *binding)
+static void Key_SetBinding (int keynum, const quake::string_view& binding)
 {
 	char	*new_ptr;
-	int		l;
-			
-	if (keynum == -1)
-		return;
 
-// free old bindings
-	if (keybindings[keynum])
-	{
-		Z_Free (keybindings[keynum]);
-		keybindings[keynum] = NULL;
-	}
-			
-// allocate memory for new binding
-	l = Q_strlen (binding);	
-	new_ptr = (char*)Z_Malloc (l+1);
-	Q_strcpy (new_ptr, binding);
-	new_ptr[l] = 0;
-	keybindings[keynum] = new_ptr;
+	assert(keynum != -1);
+	keybindings[keynum] = binding;
 }
 
 /*
@@ -419,33 +403,32 @@ void Key_SetBinding (int keynum, char *binding)
 Key_Unbind_f
 ===================
 */
-void Key_Unbind_f (void)
+void Key_Unbind_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int		b;
 
-	if (Cmd_Argc() != 2)
+	if (argc!= 2)
 	{
 		Con_Printf ("unbind <key> : remove commands from a key\n");
 		return;
 	}
 	
-	b = Key_StringToKeynum (Cmd_Argv(1));
+	b = Key_StringToKeynum (argv[1]);
 	if (b==-1)
 	{
-		Con_Printf ("\"%s\" isn't a valid key\n", Cmd_Argv(1));
+		Con_Printf ("\"%s\" isn't a valid key\n", argv[1]);
 		return;
 	}
-
-	Key_SetBinding (b, "");
+	keybindings[b].clear();
 }
 
-void Key_Unbindall_f (void)
+void Key_Unbindall_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	int		i;
 	
-	for (i=0 ; i<256 ; i++)
-		if (keybindings[i])
-			Key_SetBinding (i, "");
+	for (i = 0; i < 256; i++)
+		if (!keybindings[i].empty())
+			keybindings[i].clear();
 }
 
 
@@ -454,44 +437,40 @@ void Key_Unbindall_f (void)
 Key_Bind_f
 ===================
 */
-void Key_Bind_f (void)
+void Key_Bind_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	int			i, c, b;
-	char		cmd[1024];
+	int			 c, b;
+
 	
-	c = Cmd_Argc();
+	c = argc;
 
 	if (c != 2 && c != 3)
 	{
 		Con_Printf ("bind <key> [command] : attach a command to a key\n");
 		return;
 	}
-	b = Key_StringToKeynum (Cmd_Argv(1));
+	b = Key_StringToKeynum (argv[1]);
 	if (b==-1)
 	{
-		Con_Printf ("\"%s\" isn't a valid key\n", Cmd_Argv(1));
+		quake::con << "\"" << argv[1] << "\" isn't a valid key" << std::endl;
 		return;
 	}
-
+	auto& cmd = keybindings[b];
 	if (c == 2)
 	{
-		if (keybindings[b])
-			Con_Printf ("\"%s\" = \"%s\"\n", Cmd_Argv(1), keybindings[b] );
+		if (!cmd.empty())
+			quake::con << "\"" << argv[1] << "\" = \"" << cmd << "\"" << std::endl;
 		else
-			Con_Printf ("\"%s\" is not bound\n", Cmd_Argv(1) );
+			quake::con << "\"" << argv[1] << "\"  is not bound" << std::endl;
 		return;
 	}
-	
+	cmd.clear();
 // copy the rest of the command line
-	cmd[0] = 0;		// start out with a null string
-	for (i=2 ; i< c ; i++)
+	for (int i=2 ; i< c ; i++)
 	{
-		if (i > 2)
-			strcat (cmd, " ");
-		strcat (cmd, Cmd_Argv(i));
+		if (i > 2) cmd.push_back(' ');
+		cmd.append(argv[i]);
 	}
-
-	Key_SetBinding (b, cmd);
 }
 
 /*
@@ -501,14 +480,11 @@ Key_WriteBindings
 Writes lines containing "bind key value"
 ============
 */
-void Key_WriteBindings (idFileHandle f)
+void Key_WriteBindings (std::ostream& f)
 {
-	int		i;
-
-	for (i=0 ; i<256 ; i++)
-		if (keybindings[i])
-			if (*keybindings[i])
-				Sys_FilePrintF (f, "bind \"%s\" \"%s\"\n", Key_KeynumToString(i), keybindings[i]);
+	for (int i = 0; i < 256; i++)
+		if (!keybindings[i].empty())
+			f << "bind \"" << Key_KeynumToString(i) << " \"" << keybindings[i] << '\"' << std::endl;
 }
 
 
@@ -598,9 +574,6 @@ Should NOT be called during an interrupt!
 */
 void Key_Event (int key, qboolean down)
 {
-	char	*kb;
-	char	cmd[1024];
-
 	keydown[key] = down;
 
 	if (!down)
@@ -622,7 +595,7 @@ void Key_Event (int key, qboolean down)
 			return;	// ignore most autorepeats
 		}
 			
-		if (key >= 200 && !keybindings[key])
+		if (key >= 200 && keybindings[key].empty())
 			Con_Printf ("%s is unbound, hit F4 to set.\n", Key_KeynumToString (key) );
 	}
 
@@ -646,7 +619,7 @@ void Key_Event (int key, qboolean down)
 			break;
 		case key_game:
 		case key_console:
-			M_ToggleMenu_f ();
+			M_ToggleMenu ();
 			break;
 		default:
 			Sys_Error ("Bad key_dest");
@@ -663,19 +636,19 @@ void Key_Event (int key, qboolean down)
 //
 	if (!down)
 	{
-		kb = keybindings[key];
-		if (kb && kb[0] == '+')
+		auto& kb = keybindings[key];
+		if (!kb.empty() && kb[0] == '+')
 		{
-			sprintf (cmd, "-%s %i\n", kb+1, key);
-			Cbuf_AddText (cmd);
+			quake::fixed_string<512> cmd;
+			Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
 		}
 		if (keyshift[key] != key)
 		{
 			kb = keybindings[keyshift[key]];
-			if (kb && kb[0] == '+')
+			if (!kb.empty() && kb[0] == '+')
 			{
-				sprintf (cmd, "-%s %i\n", kb+1, key);
-				Cbuf_AddText (cmd);
+				quake::fixed_string<512> cmd;
+				Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
 			}
 		}
 		return;
@@ -686,7 +659,7 @@ void Key_Event (int key, qboolean down)
 //
 	if (cls.demoplayback && down && consolekeys[key] && key_dest == key_game)
 	{
-		M_ToggleMenu_f ();
+		M_ToggleMenu ();
 		return;
 	}
 
@@ -697,17 +670,17 @@ void Key_Event (int key, qboolean down)
 	|| (key_dest == key_console && !consolekeys[key])
 	|| (key_dest == key_game && ( !con_forcedup || !consolekeys[key] ) ) )
 	{
-		kb = keybindings[key];
-		if (kb)
+		const auto& kb = keybindings[key];
+		if (!kb.empty())
 		{
-			if (kb[0] == '+')
+			if (kb.front() == '+')
 			{	// button commands add keynum as a parm
-				sprintf (cmd, "%s %i\n", kb, key);
-				Cbuf_AddText (cmd);
+				quake::fixed_string<512> cmd;
+				Cbuf_AddText(cmd("%s %i\n", kb.c_str() + 1, key));
 			}
 			else
 			{
-				Cbuf_AddText (kb);
+				Cbuf_AddText (kb.c_str());
 				Cbuf_AddText ("\n");
 			}
 		}

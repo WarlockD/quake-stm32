@@ -48,9 +48,8 @@ void CL_StopPlayback (void)
 	if (!cls.demoplayback)
 		return;
 
-	fclose (cls.demofile);
+	cls.demofile.close();
 	cls.demoplayback = false;
-	cls.demofile = NULL;
 	cls.state = ca_disconnected;
 
 	if (cls.timedemo)
@@ -68,17 +67,12 @@ void CL_WriteDemoMessage (void)
 {
 	int		len;
 	int		i;
-	float	f;
-
-	len = LittleLong (net_message.cursize);
-	fwrite (&len, 4, 1, cls.demofile);
-	for (i=0 ; i<3 ; i++)
-	{
-		f = LittleFloat (cl.viewangles[i]);
-		fwrite (&f, 4, 1, cls.demofile);
-	}
-	fwrite (net_message.data, net_message.cursize, 1, cls.demofile);
-	fflush (cls.demofile);
+	id_little_binary_writer bw(cls.demofile);
+	bw << net_message.cursize;
+	for (i = 0; i < 3; i++)
+		bw << cl.viewangles[i];
+	bw.write(net_message.data, net_message.cursize);
+	cls.demofile.flush();
 }
 
 /*
@@ -91,7 +85,6 @@ Handles recording and playback of demos, on top of NET_ code
 int CL_GetMessage (void)
 {
 	int		r, i;
-	float	f;
 	
 	if	(cls.demoplayback)
 	{
@@ -113,21 +106,16 @@ int CL_GetMessage (void)
 					return 0;		// don't need another message yet
 			}
 		}
-		
-	// get the next message
-		fread (&net_message.cursize, 4, 1, cls.demofile);
+		id_little_binary_reader br(cls.demofile);
+		br >> net_message.cursize;
 		VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
-		for (i=0 ; i<3 ; i++)
-		{
-			r = fread (&f, 4, 1, cls.demofile);
-			cl.mviewangles[0][i] = LittleFloat (f);
-		}
-		
-		net_message.cursize = LittleLong (net_message.cursize);
+		for (i = 0; i < 3; i++)
+			br >> cl.mviewangles[0][i];
+
 		if (net_message.cursize > MAX_MSGLEN)
 			Sys_Error ("Demo message > MAX_MSGLEN");
-		r = fread (net_message.data, net_message.cursize, 1, cls.demofile);
-		if (r != 1)
+		br.read(net_message.data, net_message.cursize);
+		if (!cls.demofile)
 		{
 			CL_StopPlayback ();
 			return 0;
@@ -164,27 +152,28 @@ CL_Stop_f
 stop recording a demo
 ====================
 */
-void CL_Stop_f (void)
-{
-	if (cmd_source != src_command)
-		return;
-
+void CL_Stop() {
 	if (!cls.demorecording)
 	{
-		Con_Printf ("Not recording a demo.\n");
+		Con_Printf("Not recording a demo.\n");
 		return;
 	}
 
-// write a disconnect message to the demo file
-	SZ_Clear (&net_message);
-	MSG_WriteByte (&net_message, svc_disconnect);
-	CL_WriteDemoMessage ();
+	// write a disconnect message to the demo file
+	SZ_Clear(&net_message);
+	MSG_WriteByte(&net_message, svc_disconnect);
+	CL_WriteDemoMessage();
 
-// finish up
-	fclose (cls.demofile);
-	cls.demofile = NULL;
+	// finish up
+	cls.demofile.close();
 	cls.demorecording = false;
-	Con_Printf ("Completed demo\n");
+	Con_Printf("Completed demo\n");
+}
+void CL_Stop_f (cmd_source_t source, size_t argc, const quake::string_view argv[])
+{
+	if (source != src_command)
+		return;
+	CL_Stop();
 }
 
 /*
@@ -194,23 +183,23 @@ CL_Record_f
 record <demoname> <map> [cd track]
 ====================
 */
-void CL_Record_f (void)
+void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	int		c;
-	char	name[MAX_OSPATH];
+
 	int		track;
 
-	if (cmd_source != src_command)
+	if (source != src_command)
 		return;
 
-	c = Cmd_Argc();
+	c = argc;
 	if (c != 2 && c != 3 && c != 4)
 	{
 		Con_Printf ("record <demoname> [<map> [cd track]]\n");
 		return;
 	}
 
-	if (strstr(Cmd_Argv(1), ".."))
+	if (args[1].find("..") != quake::string_view::npos)
 	{
 		Con_Printf ("Relative pathnames are not allowed.\n");
 		return;
@@ -225,35 +214,43 @@ void CL_Record_f (void)
 // write the forced cd track number, or -1
 	if (c == 4)
 	{
-		track = atoi(Cmd_Argv(3));
+		track = Q_atoi(args[3]);
 		Con_Printf ("Forcing CD track to %i\n", cls.forcetrack);
 	}
 	else
 		track = -1;	
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
-	
+	quake::path_string name;
+
+	name += COM_GameDir();
+	name += '/';
+	name += args[1];
+
 //
 // start the map up
 //
-	if (c > 2)
-		Cmd_ExecuteString ( va("map %s", Cmd_Argv(2)), src_command);
+	if (c > 2) {
+		quake::fixed_string_stream<128> va;
+		va << "map " << args[2];
+		Cmd_Tokenizer tokenizer;
+		tokenizer.execute(va.str(), src_command);
+	}
+
 	
 //
 // open the demo file
 //
 	COM_DefaultExtension (name, ".dem");
 
-	Con_Printf ("recording to %s.\n", name);
-	cls.demofile = fopen (name, "wb");
+	Con_Printf ("recording to %s.\n", name.c_str());
+	cls.demofile.open(name.c_str(), std::ios_base::out);
 	if (!cls.demofile)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
 		return;
 	}
-
-	cls.forcetrack = track;
-	fprintf (cls.demofile, "%i\n", cls.forcetrack);
+	cls.demofile << cls.forcetrack << '\n';
+	cls.demofile.flush();
 	
 	cls.demorecording = true;
 }
@@ -266,16 +263,15 @@ CL_PlayDemo_f
 play [demoname]
 ====================
 */
-void CL_PlayDemo_f (void)
+void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
-	char	name[256];
 	int c;
 	qboolean neg = false;
 
-	if (cmd_source != src_command)
+	if (source != src_command)
 		return;
 
-	if (Cmd_Argc() != 2)
+	if (argc != 2)
 	{
 		Con_Printf ("play <demoname> : plays a demo\n");
 		return;
@@ -289,12 +285,14 @@ void CL_PlayDemo_f (void)
 //
 // open the demo file
 //
-	strcpy (name, Cmd_Argv(1));
+//	ZString name(args[1]);
+	quake::path_string name(args[1]);
+
 	COM_DefaultExtension (name, ".dem");
 
-	Con_Printf ("Playing demo from %s.\n", name);
-	COM_FOpenFile (name, &cls.demofile);
-	if (!cls.demofile)
+	Con_Printf ("Playing demo from %s.\n", name.c_str());
+	cls.demofile.open(name.c_str(),std::ios_base::in);
+	if (!cls.demofile.is_open())
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
 		cls.demonum = -1;		// stop demo loop
@@ -305,7 +303,7 @@ void CL_PlayDemo_f (void)
 	cls.state = ca_connected;
 	cls.forcetrack = 0;
 
-	while ((c = getc(cls.demofile)) != '\n')
+	while ((c = cls.demofile.get()) != '\n')
 		if (c == '-')
 			neg = true;
 		else
@@ -345,18 +343,18 @@ CL_TimeDemo_f
 timedemo [demoname]
 ====================
 */
-void CL_TimeDemo_f (void)
+void CL_TimeDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
-	if (cmd_source != src_command)
+	if (source != src_command)
 		return;
 
-	if (Cmd_Argc() != 2)
+	if (argc != 2)
 	{
 		Con_Printf ("timedemo <demoname> : gets demo speeds\n");
 		return;
 	}
 
-	CL_PlayDemo_f ();
+	CL_PlayDemo_f (source,argc, args);
 	
 // cls.td_starttime will be grabbed at the second frame of the demo, so
 // all the loading time doesn't get counted

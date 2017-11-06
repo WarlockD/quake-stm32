@@ -574,8 +574,10 @@ nextmsg:
 					ret = 1;
 				if (ret == 2)
 					Cbuf_InsertText (s);
-				else if (ret == 1)
-					Cmd_ExecuteString (s, src_client);
+				else if (ret == 1) {
+					Cmd_Tokenizer tokenizer;
+					tokenizer.execute(s, src_client);
+				}
 				else
 					Con_DPrintf("%s tried to %s\n", host_client->name, s);
 				break;

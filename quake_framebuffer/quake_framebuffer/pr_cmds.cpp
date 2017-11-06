@@ -248,7 +248,7 @@ void PF_setmodel (void)
 			break;
 			
 	if (!*check)
-		PR_RunError ("no precache: %s\n", m);
+		PR_RunError("no precache: "); // %s\n", m);
 		
 
 	e->v.model = m - pr_strings;
@@ -1119,7 +1119,7 @@ void PF_precache_model (void)
 
 void PF_coredump (void)
 {
-	ED_PrintEdicts ();
+	ED_PrintEdicts();
 }
 
 void PF_traceon (void)
@@ -1654,7 +1654,8 @@ void PF_changelevel (void)
 		Cbuf_AddText (va("changelevel2 %s %s\n",s1, s2));
 #else
 	char	*s;
-
+	
+	quake::fixed_string<128> va;
 // make sure we don't issue two changelevels
 	if (svs.changelevel_issued)
 		return;

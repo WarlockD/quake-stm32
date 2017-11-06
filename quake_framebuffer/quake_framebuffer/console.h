@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //
 // console
 //
+
+#ifndef _QUAKE_CONSOLE_H_
+#define _QUAKE_CONSOLE_H_
+
 extern int con_totallines;
 extern int con_backscroll;
 extern	qboolean con_forcedup;	// because no entities to refresh
@@ -38,10 +42,11 @@ void Con_Print (const char *txt);
 void Con_Printf (const char *fmt, ...);
 void Con_DPrintf (const char *fmt, ...);
 void Con_SafePrintf (const char *fmt, ...);
-void Con_Clear_f (void);
+void Con_Clear_f(cmd_source_t source, size_t argc, const quake::string_view&  argv);
 void Con_DrawNotify (void);
 void Con_ClearNotify (void);
-void Con_ToggleConsole_f (void);
+void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
 
 void Con_NotifyBox (char *text);	// during startup for sound / cd warnings
 
+#endif _QUAKE_CONSOLE_H_

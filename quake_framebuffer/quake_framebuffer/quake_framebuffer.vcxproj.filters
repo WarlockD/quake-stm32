@@ -428,4 +428,7 @@
       <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="quake_types.natvis" />
+  </ItemGroup>
 </Project>

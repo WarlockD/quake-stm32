@@ -18,7 +18,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 /* crc.h */
-
+#ifndef _QUAKE_CRC_H_
+#define _QUAKE_CRC_H_
 void CRC_Init(unsigned short *crcvalue);
 void CRC_ProcessByte(unsigned short *crcvalue, byte data);
+template<typename T>
+static inline void CRC_ProcessStruct(unsigned short *crc, const T* data) {
+	const byte* bdata = reinterpret_cast<const byte*>(data);
+	for (size_t i = 0; i < sizeof(T); i++) 	CRC_ProcessByte(crc, bdata[i]);
+}
 unsigned short CRC_Value(unsigned short crcvalue);
+
+#endif
