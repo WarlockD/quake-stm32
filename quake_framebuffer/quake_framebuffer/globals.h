@@ -31,7 +31,7 @@ struct cmdalias_t
 {
 	cmdalias_t	*next;
 	char	name[MAX_ALIAS_NAME];
-	quake::fixed_string<64> value;
+	quake::fixed_string<256> value; // this can be a script.. humm
 } ;
 
 

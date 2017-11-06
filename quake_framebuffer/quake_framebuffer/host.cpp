@@ -246,7 +246,7 @@ void Host_WriteConfiguration (void)
 // config.cfg cvars
 	if (host_initialized & !isDedicated)
 	{
-		quake::fixed_string<256> va;
+		quake::fixed_printf_buffer<256> va;
 		quake::ofstream f(va("%s/config.cfg", COM_GameDir));
 
 		//f = fopen (va("%s/config.cfg",com_gamedir), "w");

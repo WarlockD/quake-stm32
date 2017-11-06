@@ -439,50 +439,10 @@ static inline int toHex(int c) {
 }
 
 int	Q_atoi(const quake::string_view& str) {
-	size_t pos=0;
-	int             sign;
-
-	if (str[pos] == '-')
-	{
-		sign = -1;
-		pos++;
-	}
-	else {
-		sign = 1;
-	}
-
-	// check for character
-	if (str[pos] == '\'')
-		return sign * str[1];
-
-	int val = 0;
-	// check for hex
-	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-	{
-		pos = 2;
-		while (pos < str.size())
-		{
-			int c = str[pos++];
-			if (c >= '0' && c <= '9')
-				val = (val << 4) + c - '0';
-			else if (c >= 'a' && c <= 'f')
-				val = (val << 4) + c - 'a' + 10;
-			else if (c >= 'A' && c <= 'F')
-				val = (val << 4) + c - 'A' + 10;
-			else
-				return val*sign;
-		}
-	}
-	// assume decimal
-	while (pos < str.size())
-	{
-		int c = str[pos++];
-		if (c <'0' || c > '9')
-			return val*sign;
-		val = val * 10 + c - '0';
-	}
-	assert(0); // bad number
-	return 0;
+	char* ptr = nullptr;
+	int ret = strtol(str.data(), &ptr,0);
+	assert(str.data() < ptr);
+	return ret;
 }
 float Q_atof(const quake::string_view& str) {
 	char* ptr;

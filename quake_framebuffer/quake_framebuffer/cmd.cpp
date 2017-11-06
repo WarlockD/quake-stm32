@@ -296,6 +296,8 @@ void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view arg
 {
 	
 	cmdalias_t	*a;
+	quake::data_view<quake::string_view> view(args, argc);
+
 	if (argc == 1)
 	{
 		Con_Printf ("Current alias commands:\n");
@@ -385,10 +387,10 @@ Parses the given string into command line tokens.
 
 
  void Cmd_Tokenizer::tokenizie(COM_Parser& parser) {
-	 _args.clear();
+	 _size = 0;
 	 COM_Parser::COM_Token token;
 	 while ((token = parser.Next()) != COM_Parser::Eof && token != COM_Parser::LineFeed)
-		 _args.emplace_back(token.text());
+		 _args[_size++] = token.text();
  }
  void Cmd_Tokenizer::tokenizie(const quake::string_view& text) {
 	 COM_Parser parser(text, COM_Parser::IgnoreComments);
@@ -496,7 +498,7 @@ void Cmd_Tokenizer::execute(const quake::string_view& text, cmd_source_t src) {
 	{
 		if (lower == cmd->name)
 		{
-			cmd->function(src, _args.size(), _args.data());
+			cmd->function(src, size(), _args.data());
 			return;
 		}
 	}
@@ -512,7 +514,7 @@ void Cmd_Tokenizer::execute(const quake::string_view& text, cmd_source_t src) {
 	}
 
 	// check cvars
-	if (!Cvar_Command(_args.size(), _args.data())) {
+	if (!Cvar_Command(size(), _args.data())) {
 		quake::con << "Unknown command \"" << _args[0] << "\"" << std::endl;
 	}
 }

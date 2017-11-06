@@ -492,22 +492,23 @@ namespace quake {
 	// just used for printf stuff
 	class printf_buffer : public memlink {
 	public:
-		printf_buffer(char* str, size_t size) : memlink(str, size) {}
+		printf_buffer(char* str, size_t size) : memlink(str, size) { str[0] = '\0'; }
 		const char* operator()(const char* fmt, ...);
 		const char* c_str() const { return data(); }
 		operator const char*() const { return data(); }
 	};
 
 	template<size_t SIZE = DEFAULT_SIMPLE_BUFFER_SIZE>
-	class fixed_simple_string_buffer : public printf_buffer {
+	class fixed_printf_buffer : public printf_buffer {
 		std::array<char, SIZE> _buff;
 	public:
-		fixed_simple_string_buffer() : memlink(_buff.data(), _buff.size() - 1) {}
-		fixed_simple_string_buffer(char* str, size_t size) : memlink(_buff.data(), _buff.size() - 1) {
+		fixed_printf_buffer() : printf_buffer(_buff.data(), _buff.size() - 1) {}
+		fixed_printf_buffer(const char* str, size_t size) : printf_buffer(_buff.data(), _buff.size() - 1) {
 			assert(size < _buff.size());
 			char_traits::copy(_buff.data(), str, size);
 			_buff[size] = '\0';
 		}
+		fixed_printf_buffer(const char* str) : fixed_printf_buffer(str, std::strlen(str)) {}
 	};
 
 	// so I don't have to keep recompiling headers, alot of this is going to be in commom
@@ -555,8 +556,8 @@ namespace quake {
 
 
 		template<size_t SIZE = DEFAULT_SIMPLE_BUFFER_SIZE>
-		fixed_simple_string_buffer<SIZE> make_cstr() const {
-			return simple_string_buffer<SIZE>(_data,size());
+		fixed_printf_buffer<SIZE> make_cstr() const {
+			return fixed_printf_buffer<SIZE>(_data,size());
 		}
 	};
 	// do we need all the comparison operations? humm
@@ -580,6 +581,16 @@ namespace quake {
 		}
 		constexpr cstring_view(const_pointer str) : string_view(str) {}
 		constexpr const char* c_str() const { return data(); }
+	};
+	template<typename T>
+	class csimple_list {
+		const T* _data;
+		size_t _size;
+	public:
+		constexpr csimple_list(const T* list,size_t count) :_data(list), _size(size) {}
+		size_t size() const { return _size; }
+		const T* data() const { return _data; }
+		const T& operator[](size_t i) const { return _data[i]; }
 	};
 	// a symbol is a string that is case insentive.  Its still a string_view, but the equal functions are diffrent
 	// warning though, this does NOT override the compare functions.  I could make  the main comapre virtual, but 
@@ -654,7 +665,7 @@ namespace quake {
 		void push_back(char c) { assert((_size + 1) < (capacity() - 1)); _buffer[_size++] = c; _buffer[_size] = '\0'; }
 		void pop_back() { if (_size > 0) --_size; }
 
-		fixed_string& append(const data_view<char>&  str) {
+		fixed_string& append(const string_view&  str) {
 			assert(str.size() < (capacity() - _size - 1));
 			char_traits::copy(_buffer.data() + _size, str.data(), str.size());
 			_size += str.size();
@@ -682,7 +693,7 @@ namespace quake {
 		inline void append(const char* str, size_type len) { assign(string_view(str, len)); }
 		fixed_string& operator+=(const char* str) { append(str); return *this; }
 		fixed_string& operator+=(char c) { push_back(c); return *this; }
-		fixed_string& operator+=(const data_view<char>& str) { append(str); return *this; }
+		fixed_string& operator+=(const string_view& str) { append(str); return *this; }
 		reference operator[](size_type i) { return _buffer[i]; }
 		reference at(size_type i) { return _buffer.at(i); }
 		iterator begin() { return _buffer.data(); }
@@ -1345,11 +1356,11 @@ constexpr inline int idCast<int,idTime>(idTime f) {
 }
 template<>
 constexpr inline float idCast<float, idTime>(idTime f) {
-	return std::chrono::duration_cast<idTimef>(f).count();
+	return std::chrono::duration_cast<idTimef>(f).count()/1000.0f;
 }
 template<>
 constexpr inline idTime idCast<idTime, float>(float f) {
-	return std::chrono::duration_cast<idTime>(idTimef(f));
+	return std::chrono::duration_cast<idTime>(idTimef(f)*1000.0f);
 }
 template<>
 constexpr inline idTime idCast<idTime, double>(double f) {

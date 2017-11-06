@@ -639,7 +639,7 @@ void Key_Event (int key, qboolean down)
 		auto& kb = keybindings[key];
 		if (!kb.empty() && kb[0] == '+')
 		{
-			quake::fixed_string<512> cmd;
+			quake::fixed_printf_buffer<512> cmd;
 			Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
 		}
 		if (keyshift[key] != key)
@@ -647,7 +647,7 @@ void Key_Event (int key, qboolean down)
 			kb = keybindings[keyshift[key]];
 			if (!kb.empty() && kb[0] == '+')
 			{
-				quake::fixed_string<512> cmd;
+				quake::fixed_printf_buffer<512> cmd;
 				Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
 			}
 		}
@@ -675,7 +675,7 @@ void Key_Event (int key, qboolean down)
 		{
 			if (kb.front() == '+')
 			{	// button commands add keynum as a parm
-				quake::fixed_string<512> cmd;
+				quake::fixed_printf_buffer<512> cmd;
 				Cbuf_AddText(cmd("%s %i\n", kb.c_str() + 1, key));
 			}
 			else

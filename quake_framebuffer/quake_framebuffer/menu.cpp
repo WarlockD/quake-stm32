@@ -331,7 +331,7 @@ void M_Main_Draw (void)
 	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/mainmenu.lmp") );
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	M_DrawTransPic (54, 32 + m_main_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
@@ -414,7 +414,7 @@ void M_SinglePlayer_Draw (void)
 	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/sp_menu.lmp") );
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	M_DrawTransPic (54, 32 + m_singleplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
@@ -564,7 +564,7 @@ void M_Save_Draw (void)
 
 void M_Load_Key (int k)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
@@ -607,7 +607,7 @@ void M_Load_Key (int k)
 
 void M_Save_Key (int k)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
@@ -657,7 +657,7 @@ void M_MultiPlayer_Draw (void)
 {
 	int		f;
 	qpic_t	*p;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
 	p = Draw_CachePic ("gfx/p_multi.lmp");
 	M_DrawPic ( (320-p->width)/2, 4, p);
@@ -782,7 +782,7 @@ void M_Setup_Draw (void)
 void M_Setup_Key (int k)
 {
 	int			l;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:
@@ -1008,7 +1008,7 @@ void M_Net_Draw (void)
 	M_Print (f, 166, net_helpMessage[m_net_cursor*4+3]);
 
 	f = (int)(idCast<float>(host_time) * 10)%6;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	M_DrawTransPic (54, 32 + m_net_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 )) );
 }
 
@@ -1564,7 +1564,7 @@ void M_Menu_Help_f(cmd_source_t source, size_t argc, const quake::string_view ar
 
 void M_Help_Draw (void)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	M_DrawPic (0, 0, Draw_CachePic ( va("gfx/help%i.lmp", help_page)) );
 }
 
@@ -1798,7 +1798,7 @@ void M_SerialConfig_Draw (void)
 	int		basex;
 	char	*startJoin;
 	char	*directModem;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
 	p = Draw_CachePic ("gfx/p_multi.lmp");
@@ -1863,7 +1863,7 @@ void M_SerialConfig_Draw (void)
 void M_SerialConfig_Key (int key)
 {
 	int		l;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
@@ -2089,7 +2089,7 @@ void M_ModemConfig_Draw (void)
 void M_ModemConfig_Key (int key)
 {
 	int		l;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
@@ -2231,7 +2231,7 @@ void M_Menu_LanConfig_f(cmd_source_t source, size_t argc, const quake::string_vi
 
 void M_LanConfig_Draw (void)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	qpic_t	*p;
 	int		basex;
 	char	*startJoin;
@@ -2292,7 +2292,7 @@ void M_LanConfig_Draw (void)
 void M_LanConfig_Key (int key)
 {
 	int		l;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 
 	switch (key)
 	{
@@ -2572,7 +2572,7 @@ int		gameoptions_cursor;
 void M_GameOptions_Draw (void)
 {
 	using namespace std::chrono;
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	qpic_t	*p;
 	int		x;
 
@@ -2800,7 +2800,7 @@ void M_NetStart_Change (int dir)
 
 void M_GameOptions_Key (int key)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (key)
 	{
 	case K_ESCAPE:
@@ -2983,7 +2983,7 @@ void M_ServerList_Draw (void)
 
 void M_ServerList_Key (int k)
 {
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 	switch (k)
 	{
 	case K_ESCAPE:

@@ -1655,7 +1655,7 @@ void PF_changelevel (void)
 #else
 	char	*s;
 	
-	quake::fixed_string<128> va;
+	quake::fixed_printf_buffer<128> va;
 // make sure we don't issue two changelevels
 	if (svs.changelevel_issued)
 		return;

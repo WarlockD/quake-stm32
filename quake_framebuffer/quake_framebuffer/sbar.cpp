@@ -112,7 +112,7 @@ Sbar_Init
 void Sbar_Init (void)
 {
 	int		i;
-	quake::fixed_string<64> va;
+	quake::fixed_printf_buffer<64> va;
 	for (i=0 ; i<10 ; i++)
 	{
 		sb_nums[0][i] = Draw_PicFromWad (va("num_%i",i));
@@ -469,8 +469,8 @@ void Sbar_SoloScoreboard (void)
 
 // time
 	auto time = std::chrono::duration_cast<std::chrono::seconds>(cl.time).count();
-	minutes = time / 60;
-	seconds = time - 60 * minutes;
+	minutes = (int)time / 60;
+	seconds = (int)time - 60 * minutes;
 	tens = seconds / 10;
 	units = seconds - 10*tens;
 	Q_sprintf (str,"Time :%3i:%i%i", minutes, tens, units);
@@ -1169,7 +1169,6 @@ Sbar_DeathmatchOverlay
 */
 void Sbar_MiniDeathmatchOverlay (void)
 {
-	qpic_t			*pic;
 	int				i, k, l;
 	int				top, bottom;
 	int				x, y, f;
@@ -1209,7 +1208,7 @@ void Sbar_MiniDeathmatchOverlay (void)
             i = 0;
 
 	x = 324;
-	for (/* */; i < scoreboardlines && y < vid.height - 8 ; i++)
+	for (/* */; i < scoreboardlines && y < (int)vid.height - 8 ; i++)
 	{
 		k = fragsort[i];
 		s = &cl.scores[k];

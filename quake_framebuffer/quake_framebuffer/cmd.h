@@ -80,18 +80,19 @@ typedef enum
 class Cmd_Tokenizer {
 	static constexpr size_t MAX_ARGS = 80;
 	cmd_source_t _cmd_source;
-	ZVector<quake::string_view> _args;
+	std::array<quake::string_view, MAX_ARGS> _args;
+	size_t _size;
 public:
 	const quake::string_view* data() const { return _args.data(); }
 
-	Cmd_Tokenizer(cmd_source_t source= cmd_source_t::src_command) : _cmd_source(source) { _args.reserve(20); }
-	Cmd_Tokenizer(cmd_source_t source, COM_Parser& parser) :_cmd_source( source){ _args.reserve(20); tokenizie(parser); }
-	Cmd_Tokenizer(cmd_source_t source, const quake::string_view& text) :_cmd_source( source){ _args.reserve(20); tokenizie(text); }
-	size_t size() const { return _args.size(); }
+	Cmd_Tokenizer(cmd_source_t source= cmd_source_t::src_command) : _cmd_source(source), _size(0) {  }
+	Cmd_Tokenizer(cmd_source_t source, COM_Parser& parser) :_cmd_source( source), _size(0) {  tokenizie(parser); }
+	Cmd_Tokenizer(cmd_source_t source, const quake::string_view& text) :_cmd_source( source), _size(0) {  tokenizie(text); }
+	size_t size() const { return _size; }
 	const quake::string_view& operator[](size_t i) const { return _args[i]; }
 	void tokenizie(COM_Parser& parser);
 	void tokenizie(const quake::string_view& text);
-	bool operator==(const quake::string_view& name) const { return !_args.empty() && _args[0].size() == name.size() && Q_strncasecmp(_args[0].data(), name.data(), name.size()) == 0; }
+	bool operator==(const quake::string_view& name) const { return !_args.empty() && quake::symbol(_args[0]) == name; }
 	bool operator!=(const quake::string_view& name) const { return !(*this == name); }
 	cmd_source_t source() const { return _cmd_source; }
 	void execute(const quake::string_view& text, cmd_source_t src);

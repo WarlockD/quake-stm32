@@ -16,6 +16,17 @@
     <DisplayString Condition="_size > 0">[ size={_size}] {_data,[_size]s8}</DisplayString>
   </Type>
 
+  <Type Name="quake::csimple_list&lt;*&gt;" Inheritable="false">
+    <DisplayString Condition="_count == 0">empty</DisplayString>
+    <DisplayString Condition="_count != 0"> data = {*_list}, size= {_size} </DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>_count</Size>
+        <ValuePointer>_list</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  
   <Type Name="quake::fixed_string_buffer" Inheritable="true">
     <Intrinsic Name="used" Expression="(_IPnext - _IPfirst)"/>
     <DisplayString Condition="used() == 0">[empty]</DisplayString>

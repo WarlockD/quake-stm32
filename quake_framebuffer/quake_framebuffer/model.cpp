@@ -244,7 +244,27 @@ void Mod_TouchModel (const quake::string_view& name)
 			Cache_Check (&mod->cache);
 	}
 }
+template<size_t SIZE>
+void COM_FileBase(const quake::string_view& in, char(&out)[SIZE])
+{
+	const char *s2;
+	const char* s = &in.back();
 
+	while (s != in && *s != '.')
+		s--;
+
+	for (s2 = s; *s2 && *s2 != '/'; s2--);
+
+	if (s - s2 < 2)
+		::strncpy(out, "?model?", SIZE - 1);
+	else
+	{
+		s--;
+		size_t len = std::min(SIZE - 1, (size_t)(s - s2));
+		::strncpy(out,  s2 + 1, len);
+		out[s - s2] = 0;
+	}
+}
 /*
 ==================
 Mod_LoadModel
@@ -289,7 +309,8 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // allocate a new model
 
-	COM_FileBase(quake::string_view(loadname)).copy(mod->name, sizeof(mod->name));
+	COM_FileBase(mod->name, loadname);
+
 	
 	loadmodel = mod;
 
