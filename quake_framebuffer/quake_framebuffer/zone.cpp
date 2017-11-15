@@ -90,7 +90,9 @@ void Z_Free (void *ptr)
 	
 	if (!ptr)
 		Sys_Error ("Z_Free: NULL pointer");
-
+	//umm_free(ptr);
+	free(ptr);
+#if 0
 	block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
 	if (block->id != ZONEID)
 		Sys_Error ("Z_Free: freed a pointer without ZONEID");
@@ -119,6 +121,7 @@ void Z_Free (void *ptr)
 		if (other == mainzone->rover)
 			mainzone->rover = block;
 	}
+#endif
 }
 
 
@@ -129,10 +132,12 @@ Z_Malloc
 */
 void *Z_Malloc (size_t size)
 {
-	void	*buf;
-	
-Z_CheckHeap ();	// DEBUG
-	buf = Z_TagMalloc (size, 1);
+
+//Z_CheckHeap ();	// DEBUG
+// tag malloc is never really used
+	//void	*buf =  umm_malloc(size);
+	void	*buf = malloc(size);
+	//void	*buf = Z_TagMalloc (size, 1);
 	if (!buf)
 		Sys_Error ("Z_Malloc: failed on allocation of %i bytes",size);
 	Q_memset (buf, 0, size);
@@ -142,6 +147,7 @@ Z_CheckHeap ();	// DEBUG
 
 void *Z_TagMalloc (size_t size, int tag)
 {
+	assert(0);
 	int		extra;
 	memblock_t	*start, *rover, *new_ptr, *base;
 

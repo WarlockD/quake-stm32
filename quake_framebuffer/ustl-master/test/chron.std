@@ -1,0 +1,22 @@
+0_ms
+0_ms
+
+2/6 + 4/15 = 3/5
+2/6 / 4/15 = 5/4
+2/6 > 4/15 = true
+
+1 second is:
+1000000 microseconds
+100000000 shakes
+100 jiffies
+0 minutes
+0.82672 microfortnights
+0.316957 nanocenturies
+
+4000_ms
+5_s
+system_clock::now() <= high_resolution_clock::now()
+high_resolution_clock::now() >= system_clock::now()
+7200042_ms
+7200_s
+7200000_ms

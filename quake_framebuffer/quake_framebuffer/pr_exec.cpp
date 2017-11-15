@@ -324,15 +324,16 @@ class pr_run_error_buffer_t : public quake::quake_console_buffer {
 public:
 	pr_run_error_buffer_t() : quake::quake_console_buffer() {}
 protected:
-	virtual int_type sync() override final {
+
+	// Inherited via quake_console_buffer
+	void text_out(const char * text, size_t size) override final
+	{
 		quake::con << *(pr_statements + pr_xstatement);
 		PR_StackTrace(quake::con);
-		auto ret = quake::quake_console_buffer();
+		quake::con << text; 
 
 		pr_depth = 0;		// dump the stack so host_error can shutdown functions
 		Host_Error("Program error");
-		return 0;
-		
 	}
 };
 

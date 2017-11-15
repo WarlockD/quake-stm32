@@ -25,6 +25,8 @@ void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_v
 
 
 
+static	cmd_function_t	*cmd_functions;		// possible commands to execute
+
 cmdalias_t	*cmd_alias;
 
 int trashtest;
@@ -107,7 +109,7 @@ void Cbuf_InsertText (const quake::string_view& text)
 	if (templen)
 	{
 		temp = (char*)Z_Malloc (templen);
-		Q_memcpy (temp, cmd_text.data, templen);
+		std::memcpy (temp, cmd_text.data, templen);
 		SZ_Clear (&cmd_text);
 	}
 		
@@ -121,7 +123,7 @@ void Cbuf_InsertText (const quake::string_view& text)
 		Z_Free (temp);
 	}
 }
-
+void execute_args(const quake::string_view* args, size_t count, cmd_source_t src);
 /*
 ============
 Cbuf_Execute
@@ -129,48 +131,78 @@ Cbuf_Execute
 */
 void Cbuf_Execute (void)
 {
+	if (cmd_text.cursize <= 0) return; // nothing?
+	quake::string_view text((const char*)cmd_text.data, cmd_text.cursize);
+	quake::string_view token;
+	//UVector<quake::string_view> args;
+	std::vector<quake::string_view> args;
+	COM_Parser parser(text);
+	do {
+		token = parser.Next(true);
+		if (token.empty() || token[0] == '\n') {
+			if (!args.empty()) {
+				execute_args(args.data(),args.size(), src_command);
+				if (cmd_wait)
+				{	// skip out while text still remains in buffer, leaving it
+					// for next frame
+					cmd_wait = false;
+					if (parser.pos() == cmd_text.cursize)
+						cmd_text.cursize = 0;
+					else
+					{
+						cmd_text.cursize -= parser.pos();
+						auto r = parser.remaining();
+						r.copy((char*)cmd_text.data, cmd_text.cursize);
+					}
+					break;
+				}
+				args.clear();
+			}
+			continue;
+		}
+		args.emplace_back(token);
+	} while (true);
+#if 0
 	int		i;
 	char	*text;
-	char	line[1024];
+	ZString line;
+	line.reserve(1024);
+
 	int		quotes;
-	Cmd_Tokenizer tokenizer;
+	int		spaces = 0;
 	while (cmd_text.cursize)
 	{
 // find a \n or ; line break
 		text = (char *)cmd_text.data;
-
+		spaces = 0;
 		quotes = 0;
-		for (i=0 ; i< cmd_text.cursize ; i++)
-		{
+		for (i=0 ; i< cmd_text.cursize ; i++) {
+			
 			if (text[i] == '"')
 				quotes++;
 			if ( !(quotes&1) &&  text[i] == ';')
 				break;	// don't break if inside a quoted string
 			if (text[i] == '\n')
 				break;
+			if (!spaces && !::isspace(text[i])) ++spaces;
+			if(text[i] == '/' && text[i+1] == '/')
 		}
-			
-				
-		memcpy (line, text, i);
-		line[i] = 0;
+
 		
 // delete the text from the command buffer and move remaining commands down
 // this is necessary because commands (exec, alias) can insert data at the
 // beginning of the text buffer
 
-		if (i == cmd_text.cursize)
-			cmd_text.cursize = 0;
-		else
-		{
-			i++;
-			cmd_text.cursize -= i;
-			Q_memcpy (text, text+i, cmd_text.cursize);
-		}
+
 
 // execute the command line
+		if (spaces) {
+			assert(i < 1024);
+			line.append(text, i);
+			tokenizer.execute(line.data(), src_command);
+			line.clear();
+		}
 
-		tokenizer.execute(line, src_command);
-		
 		if (cmd_wait)
 		{	// skip out while text still remains in buffer, leaving it
 			// for next frame
@@ -178,6 +210,7 @@ void Cbuf_Execute (void)
 			break;
 		}
 	}
+#endif
 }
 
 /*
@@ -354,8 +387,6 @@ void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view arg
 
 
 
-static	cmd_function_t	*cmd_functions;		// possible commands to execute
-
 /*
 ============
 Cmd_Init
@@ -384,18 +415,6 @@ Cmd_TokenizeString
 Parses the given string into command line tokens.
 ============
 */
-
-
- void Cmd_Tokenizer::tokenizie(COM_Parser& parser) {
-	 _size = 0;
-	 COM_Parser::COM_Token token;
-	 while ((token = parser.Next()) != COM_Parser::Eof && token != COM_Parser::LineFeed)
-		 _args[_size++] = token.text();
- }
- void Cmd_Tokenizer::tokenizie(const quake::string_view& text) {
-	 COM_Parser parser(text, COM_Parser::IgnoreComments);
-	 tokenizie(parser);
- }
 
 
 /*
@@ -475,49 +494,6 @@ quake::string_view Cmd_CompleteCommand (const quake::string_view& partial)
 	return NULL;
 }
 qboolean	Cvar_Command(size_t argc, const quake::string_view argv[]);
-/*
-============
-Cmd_ExecuteString
-
-A complete command line has been parsed, so try to execute it
-FIXME: lookupnoadd the token to speed search?
-============
-*/
-void Cmd_Tokenizer::execute(const quake::string_view& text, cmd_source_t src) {
-	tokenizie(text);
-	cmd_function_t	*cmd;
-	cmdalias_t		*a;
-
-	// execute the command line
-	if (this->size() == 0)
-		return;		// no tokens
-	quake::symbol lower = _args[0];
-
-	// check functions
-	for (cmd = cmd_functions; cmd; cmd = cmd->next)
-	{
-		if (lower == cmd->name)
-		{
-			cmd->function(src, size(), _args.data());
-			return;
-		}
-	}
-
-	// check alias
-	for (a = cmd_alias; a; a = a->next)
-	{
-		if (lower == a->name)
-		{
-			Cbuf_InsertText(a->value.c_str());
-			return;
-		}
-	}
-
-	// check cvars
-	if (!Cvar_Command(size(), _args.data())) {
-		quake::con << "Unknown command \"" << _args[0] << "\"" << std::endl;
-	}
-}
 
 
 
@@ -551,4 +527,90 @@ void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_v
 	SZ_Print (&cls.message, '\n');
 }
 
+void execute_args(const quake::string_view* args, size_t count, cmd_source_t src) {
+	cmd_function_t	*cmd;
+	cmdalias_t		*a;
 
+	// execute the command line
+	if (count == 0)
+		return;		// no tokens
+	quake::symbol lower = args[0];
+	// FIX, replace with array
+
+	// check functions
+	for (cmd = cmd_functions; cmd; cmd = cmd->next)
+	{
+		if (lower == cmd->name)
+		{
+			cmd->function(src, count, args);
+			return;
+		}
+	}
+
+	// check alias
+	for (a = cmd_alias; a; a = a->next)
+	{
+		if (lower == a->name)
+		{
+			Cbuf_InsertText(a->value.c_str());
+			return;
+		}
+	}
+
+	// check cvars
+	if (!Cvar_Command(count, args)) {
+		quake::con << "Unknown command \"" << args[0] << "\"" << std::endl;
+	}
+}
+
+void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
+	cmd_function_t	*cmd;
+	cmdalias_t		*a;
+
+	// execute the command line
+	if (args.size() == 0)
+		return;		// no tokens
+	quake::symbol lower = args[0];
+	// FIX, replace with array
+
+	// check functions
+	for (cmd = cmd_functions; cmd; cmd = cmd->next)
+	{
+		if (lower == cmd->name)
+		{
+			cmd->function(src, args.size(), args.data());
+			return;
+		}
+	}
+
+	// check alias
+	for (a = cmd_alias; a; a = a->next)
+	{
+		if (lower == a->name)
+		{
+			Cbuf_InsertText(a->value.c_str());
+			return;
+		}
+	}
+
+	// check cvars
+	if (!Cvar_Command(args.size(), args.data())) {
+		quake::con << "Unknown command \"" << args[0] << "\"" << std::endl;
+	}
+}
+void execute_args(const  quake::string_view& text, cmd_source_t src) {
+	quake::string_view token;
+	UVector<quake::string_view> args;
+	COM_Parser parser(text);
+	do {
+		token = parser.Next(true);
+		if (!token.empty() || token[0] == '\n') {
+			if (!args.empty()) {
+				execute_args(args, src_command);
+				args.clear();
+			}
+			continue;
+		}
+		args.emplace_back(token);
+	} while (true);
+}

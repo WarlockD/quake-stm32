@@ -46,7 +46,7 @@ unsigned short		pr_crc;
 
 
 ddef_t *ED_FieldAtOfs (int ofs);
-qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s);
+qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
 cvar_t	gamecfg = {"gamecfg", "0"};
@@ -545,28 +545,28 @@ void ED_ParseGlobals (COM_Parser& parser)
 	while (1)
 	{	
 		auto keyname = parser.Next();
-		if (keyname == COM_Parser::Eof)
+		if (keyname.empty())
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
-		if (keyname  == '}')
+		if (keyname[0]  == '}')
 			break;
 
 		auto value = parser.Next();
-		if (value == COM_Parser::Eof)
+		if (value.empty())
 			Sys_Error("ED_ParseEntity: closing brace without data");
 
-		if (value == '}')
+		if (value[0] == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 
-		ddef_t	* key = ED_FindGlobal (keyname.text());
+		ddef_t	* key = ED_FindGlobal (keyname);
 		if (!key)
 		{
-			Con_Printf ("'%s' is not a global\n", keyname);
+			quake::con << '"' << keyname << "\" is not global" << std::endl;
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)pr_globals, key, value.text()))
+		if (!ED_ParseEpair ((void *)pr_globals, key, value))
 			Host_Error ("ED_ParseGlobals: parse error");
 	}
 }
@@ -614,48 +614,44 @@ Can parse either fields or globals
 returns false if error
 =============
 */
-qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value)
+qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 {
+
 	int		i;
 	char	string[128];
 	ddef_t	*def;
 	char	*v, *w;
 	void	*d;
 	dfunction_t	*func;
-	
+
 	d = (void *)((int *)base + key->ofs);
 	idType type = key->type;
 	switch (type)
 	{
 	case etype_t::ev_string:
-		*(string_t *)d = ED_NewString (value) - pr_strings;
+		*(string_t *)d = ED_NewString(value) - pr_strings;
 		break;
-		
+
 	case etype_t::ev_float:
-		*(float *)d = Q_atof(value);
+		assert(value.to_number(*(float *)d));
 		break;
-		
+
 	case etype_t::ev_vector:
-		value.copy(string,sizeof(string));
-		v = string;
-		w = string;
-		for (i=0 ; i<3 ; i++)
-		{
-			while (*v && *v != ' ')
-				v++;
-			*v = 0;
-			((float *)d)[i] = Q_atof (w);
-			w = v = v+1;
-		}
-		break;
-		
+	{
+		COM_Parser parser(value);
+		assert(parser.Next().to_number(((float *)d)[0]));
+		assert(parser.Next().to_number(((float *)d)[1]));
+		assert(parser.Next().to_number(((float *)d)[2]));
+	}
+	break;
+
 	case etype_t::ev_entity:
-		value.copy(string,sizeof(string));
-		*(int *)d = EDICT_TO_PROG(EDICT_NUM(atoi (string)));
+		assert(value.to_number(i));
+		*(int *)d = EDICT_TO_PROG(EDICT_NUM(i));
 		break;
-		
+
 	case etype_t::ev_field:
-		def = ED_FindField (value);
+		def = ED_FindField(value);
 		if (!def)
 		{
 			quake::con << "Can't find field " << value << std::endl;
@@ -663,9 +659,9 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value
 		}
 		*(int *)d = G_INT(def->ofs);
 		break;
-	
+
 	case etype_t::ev_function:
-		func = ED_FindFunction (value);
+		func = ED_FindFunction(value);
 		if (!func)
 		{
 			quake::con << "Can't find function " << value << std::endl;
@@ -673,7 +669,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value
 		}
 		*(func_t *)d = func - pr_functions;
 		break;
-		
+
 	default:
 		break;
 	}
@@ -707,17 +703,15 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 	// go through all the dictionary pairs
 	while (1)
 	{
-		auto keytoken = parser.Next();
-		if (keytoken == COM_Parser::Eof)
+		auto keyname = parser.Next();
+		if (keyname.empty())
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
-		if (keytoken == '}') break;
+		if (keyname[0] == '}') break;
 		// anglehack is to allow QuakeEd to write single scalar angles
 		// and allow them to be turned into vectors. (FIXME...)
 		anglehack = false;
-		assert(keytoken == COM_Parser::Symbol);
 
-		quake::string_view	keyname = keytoken.text();
 		if (keyname == "angles")
 		{
 			keyname =  "angles";
@@ -733,7 +727,7 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 
 		auto value = parser.Next();
 		// parse value	
-		if (value == COM_Parser::Eof || value == '}')
+		if (value.empty() || value[0] == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		init = true;
@@ -745,22 +739,20 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 
 		key = ED_FindField(keyname);
 		if (key == nullptr) {
-			ZStringStream ss;
-			ss << '\'' << keyname << "\' is not a field" << std::endl;
-			Con_Print(ss.str().c_str());
+			quake::con << '\'' << keyname << "' is not a field" << std::endl;
 			continue;
 		}
 
 		if (anglehack)
 		{
 			quake::fixed_string_stream<128> buf;
-			assert(value == COM_Parser::Number);
+
 			buf << "0 " << keyname << " 0";
 			if (!ED_ParseEpair((void *)&ent->v, key, buf.str()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 		else {
-			if (!ED_ParseEpair((void *)&ent->v, key, value.text()))
+			if (!ED_ParseEpair((void *)&ent->v, key, value))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 
@@ -787,7 +779,7 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
-void ED_LoadFromFile (const char *data)
+void ED_LoadFromFile (const quake::string_view& data)
 {	
 	edict_t		*ent;
 	int			inhibit;
@@ -803,9 +795,9 @@ void ED_LoadFromFile (const char *data)
 	{
 // parse the opening brace	
 		auto token = parser.Next();
-		if (token == COM_Parser::Eof) break;
+		if (token.empty()) break;
 
-		if (token != '{') {
+		if (token[0] != '{') {
 			Sys_Error("ED_LoadFromFile:  expecting {");
 		}
 

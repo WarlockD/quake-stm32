@@ -217,7 +217,7 @@ void	VID_UnlockBuffer (void);
 #include "bspfile.h"
 #include "vid.h"
 #include "sys.h"
-#include "zone.h"
+//#include "zone.h"
 #include "mathlib.h"
 
 typedef struct

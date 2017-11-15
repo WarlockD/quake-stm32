@@ -771,7 +771,7 @@ void Host_InitVCR (quakeparms_t *parms)
 	int		i, len, n;
 	char	*p;
 	int arg_count;
-	ZVector<char> buffer;
+
 
 	if (host_parms.COM_CheckParm("-playback"))
 	{
@@ -786,16 +786,17 @@ void Host_InitVCR (quakeparms_t *parms)
 			Sys_Error("Invalid signature in vcr file\n");
 		vcrFile.read(&arg_count, sizeof(int));
 		host_parms.COM_ClearArgs();
-		
+
 		host_parms.COM_AddArg("Playback"); // filler for file name
-		for (size_t i = 0; i < (size_t)arg_count; i++)
-		{
+		for (size_t i = 0; i < (size_t)arg_count; i++) {
+			ZVector<char> buffer;
 			vcrFile.read(&len, sizeof(int));
 			buffer.resize(len);
 			vcrFile.read(buffer.data(), len);
 			buffer[len] = 0;
 			host_parms.COM_AddArg(buffer.data());
 		}
+		vcrFile.close();
 	}
 #if 0
 	if ( (n = COM_CheckParm("-record")) != 0)

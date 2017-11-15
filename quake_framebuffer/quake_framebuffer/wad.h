@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef _QUAKE_WAD_H_
 #define  _QUAKE_WAD_H_
 
+#include "common.h"
 
 #define	CMP_NONE		0
 #define	CMP_LZSS		1

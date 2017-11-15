@@ -292,8 +292,7 @@ void Host_Map_f(cmd_source_t source, size_t argc, const quake::string_view argv[
 			name << argv[i] << ' ';
 
 		name.str().copy(cls.spawnparms, sizeof(cls.spawnparms));
-		Cmd_Tokenizer tokenizer;
-		tokenizer.execute("connect local", src_command);
+		execute_args("connect local", src_command);
 	}	
 }
 
@@ -652,9 +651,9 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		start = str;
 		COM_Parser parser(str);
 		auto token = parser.Next();
-		if (token == COM_Parser::Eof) break; // end of file
+		if (token.empty()) break; // end of file
 
-		if (token != '{')
+		if (token[0] != '{')
 			Sys_Error ("First token isn't a brace");
 			
 		if (entnum == -1)

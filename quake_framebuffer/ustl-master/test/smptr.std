@@ -1,0 +1,12 @@
+LoggedObj ctor 42
+LoggedObj ctor 0
+LoggedObj ctor 0
+LoggedObj ctor 0
+LoggedObj ctor 72
+Closing resource 4
+~scope_exit
+LoggedObj dtor 72
+LoggedObj dtor 0
+LoggedObj dtor 0
+LoggedObj dtor 0
+LoggedObj dtor 42

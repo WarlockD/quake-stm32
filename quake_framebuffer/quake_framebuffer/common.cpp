@@ -19,7 +19,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // common.c -- misc functions used in client and server
 
-#include "quakedef.h"
+
+#include "icommon.h"
+
 #include <cctype>
 #include <unordered_set>
 
@@ -44,6 +46,19 @@ namespace quake {
 		if (len <= 0) return nullptr;
 		return c_str();
 	}
+
+	string_view::size_type string_view::to_number(float& value, size_type offset) const {
+		const char* stazrtp = _data + offset;
+		char* endp = nullptr;
+		if (offset < _size) value = strtof(stazrtp, &endp);
+		return endp == nullptr || endp == stazrtp || endp > end() ? npos : size_t(endp - _data);
+	}
+	string_view::size_type string_view::to_number(int& value, size_type offset ) const {
+		const char* stazrtp = _data + offset;
+		char* endp = nullptr;
+		if (offset < _size) value = strtol(stazrtp, &endp,0);
+		return endp == nullptr || endp == stazrtp || endp > end() ? npos : size_t(endp - _data);
+	}
 	/// \brief Attaches the object to pointer \p p of size \p n.
 	///
 	/// If \p p is nullptr and \p n is non-zero, bad_alloc is thrown and current
@@ -58,7 +73,7 @@ namespace quake {
 	}
 
 	/// Compares to memory block pointed by l. Size is compared first.
-	bool cmemlink::operator== (const cmemlink& l) const noexcept
+	constexpr bool cmemlink::operator== (const cmemlink& l) const noexcept
 	{
 		return l._size == _size &&
 			(l._data == _data || 0 == memcmp(l._data, _data, _size));
@@ -441,13 +456,13 @@ static inline int toHex(int c) {
 int	Q_atoi(const quake::string_view& str) {
 	char* ptr = nullptr;
 	int ret = strtol(str.data(), &ptr,0);
-	assert(str.data() < ptr);
+	assert(ptr == (str.data() + str.size())); // debug
 	return ret;
 }
 float Q_atof(const quake::string_view& str) {
 	char* ptr;
 	float ret = strtof(str.data(), &ptr);
-	assert(str.data() < ptr);
+	assert(ptr == (str.data() + str.size()) ); // debug
 	return ret;
 }
 int Q_atoi (const char * str)
@@ -896,8 +911,8 @@ void SZ_Alloc (sizebuf_t *buf, int startsize)
 	if (startsize < 256)
 		startsize = 256;
 	buf->data = (byte*)Hunk_AllocName (startsize, "sizebuf");
-buf->maxsize = startsize;
-buf->cursize = 0;
+	buf->maxsize = startsize;
+	buf->cursize = 0;
 }
 
 
@@ -913,14 +928,29 @@ void SZ_Clear(sizebuf_t *buf)
 {
 	buf->cursize = 0;
 }
+void* sizebuf_t::GetSpace(int length) {
+	if (size() + length > capacity()) {
+		if (!_allowoverflow)
+			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
 
+		if (length > capacity())
+			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
+
+		_overflowed = true;
+		Con_Printf("SZ_GetSpace: overflow");
+		Clear();
+	}
+	size_t pos = size();
+	resize(length + size());
+	return data() + pos;
+}
 void *SZ_GetSpace(sizebuf_t *buf, int length)
 {
 	void    *data;
 
 	if (buf->cursize + length > buf->maxsize)
 	{
-		if (!buf->allowoverflow)
+		if (!_allowoverflow)
 			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
 
 		if (length > buf->maxsize)
@@ -970,6 +1000,8 @@ void SZ_Print(sizebuf_t *buf, char c) {
 inline static bool isComPunc(int c) {
 	return c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':';
 }
+
+
 /*
 ==============
 COM_Parse
@@ -977,59 +1009,145 @@ COM_Parse
 Parse a token out of a string
 ==============
 */
+enum class  Action {
+	Accept,		// accept the charater of the token
+	Goto,		// hard goto.  mainly for skipping charaters
+	Halt,		// finished with all the tokens
+	Restart,	// discard last accepts
+	Error
+};
+struct Entry { Action action; int next; int arg; };
+
+// state tables
+
+#define STATE_TABLE 0
+#define ACTION_TABLE 1
+#define LOOKUP_TABLE 2
+#define START 0
+#define RETURN -1
+#define GOTO(N)		{ Action::Goto, (N), 0 }
+#define ACCEPT(N) { Action::Accept, (N), 0  }
+#define RESTART(N) { Action::Restart, (N), 0  }
+#define HALT(N, C) { Action::Halt, N, ((int)(C))  }
+#define HALT0(C) HALT(0,C)
+#define ERROR(N, C) { Action::Error,  N, ((int)(C))  }
+#define ERROR0(C) ERROR(0,C)
+enum class Class {
+	Error=0,
+	Symbol,
+	Eof,
+	NewLine,
+	Whitespace,
+	String,
+	Comment,
+	Discard
+};
+//http://hackingoff.com/compilers/scanner-generator
+static constexpr const Entry lex_table[][7] = {
+	//   S				"						/						eof					'\n'				    Other
+	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),		HALT0(Class::NewLine),	ACCEPT(6) },
+	// symbol state
+	{ ACCEPT(1),	HALT(0,Class::Symbol),	ACCEPT(1),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+	// string state
+	{ ACCEPT(2),	GOTO(3),				ACCEPT(2), 			ERROR0('"'),			ACCEPT(2),		ACCEPT(2) },
+	{ HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String) },
+	// comment
+	{ ACCEPT(1),	ERROR0('"'),			ACCEPT(5),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+	{ ACCEPT(5),	ACCEPT(5),				ACCEPT(5),			RESTART(0),				RESTART(0),		ACCEPT(5), },
+	// whitespace
+	{ RESTART(0),	RESTART(0),				RESTART(0),			 	RESTART(0),			RESTART(0),				ACCEPT(6), },
+};
+
 // switched to more state based
-COM_Parser::COM_Token COM_Parser::Next() {
-	COM_Token token;
+quake::string_view COM_Parser::Next(bool test_eol) {
+	quake::string_view token;
+	size_t start = _pos;
 	size_t len = 0;
-	int c;
-	while (!_data.empty()) {
-		int c = _data[len++];
-		switch (c) {
-		case '"':
-			while (len < _data.size() && _data[len] != '\"') len++;
-			token = COM_Token(Kind::Symbol, _data.substr(1U, len - 2));
-			len++; // skip the '\"'
-			break;
-		case '/':
-			if (_mode & IgnoreComments) {
-				while (len < _data.size() && _data[len] != '\n') len++;
-				_data.remove_prefix(len);
-				len = 0; // go back to check the line feed
-				continue;
-			} else
-				token = COM_Token(c);
-			break;
-		case '\n':
-			if (_mode & IgnoreNewLine) continue;
-			token = COM_Token(Kind::LineFeed);
-			break;
-		case ' ': case '\t': case '\r': case '\f':
-			while (len < _data.size() && _data[len] == ' ' && _data[len] == '\t') len++;
-			_data.remove_prefix(len);
-			len = 0; // go back to check the line feed
-			continue;
+	int current_read;
+	bool buffered = false;
+	auto getc = [this]() -> int { return _pos < _data.size() ? _data[_pos] : -1; };
+	do {
+		//    @label_codes = {"a"=>0, "\""=>1, "/"=>2, "0"=>3, "c"=>4, "b"=>5, :other=>6}
+		// I could built a 256 charater table for this, but seriously, for this few tokens?
+		int ch = _pos < _data.size() ? _data[_pos] : -1;
+		switch (ch) { // get the charater class
+		case '"': current_read = 1; break;
+		case '/': current_read = 2; break;
+		case '\0':
+		case -1: current_read = 3; break;
+		case '\n': case ';': current_read = 4; break;
 		default:
-			while (len < _data.size()  && _data[len] > 32) len++;
-			c = std::isdigit(c) ? (int)Kind::Number : std::isalpha(c) ? (int)Kind::Symbol : c;
-			token = COM_Token(c, _data.substr(0, len));
-		};
-		break;
-	}
-	if(len > 0) _data.remove_prefix(len);
-	return token;
-#if 0
-	while (_data.size() < len && _data[len++] > 32);
+			current_read = ch > 32 ? 0 : 5;
+			break;
+		}
+		const Entry& action = lex_table[_state][current_read];
+		_state = action.next;
 
-	if (len > 0) {
-		COM_Token token = COM_Token(Kind::Symbol, quake::string_view(_data.data(), len));
-		_data.remove_prefix(len + 2);
-		return token;
-	}
-	else return false;
+		switch (action.action) {
+		case Action::Accept:
+			if (len++ == 0) 
+				start = _pos;
+		case Action::Goto:
+			++_pos;
+			break;
+		case Action::Restart:
+			len = 0;
+			break;
+		case Action::Halt:
+			if ((!test_eol && action.arg == (int)Class::NewLine)){
+				_state = 0;
+				len = 0;
+				continue; // restart
+			}
+			if (_pos > start && len > 0)
+				token = _data.substr(start, len);
+			return token;
+		default:
+			assert(0);
+			break; // error ugh
 
-#endif
+		} 
+
+	} while (true);
 	return token;
 }
+
+#if 0
+	
+	size_t start = _pos;
+	int c;
+	char* ret;
+	while (_pos < _data.size()) {
+		int c = _data[_pos++];
+		if (c == '\n' && test_eol) {
+			text = _data.substr(_pos, _pos-start);
+			break;
+		}
+		else if (c == '/' && _data[_pos] == '/') {
+			while (_pos < _data.size() && _data[_pos] != '\n') _pos++;
+			start = _pos;
+		} 
+		else if (std::isspace(c)) {
+			while (_pos < _data.size() && std::isspace(_data[_pos]) &&  _data[_pos] != '\n') _pos++;
+			start = _pos;
+			len = 0;
+		}
+		else if (c == '"') {
+			while (_pos < _data.size() && _data[_pos] != '"') len++;
+			text = _data.substr(_pos, _pos-start);
+			++_pos;
+			break;
+		}
+		else if (c > ' ') {
+			while (_pos < _data.size() && _data[_pos] > ' ') _pos++;
+			text = _data.substr(_pos, _pos-start);
+			break;
+		}
+	}
+	return text;
+#endif
+
+
 
 
 /*
@@ -1161,6 +1279,162 @@ QUAKE FILESYSTEM
 
 namespace quake {
 
+	memblock::memblock(void) noexcept		: memlink(), _capacity(0) { }
+	memblock::memblock(const void* p, size_type n) : memlink(), _capacity(0) { assign(p, n); }
+	memblock::memblock(size_type n) : memlink(), _capacity(0) { resize(n); }
+	memblock::memblock(const cmemlink& b) : memlink(), _capacity(0) { assign(b); }
+	memblock::memblock(const memlink& b) : memlink(), _capacity(0) { assign(b); }
+	memblock::memblock(const memblock& b) : memlink(), _capacity(0) { assign(b); }
+	memblock::~memblock(void) noexcept { deallocate(); }
+
+	void memblock::unlink(void) noexcept
+	{
+		_capacity = 0;
+		memlink::unlink();
+	}
+
+	/// resizes the block to \p newSize bytes, reallocating if necessary.
+	void memblock::resize(size_type newSize, bool bExact)
+	{
+		if (_capacity < newSize + minimumFreeCapacity())
+			reserve(newSize, bExact);
+		memlink::resize(newSize);
+	}
+
+	/// Frees internal data.
+	void memblock::deallocate(void) noexcept
+	{
+		if (_capacity) {
+			assert(cdata() && "Internal error: space allocated, but the pointer is nullptr");
+			assert(data() && "Internal error: read-only block is marked as allocated space");
+			umm_free(data());
+		}
+		unlink();
+	}
+
+	/// Assumes control of the memory block \p p of size \p n.
+	/// The block assigned using this function will be freed in the destructor.
+	void memblock::manage(void* p, size_type n) noexcept
+	{
+		assert(p || !n);
+		assert(!_capacity && "Already managing something. deallocate or unlink first.");
+		link(p, n);
+		_capacity = n;
+	}
+
+	/// "Instantiate" a linked block by allocating and copying the linked data.
+	void memblock::copy_link(void)
+	{
+		const pointer p(begin());
+		const size_t sz(size());
+		if (is_linked())
+			unlink();
+		assign(p, sz);
+	}
+
+	/// Copies data from \p p, \p n.
+	void memblock::assign(const void* p, size_type n)
+	{
+		assert((p != (const void*)cdata() || size() == n) && "Self-assignment can not resize");
+		resize(n);
+		std::copy_n(const_pointer(p), n, begin());
+	}
+
+	/// \brief Reallocates internal block to hold at least \p newSize bytes.
+	///
+	/// Additional memory may be allocated, but for efficiency it is a very
+	/// good idea to call reserve before doing byte-by-byte edit operations.
+	/// The block size as returned by size() is not altered. reserve will not
+	/// reduce allocated memory. If you think you are wasting space, call
+	/// deallocate and start over. To avoid wasting space, use the block for
+	/// only one purpose, and try to get that purpose to use similar amounts
+	/// of memory on each iteration.
+	///
+	void memblock::reserve(size_type newSize, bool bExact)
+	{
+		if ((newSize += minimumFreeCapacity()) <= _capacity)
+			return;
+		pointer oldBlock(is_linked() ? nullptr : data());
+		const size_t alignedSize(NextPow2(newSize));
+		if (!bExact)
+			newSize = alignedSize;
+		pointer newBlock = (pointer)umm_realloc(oldBlock, newSize);
+		if (!newBlock)
+			throw std::bad_alloc();
+		if (!oldBlock & (cdata() != nullptr))
+			std::copy_n(cdata(), std::min(size() + 1, newSize), newBlock);
+		link(newBlock, size());
+		_capacity = newSize;
+	}
+
+	/// Reduces capacity to match size
+	void memblock::shrink_to_fit(void)
+	{
+		if (is_linked())
+			return;
+		pointer newBlock = (pointer)umm_realloc(begin(), size());
+		if (!newBlock && size())
+			throw std::bad_alloc();
+		_capacity = size();
+		memlink::relink(newBlock, size());
+	}
+
+	/// Shifts the data in the linked block from \p start to \p start + \p n.
+	memblock::iterator memblock::insert(const_iterator start, size_type n)
+	{
+		const size_type ip = start - begin();
+		assert(ip <= size());
+		resize(size() + n, false);
+		memlink::insert(iat(ip), n);
+		return iat(ip);
+	}
+
+	/// Shifts the data in the linked block from \p start + \p n to \p start.
+	memblock::iterator memblock::erase(const_iterator start, size_type n)
+	{
+		const size_type ep = start - begin();
+		assert(ep + n <= size());
+		reserve(size() - n);
+		iterator iep = iat(ep);
+		memlink::erase(iep, n);
+		memlink::resize(size() - n);
+		return iep;
+	}
+
+	/// Reads the object from stream \p s
+	void memblock::read(std::istream& is)
+	{
+		assert(0);
+#if 0
+		written_size_type n = 0;
+		is >> n;
+		if (!is.verify_remaining("read", "ustl::memblock", n))
+			return;
+		resize(n);
+		is.read(data(), writable_size());
+		is.align(stream_align_of(n));
+#endif
+	}
+
+	/// Reads the entire file \p "filename".
+	void memblock::read_file(const char* filename)
+	{
+		assert(0);
+#if 0
+		fstream f;
+		f.exceptions(fstream::allbadbits);
+		f.open(filename, fstream::in);
+		const off_t fsize(f.size());
+		reserve(fsize);
+		f.read(data(), fsize);
+		f.close();
+		resize(fsize);
+#endif
+	}
+
+	memblock::size_type memblock::minimumFreeCapacity(void) const noexcept { return 0; }
+
+
 	bool operator==(const symbol& l, const string_view& r) {
 		if (l.size() != r.size()) return false;
 		for (size_t i = 0; i < l.size(); i++)
@@ -1261,6 +1535,393 @@ namespace quake {
 		sync();
 		return this->sputc(c);
 	}
+
+
+	//----------------------------------------------------------------------
+
+	constexpr const string::pos_type string::npos;
+
+	//----------------------------------------------------------------------
+
+	/// Assigns itself the value of string \p s
+	string::string(const string& s)
+		: memblock((s.size() + 1) & (s.is_linked() - 1))	// +1 because base ctor can't call virtuals of this class
+	{
+		if (s.is_linked())
+			relink(s.c_str(), s.size());
+		else {
+			std::copy_n(s.begin(), size(), begin());
+			relink(begin(), size() - 1);	// --m_Size
+		}
+	}
+
+	/// Links to \p s
+	string::string(const_pointer s) noexcept
+		: memblock()
+	{
+		if (!s) s = "";
+		relink(s, std::strlen(s));
+	}
+
+	/// Creates a string of length \p n filled with character \p c.
+	string::string(size_type n, value_type c)
+		: memblock(n + 1)	// +1 because base ctor can't call virtuals of this class
+	{
+		relink(begin(), size() - 1);	// --m_Size
+		std::fill_n(begin(), n, c);
+		at(n) = 0;
+	}
+
+	/// Resize the string to \p n characters. New space contents is undefined.
+	void string::resize(size_type n)
+	{
+		if (!(n | memblock::capacity()))
+			return relink("", 0);
+		memblock::resize(n);
+		at(n) = 0;
+	}
+
+	/// Assigns itself the value of string \p s
+	string& string::assign(const_pointer s)
+	{
+		if (!s) s = "";
+		assign(s, std::strlen(s));
+		return *this;
+	}
+
+	/// Assigns itself the value of string \p s of length \p len.
+	string& string::assign(const_pointer s, size_type len)
+	{
+		resize(len);
+		std::copy_n(s, len, begin());
+		return *this;
+	}
+
+	/// Appends to itself the value of string \p s of length \p len.
+	string& string::append(const_pointer s)
+	{
+		if (!s) s = "";
+		append(s, strlen(s));
+		return *this;
+	}
+
+	/// Appends to itself the value of string \p s of length \p len.
+	string& string::append(const_pointer s, size_type len)
+	{
+		resize(size() + len);
+		std::copy_n(s, len, end() - len);
+		return *this;
+	}
+
+	/// Appends to itself \p n characters of value \p c.
+	string& string::append(size_type n, value_type c)
+	{
+		resize(size() + n);
+		std::fill_n(end() - n, n, c);
+		return *this;
+	}
+
+	/// Copies [start,start+n) into [p,n). The result is not null terminated.
+	string::size_type string::copy(pointer p, size_type n, pos_type start) const noexcept
+	{
+		assert(p && n && start <= size());
+		const size_type btc = std::min(n, size() - start);
+		std::copy_n(iat(start), btc, p);
+		return btc;
+	}
+
+	/// Returns comparison value regarding string \p s.
+	/// The return value is:
+	/// \li 1 if this string is greater (by value, not length) than string \p s
+	/// \li 0 if this string is equal to string \p s
+	/// \li -1 if this string is less than string \p s
+	///
+	int string::compare(const_iterator first1, const_iterator last1, const_iterator first2, const_iterator last2) noexcept // static
+	{
+		assert(first1 <= last1 && (first2 <= last2 || !last2) && "Negative ranges result in memory allocation errors.");
+		const size_type len1 = std::distance(first1, last1), len2 = std::distance(first2, last2);
+		const int rvbylen = sign(int(len1 - len2));
+		int rv = memcmp(first1, first2, std::min(len1, len2));
+		return rv ? rv : rvbylen;
+	}
+
+	/// Returns true if this string is equal to string \p s.
+	bool string::operator== (const_pointer s) const noexcept
+	{
+		if (!s) s = "";
+		return size() == strlen(s) && 0 == memcmp(c_str(), s, size());
+	}
+#if 0
+	/// Returns the beginning of character \p i.
+	string::const_iterator string::wiat(pos_type i) const noexcept
+	{
+		utf8in_iterator<string::const_iterator> cfinder(begin());
+		cfinder += i;
+		return cfinder.base();
+	}
+
+	/// Inserts wide character \p c at \p ipo \p n times as a UTF-8 string.
+	///
+	/// \p ipo is a byte position, not a character position, and is intended
+	/// to be obtained from one of the find functions. Generally you are not
+	/// able to know the character position in a localized string; different
+	/// languages will have different character counts, so use find instead.
+	///
+	string& string::insert(pos_type ipo, size_type n, wvalue_type c)
+	{
+		iterator ip(iat(ipo));
+		ip = iterator(memblock::insert(memblock::iterator(ip), n * Utf8Bytes(c)));
+		fill_n(utf8out(ip), n, c);
+		*end() = 0;
+		return *this;
+	}
+
+	/// Inserts sequence of wide characters at \p ipo (byte position from a find call)
+	string& string::insert(pos_type ipo, const wvalue_type* first, const wvalue_type* last, const size_type n)
+	{
+		iterator ip(iat(ipo));
+		size_type nti = distance(first, last), bti = 0;
+		for (size_type i = 0; i < nti; ++i)
+			bti += Utf8Bytes(first[i]);
+		ip = iterator(memblock::insert(memblock::iterator(ip), n * bti));
+		utf8out_iterator<string::iterator> uout(utf8out(ip));
+		for (size_type j = 0; j < n; ++j)
+			for (size_type k = 0; k < nti; ++k, ++uout)
+				*uout = first[k];
+		*end() = 0;
+		return *this;
+	}
+#endif
+	/// Inserts character \p c into this string at \p start.
+	string::iterator string::insert(const_iterator start, size_type n, value_type c)
+	{
+		memblock::iterator ip = memblock::insert(memblock::const_iterator(start), n);
+		std::fill_n(ip, n, c);
+		*end() = 0;
+		return iterator(ip);
+	}
+
+	/// Inserts \p count instances of string \p s at offset \p start.
+	string::iterator string::insert(const_iterator start, const_pointer s, size_type n)
+	{
+		if (!s) s = "";
+		return insert(start, s, s + strlen(s), n);
+	}
+
+	/// Inserts [first,last] \p n times.
+	string::iterator string::insert(const_iterator start, const_pointer first, const_pointer last, size_type n)
+	{
+		assert(first <= last);
+		assert(begin() <= start && end() >= start);
+		assert((first < begin() || first >= end() || size() + abs_distance(first, last) < capacity()) && "Insertion of self with autoresize is not supported");
+		memblock::iterator ip = iterator(memblock::insert(memblock::const_iterator(start), std::distance(first, last) * n));
+		fill(ip, first, std::distance(first, last), n);
+		*end() = 0;
+		return iterator(ip);
+	}
+
+	/// Erases \p size bytes at \p ep.
+	string::iterator string::erase(const_iterator ep, size_type n)
+	{
+		string::iterator rv = memblock::erase(memblock::const_iterator(ep), n);
+		*end() = 0;
+		return rv;
+	}
+
+	/// Erases \p n bytes at byte offset \p epo.
+	string& string::erase(pos_type epo, size_type n)
+	{
+		erase(iat(epo), std::min(n, size() - epo));
+		return *this;
+	}
+
+	/// Replaces range [\p start, \p start + \p len] with string \p s.
+	string& string::replace(const_iterator first, const_iterator last, const_pointer s)
+	{
+		if (!s) s = "";
+		replace(first, last, s, s + strlen(s));
+		return *this;
+	}
+
+	/// Replaces range [\p start, \p start + \p len] with \p count instances of string \p s.
+	string& string::replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n)
+	{
+		assert(first <= last);
+		assert(n || std::distance(first, last));
+		assert(first >= begin() && first <= end() && last >= first && last <= end());
+		assert((i1 < begin() || i1 >= end() || abs_distance(i1, i2) * n + size() < capacity()) && "Replacement by self can not autoresize");
+		const size_type bte = std::distance(first, last), bti = std::distance(i1, i2) * n;
+		memblock::const_iterator rp = static_cast<memblock::const_iterator>(first);
+		if (bti < bte)
+			rp = memblock::erase(rp, bte - bti);
+		else if (bte < bti)
+			rp = memblock::insert(rp, bti - bte);
+		fill(rp, i1, std::distance(i1, i2), n);
+		*end() = 0;
+		return *this;
+	}
+
+	/// Returns the offset of the first occurence of \p c after \p pos.
+	string::pos_type string::find(value_type c, pos_type pos) const noexcept
+	{
+		const_iterator found = std::find(iat(pos), end(), c);
+		return found < end() ? (pos_type)std::distance(begin(), found) : npos;
+	}
+
+	/// Returns the offset of the first occurence of substring \p s of length \p n after \p pos.
+	string::pos_type string::find(const string& s, pos_type pos) const noexcept
+	{
+		if (s.empty() || s.size() > size() - pos)
+			return npos;
+		pos_type endi = s.size() - 1;
+		value_type endchar = s[endi];
+		pos_type lastPos = endi;
+		while (lastPos-- && s[lastPos] != endchar);
+		const size_type skip = endi - lastPos;
+		const_iterator i = iat(pos) + endi;
+		for (; i < end() && (i = std::find(i, end(), endchar)) < end(); i += skip)
+			if (std::memcmp(i - endi, s.c_str(), s.size()) == 0)
+				return std::distance(begin(), i) - endi;
+		return npos;
+	}
+
+	/// Returns the offset of the last occurence of character \p c before \p pos.
+	string::pos_type string::rfind(value_type c, pos_type pos) const noexcept
+	{
+		for (int i = std::min(pos, pos_type(size() - 1)); i >= 0; --i)
+			if (at(i) == c)
+				return i;
+		return npos;
+	}
+
+	/// Returns the offset of the last occurence of substring \p s of size \p n before \p pos.
+	string::pos_type string::rfind(const string& s, pos_type pos) const noexcept
+	{
+		const_iterator d = iat(pos) - 1;
+		const_iterator sp = begin() + s.size() - 1;
+		const_iterator m = s.end() - 1;
+		for (long int i = 0; d > sp && size_type(i) < s.size(); --d)
+			for (i = 0; size_type(i) < s.size(); ++i)
+				if (m[-i] != d[-i])
+					break;
+		return d > sp ? (pos_type)std::distance(begin(), d + 2 - s.size()) : npos;
+	}
+
+	/// Returns the offset of the first occurence of one of characters in \p s of size \p n after \p pos.
+	string::pos_type string::find_first_of(const string& s, pos_type pos) const noexcept
+	{
+		for (size_type i = std::min(size_type(pos), size()); i < size(); ++i)
+			if (s.find(at(i)) != npos)
+				return i;
+		return npos;
+	}
+
+	/// Returns the offset of the first occurence of one of characters not in \p s of size \p n after \p pos.
+	string::pos_type string::find_first_not_of(const string& s, pos_type pos) const noexcept
+	{
+		for (size_type i = std::min(size_type(pos), size()); i < size(); ++i)
+			if (s.find(at(i)) == npos)
+				return i;
+		return npos;
+	}
+
+	/// Returns the offset of the last occurence of one of characters in \p s of size \p n before \p pos.
+	string::pos_type string::find_last_of(const string& s, pos_type pos) const noexcept
+	{
+		for (int i = std::min(size_type(pos), size() - 1); i >= 0; --i)
+			if (s.find(at(i)) != npos)
+				return i;
+		return npos;
+	}
+
+	/// Returns the offset of the last occurence of one of characters not in \p s of size \p n before \p pos.
+	string::pos_type string::find_last_not_of(const string& s, pos_type pos) const noexcept
+	{
+		for (int i = std::min(pos, pos_type(size() - 1)); i >= 0; --i)
+			if (s.find(at(i)) == npos)
+				return i;
+		return npos;
+	}
+
+	/// Equivalent to a vsprintf on the string.
+	int string::vformat(const char* fmt, va_list args)
+	{
+		va_list args2;
+		int rv = size(), wcap;
+		do {
+			va_copy(args2, args);
+			rv = vsnprintf(data(), wcap = memblock::capacity(), fmt, args2);
+			resize(rv);
+		} while (rv >= wcap);
+		return rv;
+	}
+
+	/// Equivalent to a sprintf on the string.
+	int string::format(const char* fmt, ...)
+	{
+		va_list args;
+		va_start(args, fmt);
+		const int rv = vformat(fmt, args);
+		va_end(args);
+		return rv;
+	}
+
+	/// Returns the number of bytes required to write this object to a stream.
+	size_t string::stream_size(void) const noexcept
+	{
+	//	return Utf8Bytes(size()) + size();
+		return size();
+	}
+
+	/// Reads the object from stream \p os
+	void string::read(std::istream& is)
+	{
+		assert(0);
+#if 0
+		char szbuf[8];
+		is >> szbuf[0];
+		size_t szsz(Utf8SequenceBytes(szbuf[0]) - 1), n = 0;
+		if (!is.verify_remaining("read", "ustl::string", szsz)) return;
+		is.read(szbuf + 1, szsz);
+		n = *utf8in(szbuf);
+		if (!is.verify_remaining("read", "ustl::string", n)) return;
+		resize(n);
+		is.read(data(), size());
+#endif
+	}
+
+	/// Writes the object to stream \p os
+	void string::write(std::ostream& os) const
+	{
+		assert(0);
+#if 0
+		const written_size_type sz(size());
+		assert(sz == size() && "No support for writing strings larger than 4G");
+
+		char szbuf[8];
+		utf8out_iterator<char*> szout(szbuf);
+		*szout = sz;
+		size_t szsz = distance(szbuf, szout.base());
+
+		if (!os.verify_remaining("write", "ustl::string", szsz + sz)) return;
+		os.write(szbuf, szsz);
+		os.write(cdata(), sz);
+#endif
+	}
+
+	/// Returns a hash value for [first, last)
+	hashvalue_t string::hash(const char* first, const char* last) noexcept // static
+	{
+		hashvalue_t h = 0;
+		// This has the bits flowing into each other from both sides of the number
+		for (; first < last; ++first)
+			h = *first + ((h << 7) | (h >> (BitsInType(hashvalue_t) - 7)));
+		return h;
+	}
+
+	string::size_type string::minimumFreeCapacity(void) const noexcept { return 1; }
+
+
 
 };
 

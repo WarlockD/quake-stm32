@@ -85,14 +85,10 @@ Zone block
 #ifndef _QUAKE_ZONE_H_
 #define _QUAKE_ZONE_H_
 
-#include "quakedef.h"
-#include "common.h"
+//#include "common.h"
+// included in common
 
-#include <string>
-#include <sstream>
-#include <vector>
-#include <variant>
-#include <unordered_map>
+
 
 void Memory_Init(void *buf, size_t size);
 
@@ -102,8 +98,6 @@ void *Z_TagMalloc(size_t size, int tag);
 
 
 void Z_CheckHeap(void);
-
-
 void *Hunk_Alloc(size_t size);		// returns 0 filled memory
 void *Hunk_AllocName(int size, const quake::string_view& name);
 
@@ -138,9 +132,69 @@ void *Cache_Alloc(cache_user_t *c, int size, const quake::string_view& name);
 
 void Cache_Report(void);
 
-class ZObject {
-	void* operator new(size_t n) { return Z_Malloc(n); }
-	void operator delete(void* p) { Z_Free(p); }
+
+void *umm_info(void *ptr, int force);
+void *umm_malloc(size_t size);
+void *umm_realloc(void *ptr, size_t size);
+void umm_free(void *ptr);
+size_t umm_maxsize();
+
+// uses ummalloc
+template <typename T>
+class UAllocator
+{
+public:
+	using std_allocator = std::allocator<T>;
+	using size_type = size_t;
+	using difference_type = ptrdiff_t;
+	using value_type = T;
+	using pointer = value_type*;
+	using const_pointer = const value_type*;
+	using reference = value_type&;
+	using const_reference = const value_type&;
+	template <class U>
+	struct rebind { using other =  UAllocator<U> ; };
+
+	UAllocator() {}
+	UAllocator(const UAllocator&) {}
+	template <class U>
+	UAllocator(const UAllocator<U>&) {}
+	template <class U>
+	UAllocator& operator=(const UAllocator<U>&) { return *this; }
+
+
+	pointer   allocate(size_type n, const void* ptr = 0) {
+		assert(ptr == 0);
+		//void* ret = umm_malloc(n);
+		void* ret = Z_Malloc(n);
+		assert(ret != 0);
+		return (T*)ret;
+	}
+	void   deallocate(void* p, size_type n) { 
+		//(void)n; umm_free(p); 
+		(void)n; Z_Free(p);
+	}
+	pointer           address(reference x) const { return &x; }
+	const_pointer     address(const_reference x) const { return &x; }
+
+	void              construct(pointer p, const T& val) { new ((T*)p) T(val); }
+	void              destroy(pointer p) { p->~T(); }
+	size_type         max_size() const { return size_t(-1); }
+#if 0
+
+	pointer           address(reference x) const { return &x; }
+	const_pointer     address(const_reference x) const { return &x; }
+	UAllocator<T>&  operator=(const UAllocator&) { return *this; }
+	template<typename ... Args>
+	void              construct(pointer p, Args&& ...args) { new ((T*)p) T(std::forward<Args>(args)...); }
+	void              destroy(pointer p) { p->~T(); }
+	size_type         max_size() const { return umm_maxsize(); }
+#endif
+
+
+
+
+
 };
 
 template <typename  T>
@@ -301,20 +355,24 @@ public:
 private:
 	tracker_t* _cache;
 };
+#include <allocators>
+#include <scoped_allocator>
 
-namespace quake {
-	using string = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
-	using stringstream = std::basic_stringstream<char, std::char_traits<char>, ZAllocator<char>>;
-}
+
 // some basic wrappers to use the doom memory system
-using ZString = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
-using HString = std::basic_string<char, std::char_traits<char>, HAllocator<char>>;
-using CacheString = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
-using CacheStringStream = std::basic_stringstream<char, std::char_traits<char>, CacheAllocator<char>>;
-using ZStringStream = std::basic_stringstream<char, std::char_traits<char>, ZAllocator<char>>;
+using ZString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
+using HString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
+using CacheString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
+using CacheStringStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
+using ZStringStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
+
+using UString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
+template<typename T>
+using UVector = std::vector<T, UAllocator<T>>;
+using StringList = std::vector<UString, UAllocator<UString>>;
 
 template<typename T>
-using ZVector = std::vector<T, ZAllocator<T>>;
+using ZVector = std::vector<T, UAllocator<T>>;
 
 
 

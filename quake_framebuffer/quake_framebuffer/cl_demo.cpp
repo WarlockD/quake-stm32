@@ -232,8 +232,7 @@ void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view arg
 	if (c > 2) {
 		quake::fixed_string_stream<128> va;
 		va << "map " << args[2];
-		Cmd_Tokenizer tokenizer;
-		tokenizer.execute(va.str(), src_command);
+		execute_args(va.str(), src_command);
 	}
 
 	

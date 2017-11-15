@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef _QUAKE_NET_H_
 #define _QUAKE_NET_H_
 
+
+#include "common.h"
+
 struct qsockaddr
 {
 	short sa_family;

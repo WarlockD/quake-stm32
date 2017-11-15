@@ -957,8 +957,8 @@ void CL_ParseServerMessage (void)
 			break;
 
 		case svc_sellscreen: {
-			Cmd_Tokenizer tokenizer;
-			tokenizer.execute("help", src_command);
+			execute_args("help", src_command);
+			break;
 		}
 			break;
 		}

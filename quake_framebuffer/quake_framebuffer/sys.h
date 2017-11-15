@@ -73,10 +73,13 @@ namespace quake {
 	public:
 		quake_console_buffer();
 	protected:
-		virtual int_type sync() override;
+		virtual void text_out(const char* text, size_t size) = 0;
+		int_type sync() override final;
 		int_type overflow(int_type ch) override final;
 	};
 	extern std::ostream con; // this is the console out
+	extern std::ostream debug; // this is the console out
+	
 }
 //
 // memory protection

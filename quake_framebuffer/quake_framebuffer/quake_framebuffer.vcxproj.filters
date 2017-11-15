@@ -16,6 +16,9 @@
     <Filter Include="quake">
       <UniqueIdentifier>{7cc5796c-8e56-40f7-a606-f732f7ba8e4e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="qstl">
+      <UniqueIdentifier>{a5eef166-b3cc-4ebe-a243-043619d57331}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cd_null.cpp">
@@ -225,6 +228,21 @@
     <ClCompile Include="global.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="umm_malloc.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ustl-master\cmemlink.cc">
+      <Filter>qstl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ustl-master\memblock.cc">
+      <Filter>qstl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ustl-master\memlink.cc">
+      <Filter>qstl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ustl-master\ustring.cc">
+      <Filter>qstl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">
@@ -425,6 +443,33 @@
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="globals.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="umm_malloc.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="umm_malloc_cfg.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\cmemlink.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\memblock.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\memlink.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\metamac.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\ustring.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ustl-master\uvector.h">
+      <Filter>qstl</Filter>
+    </ClInclude>
+    <ClInclude Include="icommon.h">
       <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>

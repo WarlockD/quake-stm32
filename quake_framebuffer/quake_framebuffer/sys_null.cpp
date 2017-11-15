@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sys_null.h -- null system driver to aid porting efforts
 
 #include "quakedef.h"
-#include "zone.h"
+
 #include "errno.h"
 
 #include <assert.h>
@@ -191,8 +191,8 @@ namespace quake {
 		std::streamsize n = static_cast<std::streamsize>(pptr() - pbase());
 		if (n > 0) {
 			*pptr() = '\0';
-			Sys_WriteConsole(pbase());
-			Con_Print(pbase());
+			text_out(pbase(), n);
+
 			pbump(-n);
 			setp(_buffer.data(), _buffer.data() + _buffer.size() - 2);
 		}
@@ -209,9 +209,28 @@ namespace quake {
 		}
 		return char_traits::not_eof(ch);
 	}
-
-	static quake_console_buffer console_buffer;
+	class console_buffer_t : public quake_console_buffer {
+	public:
+		console_buffer_t() : quake_console_buffer() {}
+	protected:
+		void text_out(const char* text, size_t size) override final {
+			Sys_WriteConsole(text);
+			Con_Print(text);
+		}
+	};
+	class debug_buffer_t : public quake_console_buffer {
+	public:
+		debug_buffer_t() : quake_console_buffer() {}
+	protected:
+		void text_out(const char* text, size_t size) override final {
+			Sys_WriteConsole(text);
+		}
+	};
+	static console_buffer_t console_buffer;
+	static debug_buffer_t debug_buffer;
 	std::ostream con(&console_buffer); // this is the main console out
+
+	extern std::ostream debug(&debug_buffer); // this is the console out
 }
 
 

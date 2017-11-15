@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef _QUAKE_DRAW_H_
 #define _QUAKE_DRAW_H_
 
+
+#include "common.h"
+
 extern	qpic_t		*draw_disc;	// also used on sbar
 
 void Draw_Init (void);

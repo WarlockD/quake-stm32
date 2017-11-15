@@ -156,6 +156,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\ustl-master\cmemlink.cc" />
+    <ClCompile Include="..\ustl-master\memblock.cc" />
+    <ClCompile Include="..\ustl-master\memlink.cc" />
+    <ClCompile Include="..\ustl-master\ustring.cc" />
     <ClCompile Include="cd_null.cpp" />
     <ClCompile Include="chase.cpp" />
     <ClCompile Include="cl_demo.cpp" />
@@ -220,6 +224,7 @@
     <ClCompile Include="sv_phys.cpp" />
     <ClCompile Include="sv_user.cpp" />
     <ClCompile Include="sys_null.cpp" />
+    <ClCompile Include="umm_malloc.cpp" />
     <ClCompile Include="vid_null.cpp" />
     <ClCompile Include="view.cpp" />
     <ClCompile Include="wad.cpp" />
@@ -230,6 +235,12 @@
     <Image Include="quake.gif" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\ustl-master\cmemlink.h" />
+    <ClInclude Include="..\ustl-master\memblock.h" />
+    <ClInclude Include="..\ustl-master\memlink.h" />
+    <ClInclude Include="..\ustl-master\metamac.h" />
+    <ClInclude Include="..\ustl-master\ustring.h" />
+    <ClInclude Include="..\ustl-master\uvector.h" />
     <ClInclude Include="adivtab.h" />
     <ClInclude Include="anorms.h" />
     <ClInclude Include="anorm_dots.h" />
@@ -252,6 +263,7 @@
     <ClInclude Include="d_ifacea.h" />
     <ClInclude Include="d_local.h" />
     <ClInclude Include="globals.h" />
+    <ClInclude Include="icommon.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="keys.h" />
     <ClInclude Include="mathlib.h" />
@@ -286,6 +298,8 @@
     <ClInclude Include="sound.h" />
     <ClInclude Include="spritegn.h" />
     <ClInclude Include="sys.h" />
+    <ClInclude Include="umm_malloc.h" />
+    <ClInclude Include="umm_malloc_cfg.h" />
     <ClInclude Include="vgamodes.h" />
     <ClInclude Include="vid.h" />
     <ClInclude Include="vid_dos.h" />

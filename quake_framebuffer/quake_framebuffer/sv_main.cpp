@@ -1003,8 +1003,7 @@ void SV_SendReconnect (void)
 		Cbuf_InsertText("reconnect\n");
 #else
 	{
-		Cmd_Tokenizer tokenizer;
-		tokenizer.execute("reconnect\n", src_command);
+		execute_args("reconnect\n", src_command);
 	}
 #endif
 }

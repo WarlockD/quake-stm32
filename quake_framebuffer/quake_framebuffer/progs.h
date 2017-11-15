@@ -121,7 +121,7 @@ void ED_ParseEdict (COM_Parser& data, edict_t *ent);
 void ED_WriteGlobals (std::ostream& f);
 void ED_ParseGlobals (COM_Parser& data);
 
-void ED_LoadFromFile (const char *data);
+void ED_LoadFromFile (const quake::string_view& data);
 
 //define EDICT_NUM(n) ((edict_t *)(sv.edicts+ (n)*pr_edict_size))
 //define NUM_FOR_EDICT(e) (((byte *)(e) - sv.edicts)/pr_edict_size)

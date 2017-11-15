@@ -36,11 +36,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <fstream>
 #include <variant>
 #include <exception>
+#include <unordered_map>
+#include <unordered_set>
+
 // we need the basic file functions
 #ifdef min
 #undef min
 #endif
-
+#ifdef max
+#undef max
+#endif
 using idTime = std::chrono::milliseconds;
 using idTimef = std::chrono::duration<float, std::milli>;
 #if !defined BYTE_DEFINED
@@ -134,6 +139,8 @@ operator<<(std::basic_ostream<C, CT>& os, const T& s) {
 namespace quake {
 	static constexpr size_t DEFAULT_STREAM_BUFFER_SIZE = 1024;
 	static constexpr size_t DEFAULT_SIMPLE_BUFFER_SIZE = 64;
+	using hashvalue_t = size_t;
+	using ssize_t = typename std::conditional<sizeof(size_t) == sizeof(int32_t), int32_t, int64_t>::type;
 	using char_type = char;
 	using char_traits = std::char_traits<char_type>;
 
@@ -236,12 +243,12 @@ namespace quake {
 	inline size_t stream_align_of(const T&)
 	{
 		if (std::numeric_limits<T>::is_integral)
-			return __alignof__(T);
+			return __alignof(T);
 		return 4;
 	}
 
 #define ALIGNOF(type,grain)	\
-	namespace ustl {		\
+	namespace quake {		\
 		template <> inline size_t stream_align_of (const type&) { return grain; } }
 
 	class cmemlink {
@@ -258,9 +265,9 @@ namespace quake {
 		typedef const_iterator	iterator;
 		typedef const cmemlink&	rcself_t;
 	public:
-		inline				cmemlink(void) : _data(nullptr), _size(0) { }
-		inline				cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
-		inline				cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
+		constexpr inline				cmemlink(void) : _data(nullptr), _size(0) { }
+		constexpr inline				cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
+		constexpr inline				cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
 		inline virtual     ~cmemlink(void) noexcept {}
 		void				link(const void* p, size_type n);
 		inline void			link(const cmemlink& l) { link(l.begin(), l.size()); }
@@ -268,18 +275,18 @@ namespace quake {
 		inline void			relink(const void* p, size_type n);
 		virtual void		unlink(void) noexcept { _data = nullptr; _size = 0; }
 		inline rcself_t		operator= (const cmemlink& l) { link(l); return *this; }
-		bool				operator== (const cmemlink& l) const noexcept;
+		constexpr bool				operator== (const cmemlink& l) const noexcept;
 		inline void			swap(cmemlink& l) { std::swap(_data, l._data); std::swap(_size, l._size); }
-		inline size_type	size(void) const { return _size; }
-		inline size_type	max_size(void) const { return size(); }
-		inline size_type	readable_size(void) const { return size(); }
-		inline bool			empty(void) const { return !size(); }
-		inline const_pointer	data(void) const { return _data; }
-		inline const_pointer	cdata(void) const { return _data; }
-		inline iterator		begin(void) const { return iterator(cdata()); }
-		inline iterator		iat(size_type i) const { assert(i <= size()); return begin() + i; }
-		inline iterator		end(void) const { return iat(size()); }
-		inline void			resize(size_type n) { _size = n; }
+		constexpr inline size_type	size(void) const { return _size; }
+		constexpr inline size_type	max_size(void) const { return size(); }
+		constexpr inline size_type	readable_size(void) const { return size(); }
+		constexpr inline bool			empty(void) const { return !size(); }
+		constexpr inline const_pointer	data(void) const { return _data; }
+		constexpr inline const_pointer	cdata(void) const { return _data; }
+		constexpr inline iterator		begin(void) const { return iterator(cdata()); }
+		constexpr inline iterator		iat(size_type i) const {  return begin() + i; }
+		constexpr inline iterator		end(void) const { return iat(size()); }
+		constexpr inline void			resize(size_type n) { _size = n; }
 		inline void			read(std::istream&) { assert(!"ustl::cmemlink is a read-only object."); }
 	private:
 		const_pointer	_data;		///< Pointer to the data block (const)
@@ -315,20 +322,20 @@ namespace quake {
 		typedef pointer			iterator;
 		typedef const memlink&		rcself_t;
 	public:
-		inline		memlink(void) : cmemlink() {}
-		inline		memlink(void* p, size_type n) : cmemlink(p, n) {}
-		inline		memlink(const void* p, size_type n) : cmemlink(p, n) {}
-		inline		memlink(rcself_t l) : cmemlink(l) {}
-		inline explicit	memlink(const cmemlink& l) : cmemlink(l) {}
+		constexpr inline		memlink(void) : cmemlink() {}
+		constexpr inline		memlink(void* p, size_type n) : cmemlink(p, n) {}
+		constexpr inline		memlink(const void* p, size_type n) : cmemlink(p, n) {}
+		constexpr inline		memlink(rcself_t l) : cmemlink(l) {}
+		constexpr inline explicit	memlink(const cmemlink& l) : cmemlink(l) {}
 		inline pointer	data(void) { return const_cast<pointer>(cmemlink::data()); }
-		inline const_pointer	data(void) const { return cmemlink::data(); }
+		constexpr inline const_pointer	data(void) const { return cmemlink::data(); }
 		inline iterator	begin(void) { return iterator(data()); }
 		inline iterator	iat(size_type i) { assert(i <= size()); return begin() + i; }
 		inline iterator	end(void) { return iat(size()); }
-		inline const_iterator	begin(void) const { return cmemlink::begin(); }
-		inline const_iterator	end(void) const { return cmemlink::end(); }
-		inline const_iterator	iat(size_type i) const { return cmemlink::iat(i); }
-		size_type		writable_size(void) const { return size(); }
+		constexpr inline const_iterator	begin(void) const { return cmemlink::begin(); }
+		constexpr inline const_iterator	end(void) const { return cmemlink::end(); }
+		constexpr inline const_iterator	iat(size_type i) const { return cmemlink::iat(i); }
+		constexpr size_type		writable_size(void) const { return size(); }
 		inline rcself_t	operator= (const cmemlink& l) { cmemlink::operator= (l); return *this; }
 		inline rcself_t	operator= (rcself_t l) { cmemlink::operator= (l); return *this; }
 		inline void		link(const void* p, size_type n) { cmemlink::link(p, n); }
@@ -378,10 +385,60 @@ namespace quake {
 		_size = n;
 	}
 
-	//----------------------------------------------------------------------
 
 	/// Use with cmemlink-derived classes to link to a static array
 #define static_link(v)	link (VectorBlock(v))
+	/// \class memblock memblock.h ustl.h
+	/// \ingroup MemoryManagement
+	///
+	/// \brief Allocated memory block.
+	///
+	/// Adds memory management capabilities to memlink. Uses malloc and realloc to
+	/// maintain the internal pointer, but only if allocated using members of this class,
+	/// or if linked to using the Manage() member function. Managed memory is automatically
+	/// freed in the destructor.
+	///
+	class memblock : public memlink {
+	public:
+		memblock(void) noexcept;
+		memblock(const void* p, size_type n);
+		explicit			memblock(size_type n);
+		explicit			memblock(const cmemlink& b);
+		explicit			memblock(const memlink& b);
+		memblock(const memblock& b);
+		virtual			~memblock(void) noexcept;
+		virtual void		unlink(void) noexcept override;
+		inline void			assign(const cmemlink& l) { assign(l.cdata(), l.readable_size()); }
+		inline const memblock&	operator= (const cmemlink& l) { assign(l); return *this; }
+		inline const memblock&	operator= (const memlink& l) { assign(l); return *this; }
+		inline const memblock&	operator= (const memblock& l) { assign(l); return *this; }
+		inline void			swap(memblock& l) noexcept { memlink::swap(l); std::swap(_capacity, l._capacity); }
+		void			assign(const void* p, size_type n);
+		void			reserve(size_type newSize, bool bExact = false);
+		void			resize(size_type newSize, bool bExact = true);
+		iterator			insert(const_iterator start, size_type size);
+		iterator			erase(const_iterator start, size_type size);
+		inline void			clear(void) noexcept { resize(0); }
+		inline size_type		capacity(void) const { return _capacity; }
+		inline bool			is_linked(void) const { return !capacity(); }
+		inline size_type		max_size(void) const { return is_linked() ? memlink::max_size() : SIZE_MAX; }
+		inline void			manage(memlink& l) { manage(l.begin(), l.size()); }
+		void			deallocate(void) noexcept;
+		void			shrink_to_fit(void);
+		void			manage(void* p, size_type n) noexcept;
+		void			copy_link(void);
+		void			read(std::istream& is);
+		void			read_file(const char* filename);
+		inline			memblock(memblock&& b) : memlink(), _capacity(0) { swap(b); }
+		inline memblock&		operator= (memblock&& b) { swap(b); return *this; }
+	protected:
+		virtual size_type		minimumFreeCapacity(void) const noexcept;
+	private:
+		size_type			_capacity;	///< Number of bytes allocated by Resize.
+	};
+
+	//----------------------------------------------------------------------
+
 	// base class for all arrays that are refrenced and passed around
 	// Its basicly a pointer and the count of elements
 	// soo..  While I LOVE quake::string_view, I hate std::string as it allocates on the heap
@@ -406,6 +463,8 @@ namespace quake {
 
 		constexpr data_view(const_pointer data, size_type size) noexcept : _data(data), _size(size) {}
 		constexpr data_view() noexcept : _data(nullptr), _size(0) {}
+		constexpr data_view(const data_view& copy) noexcept : _data(copy.data()), _size(copy.size()) {}
+		constexpr data_view(data_view&& move) noexcept : _data(move.data()), _size(move.size()) { move._data = nullptr; move._size = 0; }
 		inline constexpr const_pointer data() const noexcept { return _data; }
 		inline constexpr size_t size() const noexcept { return _size; }
 
@@ -513,6 +572,7 @@ namespace quake {
 
 	// so I don't have to keep recompiling headers, alot of this is going to be in commom
 	class string_view : public data_view<char> {
+		void relink(const_pointer p, size_t len) { _data = p; _size = len; }
 	public:
 		using char_traits = std::char_traits<char>;
 		static inline size_type hasher(const char* str, size_type size) {
@@ -520,9 +580,17 @@ namespace quake {
 			while (size--) h = (h * 33) ^ (uint8_t)*str++;
 			return h;
 		}
+		inline const_iterator begin() const { return data_view<char>::begin(); }
+		inline const_iterator end() const { return data_view<char>::end(); }
+
 		constexpr string_view() : data_view<char>("",0) {}
-		constexpr string_view(const_pointer str, size_t size) : data_view<char>(str, size) {}
+		constexpr string_view(const_pointer str, size_t size) : data_view<char>(str==nullptr || size == 0 ? "" : str, str == nullptr || size == 0 ? 0 : size) {}
 		constexpr string_view(const_pointer str) : string_view(str, char_traits::length(str)) {}
+		constexpr string_view(const string_view& copy) noexcept : string_view(copy.data(),copy.size()) {}
+		constexpr string_view(string_view&& move) noexcept : string_view(move.data(), move.size()) { move._data = ""; move._size = 0; }
+		string_view& operator=(const string_view& copy) noexcept {  relink(copy.data(), copy.size());  return *this; }
+		string_view& operator=(string_view&& move) noexcept { relink(move.data(), move.size()); move.relink("", 0); return *this; }
+
 		constexpr string_view substr(size_type pos = 0, size_type count = npos) const {
 			return (pos > size())
 				? (throw std::out_of_range("data_helpers::split"), string_view())
@@ -535,6 +603,8 @@ namespace quake {
 				ret = size() == sv.size() ? 0 : (size() < sv.size() ? -1 : 1);
 			return ret;
 		}
+		inline const char& operator[](size_t i) const { return i < size() ? data()[i] : data()[size()-1]; } // so we can return a 0 termated string
+
 		inline int compare(size_type pos1, size_type count1, string_view sv) const { return substr(pos1, count1).compare(sv); }
 		inline int compare(size_type pos1, size_type count1, string_view sv, size_type pos2, size_type count2) const { return substr(pos1, count1).compare(sv.substr(pos2, count2)); }
 		inline int compare(const char*s) const noexcept { return compare(string_view(s)); }
@@ -554,12 +624,382 @@ namespace quake {
 		inline constexpr size_type rfind(const char* what, size_type offset = 0) const { return priv::find(*this, offset, string_view(what)); }
 		inline constexpr size_type rfind(const char* what, size_type offset, size_type count)  const { return priv::find(*this, offset, string_view(what, count)); }
 
+		size_type to_number(float& value, size_type offset=0) const;
+		size_type to_number(int& value, size_type offset = 0) const;
 
 		template<size_t SIZE = DEFAULT_SIMPLE_BUFFER_SIZE>
 		fixed_printf_buffer<SIZE> make_cstr() const {
 			return fixed_printf_buffer<SIZE>(_data,size());
 		}
+		inline const_iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
 	};
+	
+
+	/// \class string ustring.h ustl.h
+	/// \ingroup Sequences
+	///
+	/// \brief STL basic_string&lt;char&gt; equivalent.
+	///
+	/// An STL container for text string manipulation.
+	/// Differences from C++ standard:
+	///	- string is a class, not a template. Wide characters are assumed to be
+	///		encoded with utf8 at all times except when rendering or editing,
+	///		where you would use a utf8 iterator.
+	/// 	- format member function - you can, of course use an \ref ostringstream,
+	///		which also have format functions, but most of the time this way
+	///		is more convenient. Because uSTL does not implement locales,
+	///		format is the only way to create localized strings.
+	/// 	- const char* cast operator. It is much clearer to use this than having
+	/// 		to type .c_str() every time.
+	/// 	- length returns the number of _characters_, not bytes.
+	///		This function is O(N), so use wisely.
+	///
+	/// An additional note is in order regarding the use of indexes. All indexes
+	/// passed in as arguments or returned by find are byte offsets, not character
+	/// offsets. Likewise, sizes are specified in bytes, not characters. The
+	/// rationale is that there is no way for you to know what is in the string.
+	/// There is no way for you to know how many characters are needed to express
+	/// one thing or another. The only thing you can do to a localized string is
+	/// search for delimiters and modify text between them as opaque blocks. If you
+	/// do anything else, you are hardcoding yourself into a locale! So stop it!
+	///
+	class string : public memblock {
+	public:
+		typedef char		value_type;
+		typedef unsigned char	uvalue_type;
+		typedef value_type*		pointer;
+		typedef const value_type*	const_pointer;
+		//typedef wchar_t		wvalue_type;
+		//typedef wvalue_type*	wpointer;
+		//typedef const wvalue_type*	const_wpointer;
+		typedef pointer		iterator;
+		typedef const_pointer	const_iterator;
+		typedef value_type&		reference;
+		typedef value_type		const_reference;
+		typedef std::reverse_iterator<iterator>		reverse_iterator;
+		typedef std::reverse_iterator<const_iterator>	const_reverse_iterator;
+	//	typedef utf8in_iterator<const_iterator>		utf8_iterator;
+		typedef size_type		pos_type;
+		static constexpr const pos_type npos = INT_MAX;	///< Value that means the end of string.
+	public:
+		inline			string(void) noexcept : memblock() { relink("", 0); }
+		string(const string& s);
+		inline			string(const string& s, pos_type o, size_type n = npos);
+		inline explicit		string(const cmemlink& l);
+		string(const_pointer s) noexcept;
+		inline			string(const_pointer s, size_type len);
+		inline			string(const_pointer s1, const_pointer s2);
+		string(size_type n, value_type c);
+		inline			~string(void) noexcept { }
+		inline pointer		data(void) { return string::pointer(memblock::data()); }
+		inline const_pointer	data(void) const { return string::const_pointer(memblock::data()); }
+		inline const_pointer	c_str(void) const { return string::const_pointer(memblock::cdata()); }
+		inline size_type		max_size(void) const { size_type s(memblock::max_size()); return s - !!s; }
+		inline size_type		capacity(void) const { size_type c(memblock::capacity()); return c - !!c; }
+		void			resize(size_type n);
+		inline void			resize(size_type n, value_type c);
+		inline void			clear(void) { resize(0); }
+		inline iterator		begin(void) { return iterator(memblock::begin()); }
+		inline const_iterator	begin(void) const { return const_iterator(memblock::begin()); }
+		inline const_iterator	cbegin(void) const { return begin(); }
+		inline iterator		end(void) { return iterator(memblock::end()); }
+		inline const_iterator	end(void) const { return const_iterator(memblock::end()); }
+		inline const_iterator	cend(void) const { return end(); }
+		inline reverse_iterator	rbegin(void) { return reverse_iterator(end()); }
+		inline const_reverse_iterator	rbegin(void) const { return const_reverse_iterator(end()); }
+		inline const_reverse_iterator	crbegin(void) const { return rbegin(); }
+		inline reverse_iterator	rend(void) { return reverse_iterator(begin()); }
+		inline const_reverse_iterator	rend(void) const { return const_reverse_iterator(begin()); }
+		inline const_reverse_iterator	crend(void) const { return rend(); }
+		//inline utf8_iterator	utf8_begin(void) const { return utf8_iterator(begin()); }
+		//inline utf8_iterator	utf8_end(void) const { return utf8_iterator(end()); }
+		inline const_reference	at(pos_type pos) const { assert(pos <= size() && begin()); return begin()[pos]; }
+		inline reference		at(pos_type pos) { assert(pos <= size() && begin()); return begin()[pos]; }
+		constexpr inline const_iterator	iat(pos_type pos) const { return cdata() + ((pos) && pos >= npos ? size() : std::min(size_type(pos), size())); }
+		inline iterator		iat(pos_type pos) { return const_cast<iterator>(const_cast<const string*>(this)->iat(pos)); }
+		const_iterator		wiat(pos_type i) const noexcept;
+		inline iterator		wiat(pos_type i) { return const_cast<iterator>(const_cast<const string*>(this)->wiat(i)); }
+		inline const_reference	front(void) const { return at(0); }
+		inline reference		front(void) { return at(0); }
+		inline const_reference	back(void) const { return at(size() - 1); }
+		inline reference		back(void) { return at(size() - 1); }
+	//	inline size_type		length(void) const { return distance(utf8_begin(), utf8_end()); }
+		inline size_type		length(void) const { return size(); }
+		inline string&		append(const_iterator i1, const_iterator i2) { return append(i1, std::distance(i1, i2)); }
+		string&	   		append(const_pointer s, size_type len);
+		string&	   		append(const_pointer s);
+		string&			append(size_type n, value_type c);
+		//inline string&		append(size_type n, wvalue_type c) { insert(size(), n, c); return *this; }
+	//	inline string&		append(const_wpointer s1, const_wpointer s2) { insert(size(), s1, s2); return *this; }
+		//inline string&		append(const_wpointer s) { const_wpointer se(s); for (; se&&*se; ++se) {} return append(s, se); }
+		inline string&		append(const string& s) { return append(s.begin(), s.end()); }
+		inline string&		append(const string& s, pos_type o, size_type n) { return append(s.iat(o), s.iat(o + n)); }
+		inline void			push_back(value_type c) { resize(size() + 1); end()[-1] = c; }
+	//	inline void			push_back(wvalue_type c) { append(1, c); }
+		inline void			pop_back(void) { resize(size() - 1); }
+		inline string&		assign(const_iterator i1, const_iterator i2) { return assign(i1, std::distance(i1, i2)); }
+		string&	    		assign(const_pointer s, size_type len);
+		string&	    		assign(const_pointer s);
+		//inline string&		assign(const_wpointer s1, const_wpointer s2) { clear(); return append(s1, s2); }
+		//inline string&		assign(const_wpointer s1) { clear(); return append(s1); }
+		inline string&		assign(const string& s) { return assign(s.begin(), s.end()); }
+		inline string&		assign(const string& s, pos_type o, size_type n) { return assign(s.iat(o), s.iat(o + n)); }
+		inline string&		assign(size_type n, value_type c) { clear(); return append(n, c); }
+		//inline string&		assign(size_type n, wvalue_type c) { clear(); return append(n, c); }
+		size_type			copy(pointer p, size_type n, pos_type pos = 0) const noexcept;
+		inline size_type		copyto(pointer p, size_type n, pos_type pos = 0) const noexcept { size_type bc = copy(p, n - 1, pos); p[bc] = 0; return bc; }
+		inline int			compare(const string& s) const { return compare(begin(), end(), s.begin(), s.end()); }
+		inline int			compare(pos_type start, size_type len, const string& s) const { return compare(iat(start), iat(start + len), s.begin(), s.end()); }
+		inline int			compare(pos_type s1, size_type l1, const string& s, pos_type s2, size_type l2) const { return compare(iat(s1), iat(s1 + l1), s.iat(s2), s.iat(s2 + l2)); }
+		inline int			compare(const_pointer s) const { return compare(begin(), end(), s, s + strlen(s)); }
+		inline int			compare(pos_type s1, size_type l1, const_pointer s, size_type l2) const { return compare(iat(s1), iat(s1 + l1), s, s + l2); }
+		inline int			compare(pos_type s1, size_type l1, const_pointer s) const { return compare(s1, l1, s, strlen(s)); }
+		static int			compare(const_iterator first1, const_iterator last1, const_iterator first2, const_iterator last2) noexcept;
+		inline			operator const value_type* (void) const;
+		inline			operator value_type* (void);
+		inline const string&	operator= (const string& s) { return assign(s.begin(), s.end()); }
+		inline const string&	operator= (const_reference c) { return assign(&c, 1); }
+		inline const string&	operator= (const_pointer s) { return assign(s); }
+		//inline const string&	operator= (const_wpointer s) { return assign(s); }
+		inline const string&	operator+= (const string& s) { return append(s.begin(), s.size()); }
+		inline const string&	operator+= (value_type c) { push_back(c); return *this; }
+		inline const string&	operator+= (const_pointer s) { return append(s); }
+		//inline const string&	operator+= (wvalue_type c) { return append(1, c); }
+		inline const string&	operator+= (uvalue_type c) { return operator+= (value_type(c)); }
+	//	inline const string&	operator+= (const_wpointer s) { return append(s); }
+		inline string		operator+ (const string& s) const;
+		inline bool			operator== (const string& s) const { return memblock::operator== (s); }
+		bool			operator== (const_pointer s) const noexcept;
+		inline bool			operator== (value_type c) const { return size() == 1 && c == at(0); }
+		inline bool			operator== (uvalue_type c) const { return operator== (value_type(c)); }
+		inline bool			operator!= (const string& s) const { return !operator== (s); }
+		inline bool			operator!= (const_pointer s) const { return !operator== (s); }
+		inline bool			operator!= (value_type c) const { return !operator== (c); }
+		inline bool			operator!= (uvalue_type c) const { return !operator== (c); }
+		inline bool			operator< (const string& s) const { return 0 > compare(s); }
+		inline bool			operator< (const_pointer s) const { return 0 > compare(s); }
+		inline bool			operator< (value_type c) const { return 0 > compare(begin(), end(), &c, &c + 1); }
+		inline bool			operator< (uvalue_type c) const { return operator< (value_type(c)); }
+		inline bool			operator> (const_pointer s) const { return 0 < compare(s); }
+		inline string&		insert(pos_type ip, size_type n, value_type c) { insert(iat(ip), n, c); return *this; }
+		inline string&		insert(pos_type ip, const_pointer s) { insert(iat(ip), s, s + strlen(s)); return *this; }
+		inline string&		insert(pos_type ip, const_pointer s, size_type nlen) { insert(iat(ip), s, s + nlen); return *this; }
+		inline string&		insert(pos_type ip, const string& s) { insert(iat(ip), s.c_str(), s.size()); return *this; }
+		inline string&		insert(pos_type ip, const string& s, size_type sp, size_type slen) { insert(iat(ip), s.iat(sp), s.iat(sp + slen)); return *this; }
+		//string&			insert(pos_type ip, size_type n, wvalue_type c);
+		//string&			insert(pos_type ip, const_wpointer first, const_wpointer last, size_type n = 1);
+		inline string&		insert(int ip, size_type n, value_type c) { insert(pos_type(ip), n, c); return *this; }
+		inline string&		insert(int ip, const_pointer s, size_type nlen) { insert(pos_type(ip), s, nlen); return *this; }
+		iterator			insert(const_iterator start, size_type n, value_type c);
+		inline iterator		insert(const_iterator start, value_type c) { return insert(start, 1u, c); }
+		iterator			insert(const_iterator start, const_pointer s, size_type n);
+		iterator			insert(const_iterator start, const_pointer first, const_iterator last, size_type n = 1);
+		iterator			erase(const_iterator epo, size_type n = 1);
+		string&			erase(pos_type epo = 0, size_type n = npos);
+		inline string&		erase(int epo, size_type n = npos) { return erase(pos_type(epo), n); }
+		inline iterator		erase(const_iterator first, const_iterator last) { return erase(first, size_type(std::distance(first, last))); }
+		inline iterator		eraser(pos_type first, pos_type last) { return erase(iat(first), iat(last)); }
+		string&			replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n);
+		template <typename InputIt>
+		string&			replace(const_iterator first, const_iterator last, InputIt first2, InputIt last2) { return replace(first, last, first2, last2, 1); }
+		inline string&		replace(const_iterator first, const_iterator last, const string& s) { return replace(first, last, s.begin(), s.end()); }
+		string&			replace(const_iterator first, const_iterator last, const_pointer s);
+		inline string&		replace(const_iterator first, const_iterator last, const_pointer s, size_type slen) { return replace(first, last, s, s + slen); }
+		inline string&		replace(const_iterator first, const_iterator last, size_type n, value_type c) { return replace(first, last, &c, &c + 1, n); }
+		inline string&		replace(pos_type rp, size_type n, const string& s) { return replace(iat(rp), iat(rp + n), s); }
+		inline string&		replace(pos_type rp, size_type n, const string& s, size_type sp, size_type slen) { return replace(iat(rp), iat(rp + n), s.iat(sp), s.iat(sp + slen)); }
+		inline string&		replace(pos_type rp, size_type n, const_pointer s, size_type slen) { return replace(iat(rp), iat(rp + n), s, s + slen); }
+		inline string&		replace(pos_type rp, size_type n, const_pointer s) { return replace(iat(rp), iat(rp + n), string(s)); }
+		inline string&		replace(pos_type rp, size_type n, size_type count, value_type c) { return replace(iat(rp), iat(rp + n), count, c); }
+		inline string		substr(pos_type o = 0, size_type n = npos) const { return string(*this, o, n); }
+		inline void			swap(string& v) { memblock::swap(v); }
+		pos_type			find(value_type c, pos_type pos = 0) const noexcept;
+		pos_type			find(const string& s, pos_type pos = 0) const noexcept;
+		inline pos_type		find(uvalue_type c, pos_type pos = 0) const noexcept { return find(value_type(c), pos); }
+		inline pos_type		find(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find(sp, pos); }
+		pos_type			rfind(value_type c, pos_type pos = npos) const noexcept;
+		pos_type			rfind(const string& s, pos_type pos = npos) const noexcept;
+		inline pos_type		rfind(uvalue_type c, pos_type pos = npos) const noexcept { return rfind(value_type(c), pos); }
+		inline pos_type		rfind(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return rfind(sp, pos); }
+		pos_type			find_first_of(const string& s, pos_type pos = 0) const noexcept;
+		inline pos_type		find_first_of(value_type c, pos_type pos = 0) const { string sp(1, c); return find_first_of(sp, pos); }
+		inline pos_type		find_first_of(uvalue_type c, pos_type pos = 0) const { return find_first_of(value_type(c), pos); }
+		inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_first_of(sp, pos); }
+		pos_type			find_first_not_of(const string& s, pos_type pos = 0) const noexcept;
+		inline pos_type		find_first_not_of(value_type c, pos_type pos = 0) const { string sp(1, c); return find_first_not_of(sp, pos); }
+		inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = 0) const { return find_first_not_of(value_type(c), pos); }
+		inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_first_not_of(sp, pos); }
+		pos_type			find_last_of(const string& s, pos_type pos = npos) const noexcept;
+		inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { string sp(1, c); return find_last_of(sp, pos); }
+		inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
+		inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_last_of(sp, pos); }
+		pos_type			find_last_not_of(const string& s, pos_type pos = npos) const noexcept;
+		inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { string sp(1, c); return find_last_not_of(sp, pos); }
+		inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
+		inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_last_not_of(sp, pos); }
+		int				vformat(const char* fmt, va_list args);
+		int				format(const char* fmt, ...);// __attribute__((__format__(__printf__, 2, 3)));
+		void			read(std::istream&);
+		void			write(std::ostream& os) const;
+		size_t			stream_size(void) const noexcept;
+		static hashvalue_t		hash(const char* f1, const char* l1) noexcept;
+
+		using initlist_t = std::initializer_list<value_type>;
+		inline			string(string&& v) : memblock(std::move(v)) {}
+		inline			string(initlist_t v) : memblock() { assign(v.begin(), v.size()); }
+		inline string&		assign(string&& v) { swap(v); return *this; }
+		inline string&		assign(initlist_t v) { return assign(v.begin(), v.size()); }
+		inline string&		append(initlist_t v) { return append(v.begin(), v.size()); }
+		inline string&		operator+= (initlist_t v) { return append(v.begin(), v.size()); }
+		inline string&		operator= (string&& v) { return assign(std::move(v)); }
+		inline string&		operator= (initlist_t v) { return assign(v.begin(), v.size()); }
+		inline iterator		insert(const_iterator ip, initlist_t v) { return insert(ip, v.begin(), v.end()); }
+		inline string&		replace(const_iterator first, const_iterator last, initlist_t v) { return replace(first, last, v.begin(), v.end()); }
+
+	private:
+		virtual size_type		minimumFreeCapacity(void) const noexcept final override;
+	};
+
+	//----------------------------------------------------------------------
+
+	/// Assigns itself the value of string \p s
+	inline string::string(const cmemlink& s)
+		: memblock()
+	{
+		assign(const_iterator(s.begin()), s.size());
+	}
+
+	/// Assigns itself a [o,o+n) substring of \p s.
+	inline string::string(const string& s, pos_type o, size_type n)
+		: memblock()
+	{
+		assign(s, o, n);
+	}
+
+	/// Copies the value of \p s of length \p len into itself.
+	inline string::string(const_pointer s, size_type len)
+		: memblock()
+	{
+		assign(s, len);
+	}
+
+	/// Copies into itself the string data between \p s1 and \p s2
+	inline string::string(const_pointer s1, const_pointer s2)
+		: memblock()
+	{
+		assert(s1 <= s2 && "Negative ranges result in memory allocation errors.");
+		assign(s1, s2);
+	}
+
+	/// Returns the pointer to the first character.
+	inline string::operator const string::value_type* (void) const
+	{
+		assert((!end() || !*end()) && "This string is linked to data that is not 0-terminated. This may cause serious security problems. Please assign the data instead of linking.");
+		return begin();
+	}
+
+	/// Returns the pointer to the first character.
+	inline string::operator string::value_type* (void)
+	{
+		assert((end() && !*end()) && "This string is linked to data that is not 0-terminated. This may cause serious security problems. Please assign the data instead of linking.");
+		return begin();
+	}
+
+	/// Concatenates itself with \p s
+	inline string string::operator+ (const string& s) const
+	{
+		string result(*this);
+		result += s;
+		return result;
+	}
+
+	/// Resize to \p n and fill new entries with \p c
+	inline void string::resize(size_type n, value_type c)
+	{
+		const size_type oldn = size();
+		resize(n);
+		const ssize_t m = std::max(ssize_t(n - oldn), ssize_t(0));
+		std::fill_n(iat(oldn), m, c);
+	}
+
+	//----------------------------------------------------------------------
+	// Operators needed to avoid comparing pointer to pointer
+
+#define PTR_STRING_CMP(op, impl)	\
+inline bool op (const char* s1, const string& s2) { return impl; }
+	PTR_STRING_CMP(operator==, (s2 == s1))
+		PTR_STRING_CMP(operator!=, (s2 != s1))
+		PTR_STRING_CMP(operator<, (s2 >  s1))
+		PTR_STRING_CMP(operator<=, (s2 >= s1))
+		PTR_STRING_CMP(operator>, (s2 <  s1))
+		PTR_STRING_CMP(operator>=, (s2 <= s1))
+#undef PTR_STRING_CMP
+
+		inline string operator+ (const char* cs, const string& ss) { string r; r.reserve(strlen(cs) + ss.size()); r += cs; r += ss; return r; }
+
+	//----------------------------------------------------------------------
+
+	inline hashvalue_t hash_value(const char* first, const char* last)
+	{
+		return string::hash(first, last);
+	}
+	inline hashvalue_t hash_value(const char* v)
+	{
+		return hash_value(v, v + strlen(v));
+	}
+
+	//----------------------------------------------------------------------
+	// String-number conversions
+
+#define STRING_TO_INT_CONVERTER(name,type,func)	\
+inline type name (const string& str, size_t* idx = nullptr, int base = 10) \
+{					\
+    const char* sp = str.c_str();	\
+    char* endp = nullptr;		\
+    type r = func (sp, idx ? &endp : nullptr, base);\
+    if (idx)				\
+	*idx = endp - sp;		\
+    return r;				\
+}
+	STRING_TO_INT_CONVERTER(stoi, int, strtol)
+		STRING_TO_INT_CONVERTER(stol, long, strtol)
+		STRING_TO_INT_CONVERTER(stoul, unsigned long, strtoul)
+#if HAVE_LONG_LONG
+		STRING_TO_INT_CONVERTER(stoll, long long, strtoll)
+		STRING_TO_INT_CONVERTER(stoull, unsigned long long, strtoull)
+#endif
+#undef STRING_TO_INT_CONVERTER
+
+#define STRING_TO_FLOAT_CONVERTER(name,type,func) \
+inline type name (const string& str, size_t* idx = nullptr) \
+{					\
+    const char* sp = str.c_str();	\
+    char* endp = nullptr;		\
+    type r = func (sp, idx ? &endp : nullptr);\
+    if (idx)				\
+	*idx = endp - sp;		\
+    return r;				\
+}
+		STRING_TO_FLOAT_CONVERTER(stof, float, strtof)
+		STRING_TO_FLOAT_CONVERTER(stod, double, strtod)
+		STRING_TO_FLOAT_CONVERTER(stold, long double, strtold)
+#undef STRING_TO_FLOAT_CONVERTER
+
+#define NUMBER_TO_STRING_CONVERTER(type,fmts)\
+    inline string to_string (type v) { string r; r.format(fmts,v); return r; }
+		NUMBER_TO_STRING_CONVERTER(int, "%d")
+		NUMBER_TO_STRING_CONVERTER(long, "%ld")
+		NUMBER_TO_STRING_CONVERTER(unsigned long, "%lu")
+#if HAVE_LONG_LONG
+		NUMBER_TO_STRING_CONVERTER(long long, "%lld")
+		NUMBER_TO_STRING_CONVERTER(unsigned long long, "%llu")
+#endif
+		NUMBER_TO_STRING_CONVERTER(float, "%f")
+		NUMBER_TO_STRING_CONVERTER(double, "%lf")
+		NUMBER_TO_STRING_CONVERTER(long double, "%Lf")
+#undef NUMBER_TO_STRING_CONVERTER
+
+
 	// do we need all the comparison operations? humm
 	inline bool operator==(const string_view& l, const string_view& r) { return l.compare(r) == 0; }
 	inline bool operator==(const string_view& l, const string_view::const_pointer r) { return l.compare(r) == 0; }
@@ -905,28 +1345,21 @@ namespace std {
 		}
 	};
 }
-
+// any dynamicly defined stuff needs to be created after this
 
 #include "zone.h"
 
-namespace quake {
-	using string = std::basic_string<char_type, char_traits, ZAllocator<char>>;
 
-	struct ZObject {
-		static void* operator new(size_t size) { return (void*)Z_Malloc(size); }
-		static void operator delete(void* ptr) { Z_Free(ptr); }
-	};
-
-}
 //============================================================================
 
-struct sizebuf_t
-{
-	qboolean	allowoverflow;	// if false, do a Sys_Error
-	qboolean	overflowed;		// set to true if the buffer size failed
-	byte	*data;
-	int		maxsize;
-	int		cursize;
+class sizebuf_t : public quake::memblock {
+	qboolean	_allowoverflow;	// if false, do a Sys_Error
+	qboolean	_overflowed;	// set to true if the buffer size failed
+	size_t		_maxsize;
+public:
+	void* GetSpace(int length);
+	void Clear();
+
 } ;
 
 void SZ_Alloc (sizebuf_t *buf, int startsize);
@@ -1277,55 +1710,43 @@ void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu)
 
 
 
-
-
-// parser
-class COM_Parser {
+class COM_Value {
 public:
 	enum Kind {
 		LineFeed = '\n',
 		Symbol = 'a',
-		Number = '0',
 		Eof = -1
 	};
-	class COM_Token {
-	public:
-		COM_Token() : COM_Token(Kind::Eof){}
-		COM_Token(int token) : _token(token), _text() {}
-		COM_Token(Kind token) : _token((int)token), _text() {}
-		COM_Token(Kind token, const quake::string_view& text) : _token((int)token), _text(text) {}
-		COM_Token(int token, const quake::string_view& text) : _token(token), _text(text) {}
-		bool operator==(const COM_Token& r) const { return _token == r._token;  }
-		bool operator==(int c) const { return _token == c; }
-		bool operator==(Kind c) const { return _token == (int)c; }
-		bool operator!=(const COM_Token& r) const { return !(*this == r);}
-		bool operator!=(int r) const { return  !(*this == r);}
-		bool operator!=(Kind r) const { return !(*this == r); }
-		const quake::string_view& text() const { return _text; }
-	private:
-		int _token;
-		quake::string_view _text;
-	};
-	enum ParserType {
-		//WhiteSpaceTokens=1,
-		IgnoreComments=1,
-		IgnoreNewLine=2,
-		AcceptAll = 0,
-		Default = IgnoreComments | IgnoreNewLine,
-	};
-
-	COM_Parser(const quake::string_view& data, ParserType mode = Default) : _data(data), _mode(mode) {}
-	COM_Parser(const char* str, ParserType mode = Default) : _data(str) , _mode(mode) {}
-	COM_Parser(const COM_Parser& copy) = delete;
-	COM_Parser(COM_Parser&& move) = delete;
-	void setMode(ParserType mode) { _mode = mode; }
-	COM_Parser() : _data() {}
-	COM_Token Next();
-	operator const quake::string_view&() const { return _data; }
-protected:
-	quake::string_view _data;
-	ParserType _mode;
+	COM_Value() : _type((int)Kind::Eof) {}
+	COM_Value(const quake::string_view& text, Kind token=Kind::Symbol) : _type((int)token), _text(text) {}
+	bool operator==(const COM_Value& r) const { return _type == r._type; }
+	Kind type() const { return (Kind)_type; }
+	const quake::string_view& text() const {  return _text; }
+	bool operator==(int c) const { return _type == c; }
+	bool operator==(Kind c) const { return _type == (int)c; }
+	bool operator!=(const COM_Value& r) const { return !(*this == r); }
+	bool operator!=(int r) const { return  !(*this == r); }
+	bool operator!=(Kind r) const { return !(*this == r); }
+private:
+	int _type;
+	quake::string_view _text;
 };
+
+// parser
+class COM_Parser {
+public:
+	COM_Parser() : _data(""), _state(0) {}
+	COM_Parser(const quake::string_view& data) : _data(data), _pos(0), _state(0) {}
+	quake::string_view Next(bool test_eol=false);
+	operator const quake::string_view&() const { return _data; }
+	size_t pos() const { return _pos; }
+	quake::string_view remaining() const { return _data.substr(_pos); }
+protected:
+	int _state;
+	size_t _pos;
+	quake::string_view _data;
+};
+
 
 
 #if 0

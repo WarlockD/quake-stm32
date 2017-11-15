@@ -1,0 +1,170 @@
+----------------------------------------------------------------------
+ Testing type traits
+----------------------------------------------------------------------
+true	= is_void<void>
+false	= is_void<int>
+false	= is_void<void*>
+false	= is_void<TTA>
+true	= is_integral<char>
+true	= is_integral<const char>
+true	= is_integral<volatile char>
+true	= is_integral<const volatile char>
+true	= is_integral<signed char>
+true	= is_integral<unsigned char>
+true	= is_integral<short>
+true	= is_integral<unsigned short>
+true	= is_integral<int>
+true	= is_integral<unsigned int>
+true	= is_integral<long>
+true	= is_integral<unsigned long>
+true	= is_integral<long long>
+true	= is_integral<unsigned long long>
+false	= is_integral<float>
+false	= is_integral<void*>
+false	= is_integral<TTA>
+false	= is_integral<TTA*>
+true	= is_floating_point<float>
+true	= is_floating_point<double>
+false	= is_floating_point<int>
+false	= is_array<int>
+true	= is_array<int[4]>
+true	= is_array<int[2][4]>
+true	= is_array<const char[]>
+false	= is_pointer<long>
+true	= is_pointer<void*>
+true	= is_pointer<TTA*>
+false	= is_lvalue_reference<long>
+true	= is_lvalue_reference<int&>
+true	= is_lvalue_reference<void*&>
+true	= is_lvalue_reference<volatile float&>
+false	= is_rvalue_reference<long>
+true	= is_rvalue_reference<int&&>
+false	= is_rvalue_reference<void*&>
+true	= is_rvalue_reference<volatile float&&>
+false	= is_reference<long>
+true	= is_reference<int&>
+true	= is_reference<void*&>
+true	= is_reference<volatile float&>
+false	= is_member_object_pointer<void>
+false	= is_member_function_pointer<int>
+true	= is_member_function_pointer<void (TTA::*)(void)>
+true	= is_enum<TestEnum>
+false	= is_enum<TTA>
+false	= is_enum<int>
+true	= is_class<TTA>
+false	= is_class<int>
+false	= is_function<int>
+false	= is_function<void (*)(int)>
+true	= is_function<decltype(Print)>
+false	= is_function<void (TTA::*)(void)>
+true	= is_arithmetic<int>
+true	= is_arithmetic<volatile float>
+true	= is_arithmetic<const char>
+false	= is_arithmetic<TTA>
+false	= is_arithmetic<TestEnum>
+false	= is_floating_point<int>
+true	= is_floating_point<float>
+true	= is_floating_point<double>
+false	= is_floating_point<TTA>
+true	= is_object<int>
+true	= is_object<float>
+true	= is_object<TTA>
+true	= is_object<TestEnum>
+true	= is_scalar<volatile int>
+true	= is_scalar<float>
+false	= is_scalar<TTA>
+true	= is_scalar<TestEnum>
+false	= is_compound<const int>
+false	= is_compound<float>
+true	= is_compound<TTA>
+true	= is_compound<TestEnum>
+true	= is_member_pointer<void (TTA::*)(void)>
+false	= is_member_pointer<void*>
+false	= is_const<int>
+true	= is_const<const int>
+true	= is_const<const volatile int>
+false	= is_volatile<float>
+false	= is_volatile<const float>
+true	= is_volatile<const volatile float>
+true	= is_pod<int>
+true	= is_pod<int[15]>
+true	= is_pod<TTA>
+false	= is_pod<Polymorphic>
+false	= is_empty<int>
+true	= is_empty<TTA>
+true	= is_empty<TTB>
+true	= has_trivial_constructor<TTA>
+false	= has_trivial_constructor<Polymorphic>
+true	= has_trivial_copy<TTA>
+false	= has_trivial_copy<Polymorphic>
+true	= has_trivial_assign<TTA>
+false	= has_trivial_assign<Polymorphic>
+true	= has_trivial_destructor<TTA>
+false	= has_trivial_destructor<Polymorphic>
+true	= is_signed<int>
+false	= is_signed<unsigned int>
+false	= is_signed<float>
+false	= is_unsigned<int>
+true	= is_unsigned<unsigned int>
+true	= is_unsigned<float>
+true	= sizeof(char) == alignment_of<char>
+true	= sizeof(short) == alignment_of<short>
+true	= sizeof(int) == alignment_of<int>
+true	= sizeof(void*) == alignment_of<void*>
+true	= sizeof(double) == alignment_of<double>
+true	= sizeof(char) == alignment_of<TTA>
+true	= 0 == rank<int>
+true	= 1 == rank<int[1]>
+true	= 2 == rank<int[][2]>
+true	= 3 == rank<int[1][2][3]>
+true	= 0 == extent<int>
+true	= 1 == extent<int[1]>
+true	= 1 == extent<int[1][2]>
+true	= 2 == extent<int[][2],1>
+true	= 1 == extent<int[1][2][3]>
+true	= 2 == extent<int[1][2][3],1>
+true	= 3 == extent<int[1][2][3],2>
+true	= is_same<int,int>
+false	= is_same<int,unsigned int>
+false	= is_base_of<int,unsigned int>
+true	= is_base_of<TTA,TTB>
+false	= is_base_of<TTA,Polymorphic>
+true	= is_convertible<int,unsigned int>
+true	= is_convertible<TTA,TTA>
+false	= is_convertible<TTA*,TTB*>
+true	= is_convertible<TTB*,TTA*>
+true	= is_same<remove_const<const int>::type,int>
+false	= is_same<remove_const<const volatile int>::type,int>
+false	= is_same<remove_volatile<const int>::type,int>
+false	= is_same<remove_volatile<const volatile int>::type,int>
+false	= is_same<add_const<int>::type,volatile int>
+true	= is_same<add_const<volatile int>::type,const volatile int>
+true	= is_same<add_volatile<int>::type,volatile int>
+true	= is_same<add_volatile<const int>::type,const volatile int>
+true	= is_same<add_cv<int>::type,const volatile int>
+true	= is_same<remove_pointer<int*>::type,int>
+true	= is_same<remove_reference<const int&>::type,const int>
+true	= is_same<remove_reference<const volatile int&>::type,const volatile int>
+true	= is_same<add_pointer<int>::type,int*>
+true	= is_same<add_lvalue_reference<int volatile>::type,volatile int&>
+true	= is_same<add_rvalue_reference<int>::type,int&&>
+true	= is_same<remove_extent<int>::type,int>
+true	= is_same<remove_extent<int[2][3]>::type,int[3]>
+true	= is_same<remove_extent<int[][3]>::type,int[3]>
+true	= is_same<remove_extent<int[3]>::type,int>
+true	= is_same<remove_all_extents<int>::type,int>
+true	= is_same<remove_all_extents<int[2][3]>::type,int>
+true	= is_same<remove_all_extents<int[3]>::type,int>
+false	= has_member_function_Function<TTB>
+true	= has_member_function_Function<Polymorphic>
+false	= has_member_function_read<Polymorphic>
+true	= has_member_function_read<vector<int>>
+true	= has_static_member_variable_s_var<Polymorphic>
+false	= has_static_member_variable_s_invalid<Polymorphic>
+aligned_storage<1,1>::type:	sizeof 1,	alignof 1
+aligned_storage<2,1>::type:	sizeof 2,	alignof 1
+aligned_storage<2,2>::type:	sizeof 2,	alignof 2
+aligned_storage<2,4>::type:	sizeof 4,	alignof 4
+aligned_storage<5,4>::type:	sizeof 8,	alignof 4
+aligned_storage<16,8>::type:	sizeof 16,	alignof 8
+aligned_storage<17,16>::type:	sizeof 32,	alignof 16
