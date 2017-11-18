@@ -19,7 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cvar.c -- dynamic variable tracking
 
-#include "quakedef.h"
+
+#include "icommon.h"
 
 cvar_t	*cvar_vars;
 char	*cvar_null_string = "";
@@ -110,12 +111,19 @@ void Cvar_Set (const quake::string_view& var_name, const quake::string_view& val
 		quake::con << "Cvar_Set: variable " << var_name << " not found" << std::endl;
 		return;
 	}
-	if (var->string != value) {
+	quake::string temp(value.data(), value.size());
+	if (var->string != temp) {
+		var->string = std::move(temp);
+#if 0
 		Z_Free(var->string);	// free the old value string
 
 		var->string = (char*)Z_Malloc(value.size() + 1);
 		value.copy(var->string, value.size());
-		var->value = Q_atof(var->string);
+		var->string[value.size()] = 0;
+#endif
+		float f = Q_atof(var->string);
+		var->value = f;
+
 		if (var->server && changed)
 		{
 			if (sv.active)
@@ -164,9 +172,9 @@ void Cvar_RegisterVariable (cvar_t *variable)
 	}
 		
 // copy the value off, because future sets will Z_Free it
-	oldstr = variable->string;
-	variable->string = (char*)Z_Malloc (Q_strlen(variable->string)+1);
-	Q_strcpy (variable->string, oldstr);
+//	oldstr = variable->string;
+//	variable->string = (char*)Z_Malloc (Q_strlen(variable->string)+1);
+//	Q_strcpy (variable->string, oldstr);
 	variable->value = Q_atof (variable->string);
 	
 // link the variable in

@@ -124,7 +124,7 @@ private:
 #else
 struct cvar_t {
 	const char* name;
-	char* string;
+	quake::string string;
 	float value;
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
 	qboolean server;		// notifies players when changed

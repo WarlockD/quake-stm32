@@ -265,9 +265,10 @@ namespace quake {
 		typedef const_iterator	iterator;
 		typedef const cmemlink&	rcself_t;
 	public:
-		constexpr inline				cmemlink(void) : _data(nullptr), _size(0) { }
-		constexpr inline				cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
-		constexpr inline				cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
+		constexpr inline		cmemlink(nullptr_t p, size_type n) : _data(nullptr), _size(0) { assert(n == 0); }
+		constexpr inline		cmemlink(void) : _data(nullptr), _size(0) { }
+		constexpr inline		cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
+		constexpr inline		cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
 		inline virtual     ~cmemlink(void) noexcept {}
 		void				link(const void* p, size_type n);
 		inline void			link(const cmemlink& l) { link(l.begin(), l.size()); }
@@ -325,6 +326,7 @@ namespace quake {
 		constexpr inline		memlink(void) : cmemlink() {}
 		constexpr inline		memlink(void* p, size_type n) : cmemlink(p, n) {}
 		constexpr inline		memlink(const void* p, size_type n) : cmemlink(p, n) {}
+		constexpr inline		memlink(nullptr_t p, size_type n) : cmemlink(p, n) {}
 		constexpr inline		memlink(rcself_t l) : cmemlink(l) {}
 		constexpr inline explicit	memlink(const cmemlink& l) : cmemlink(l) {}
 		inline pointer	data(void) { return const_cast<pointer>(cmemlink::data()); }
@@ -486,7 +488,7 @@ namespace quake {
 			if (offset > size())
 				throw std::out_of_range("data_helpers::at");
 			size_type rlen = std::min(count, size() - offset);
-			std::memcpy(dist, data() + offset, rlen * sizeof(T));
+			Q_memcpy(dist, data() + offset, rlen * sizeof(T));
 			return rlen;
 		}
 		inline constexpr void remove_prefix(size_type count) noexcept { assert(count <= size()); _data += count; _size -= count; }
@@ -569,7 +571,14 @@ namespace quake {
 		}
 		fixed_printf_buffer(const char* str) : fixed_printf_buffer(str, std::strlen(str)) {}
 	};
+	using string_view = std::string_view;
 
+	static inline size_t string_hasher(const char* str, size_t size) {
+		size_t h = 5381;
+		while (size--) h = (h * 33) ^ (uint8_t)*str++;
+		return h;
+	}
+#if 0
 	// so I don't have to keep recompiling headers, alot of this is going to be in commom
 	class string_view : public data_view<char> {
 		void relink(const_pointer p, size_t len) { _data = p; _size = len; }
@@ -633,7 +642,7 @@ namespace quake {
 		}
 		inline const_iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
 	};
-	
+#endif
 
 	/// \class string ustring.h ustl.h
 	/// \ingroup Sequences
@@ -681,8 +690,18 @@ namespace quake {
 	//	typedef utf8in_iterator<const_iterator>		utf8_iterator;
 		typedef size_type		pos_type;
 		static constexpr const pos_type npos = INT_MAX;	///< Value that means the end of string.
+		// https://stackoverflow.com/questions/2041355/c-constructor-accepting-only-a-string-literal
+		// nice idea to detect string literals
+		struct Dummy {};
+		template<typename T> struct IsCharPtr {};
+		template<> struct IsCharPtr<const char *> { typedef Dummy* Type; };
+		template<> struct IsCharPtr<char *> { typedef Dummy* Type; };
 	public:
+		// 
 		inline			string(void) noexcept : memblock() { relink("", 0); }
+		template<int N> string(const char(&v)[N]) { relink(v, std::strlen(v)); }
+		template<int N> string(char(&)[N]) { relink(v, std::strlen(v)); }
+		template<typename T> string(T v, typename IsCharPtr<T>::Type = 0) { assign((T)v); }
 		string(const string& s);
 		inline			string(const string& s, pos_type o, size_type n = npos);
 		inline explicit		string(const cmemlink& l);
@@ -768,7 +787,10 @@ namespace quake {
 		inline const string&	operator+= (uvalue_type c) { return operator+= (value_type(c)); }
 	//	inline const string&	operator+= (const_wpointer s) { return append(s); }
 		inline string		operator+ (const string& s) const;
-		inline bool			operator== (const string& s) const { return memblock::operator== (s); }
+		inline bool			operator== (const string& s) const {
+			return s.size() == size() &&
+				(s.data() == data() || 0 == std::memcmp(s.data(), data(), size()));
+		}
 		bool			operator== (const_pointer s) const noexcept;
 		inline bool			operator== (value_type c) const { return size() == 1 && c == at(0); }
 		inline bool			operator== (uvalue_type c) const { return operator== (value_type(c)); }
@@ -926,7 +948,7 @@ namespace quake {
 	// Operators needed to avoid comparing pointer to pointer
 
 #define PTR_STRING_CMP(op, impl)	\
-inline bool op (const char* s1, const string& s2) { return impl; }
+static inline bool op (const char* s1, const string& s2) { return impl; }
 	PTR_STRING_CMP(operator==, (s2 == s1))
 		PTR_STRING_CMP(operator!=, (s2 != s1))
 		PTR_STRING_CMP(operator<, (s2 >  s1))
@@ -999,6 +1021,27 @@ inline type name (const string& str, size_t* idx = nullptr) \
 		NUMBER_TO_STRING_CONVERTER(long double, "%Lf")
 #undef NUMBER_TO_STRING_CONVERTER
 
+	template<typename FUNC, typename T>
+	inline size_t _to_number_int(FUNC f, const string_view& str, T& value, int base = 0) {
+		const char* sp = str.data();
+		char* endp = nullptr;
+		value = f(sp, &endp, base);
+		return endp - sp;
+	}
+	template<typename FUNC, typename T>
+	inline size_t _to_number_float(FUNC f, const string_view& str, T& value) {
+		const char* sp = str.data();
+		char* endp = nullptr;
+		value = f(sp, &endp);
+		return endp - sp;
+	}
+	inline size_t to_number(const string_view& str, float& value) { return _to_number_float(::strtof,str, value); }
+	inline size_t to_number(const string_view& str, double& value) { return _to_number_float(::strtod, str, value); }
+	inline size_t to_number(const string_view& str, long double& value) { return _to_number_float(::strtold, str, value); }
+	inline size_t to_number(const string_view& str, int& value, int base = 0) { return _to_number_int(::strtol, str, value,base); }
+	inline size_t to_number(const string_view& str, long& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
+	inline size_t to_number(const string_view& str, unsigned long& value, int base = 0) { return _to_number_int(::strtoul, str, value, base); }
+
 
 	// do we need all the comparison operations? humm
 	inline bool operator==(const string_view& l, const string_view& r) { return l.compare(r) == 0; }
@@ -1011,17 +1054,7 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	std::ostream& operator<<(std::ostream& os, const string_view& sv);
 
 	// special cview that is 0 terminated
-	class cstring_view : public string_view {
-	public:
-		constexpr cstring_view() : string_view("", 0) {}
-		constexpr cstring_view(const_pointer str, size_t size) : string_view(str, size) { 
-			if (size > 0 && str[size] != '\0') {
-				Sys_Error("Bad cstring assignment"); // remove cause this is debuging
-			}
-		}
-		constexpr cstring_view(const_pointer str) : string_view(str) {}
-		constexpr const char* c_str() const { return data(); }
-	};
+
 	template<typename T>
 	class csimple_list {
 		const T* _data;
@@ -1036,90 +1069,94 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	// warning though, this does NOT override the compare functions.  I could make  the main comapre virtual, but 
 	// I am trying to hold off on that
 	// mabye rewrite this with static inhertenice? humm
-	class symbol : public string_view {
+	class symbol  {
+		string_view _view;
 	public:
 		using char_traits = std::char_traits<char>;
-		static inline size_type hasher(const char* str, size_type size) {
-			size_type h = 5381;
-			while (size--) h = (h * 33) ^ (uint8_t)tolower(*str++);
-			return h;
-		}
-		constexpr symbol() : string_view() {}
-		constexpr symbol(const_pointer str, size_t size) : string_view(str, size) {}
-		constexpr symbol(const_pointer str) : string_view(str, std::strlen(str)) {}
-		constexpr symbol(const string_view& str) : string_view(str) {}
-
-		void swap(symbol& r)
-		{	// swap with _Right
-			string_view::swap(static_cast<string_view&>(r));
-		}
+		constexpr symbol(const string_view& str) : _view(str) {}
+		constexpr symbol() : _view() {}
+		constexpr symbol(const char* str, size_t size) : symbol(string_view(str, size)) {}
+		constexpr symbol(const char* str) : symbol(string_view(str)) {}
+	
+		auto data() const { return _view.data(); }
+		auto size() const { return _view.size(); }
+		auto operator[](size_t i) const { return _view[i]; }
+		auto begin() const { return _view.begin(); }
+		auto end() const { return _view.end(); }
+		bool operator==(const string_view& r) const;
+		inline bool operator==(const symbol& r) const { return *this == r._view; }
+		inline bool operator==(string_view::const_pointer r) const { return *this == string_view(r); }
+		inline bool operator!=(const string_view& r) const { return !(*this == r); }
+		inline bool operator!=(const symbol& r) const { return *this != r._view; }
+		inline bool operator!=( string_view::const_pointer r)const { return !(*this == r); }
 	};
 
-	bool operator==(const symbol& l, const string_view& r);
-	inline bool operator==(const symbol& l, const string_view::const_pointer r) { return l == string_view(r); }
-	inline bool operator!=(const symbol& l, const string_view& r) { return !(l == r); }
-	inline bool operator!=(const symbol& l, const string_view::const_pointer r) { return !(l == r); }
+
 	std::ostream& operator<<(std::ostream& os, const symbol& sv);
 
 	template<size_t SIZE> class fixed_string_stream;
 	// fixed buffer string
-	template<size_t _SIZE>
-	class fixed_string : public cstring_view {
-	protected:
-		std::array<value_type, _SIZE> _buffer;
-		friend class fixed_string_stream<_SIZE>;
+	class string_buffer {
 	public:
-		static_assert(_SIZE > 1, "buffer size has to have space for 0");
-		using reference = value_type&;
-		using pointer = value_type*;
+		using value_type = typename string_view::value_type;
+		using size_type = typename string_view::size_type;
+		using reference = typename string_view::reference;
+		using pointer = typename string_view::pointer;
 		using iterator = pointer;
+		using const_reference = typename string_view::const_reference;
+		using const_pointer = typename string_view::const_pointer;
+		using const_iterator = const_pointer;
+		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
-		constexpr size_type capacity() const { return _buffer.size(); }
+		constexpr size_type capacity() const { return _capacity; }
+		static constexpr size_t npos = size_t(-1);
+		const_pointer data() const { return _buffer; }
+		const_pointer c_str() const { return _buffer; }
+		pointer data() { return _buffer; }
+		size_type size() const { return _size; }
 		void clear() { _size = 0; _buffer[0] = '\0'; }
-		constexpr void assign(const data_view<char>&  str) {
+		void assign(const string_view&  str) {
 			assert(str.size() < (capacity() - 1));
-			_data = _buffer.data();
 			_size = str.size();
-			char_traits::copy(_buffer.data(), str.data(), _size);
+			char_traits::copy(_buffer, str.data(), _size);
 			_buffer[_size] = '\0';
 		}
-		inline fixed_string& assign(const char* str) { assign(string_view(str)); return *this; }
-		inline fixed_string& assign(const char* str, size_type len) { assign(string_view(str, len)); return *this;}
+		inline string_buffer& assign(const char* str) { assign(string_view(str)); return *this; }
+		inline string_buffer& assign(const char* str, size_type len) { assign(string_view(str, len)); return *this;}
 
-		fixed_string&  assign(size_t n, char c) { 
-			assert(str.size() < (capacity() - 1));
-			_data = _buffer.data();
+		string_buffer&  assign(size_t n, char c) {
+			assert(size() < (capacity() - 1));
 			_size = n;
-			std::fill_n(_buffer.begin(), n, c);
+			std::fill_n(_buffer, n, c);
 			_buffer[_size] = '\0';
 			return *this;
 		}
-		pointer data() { return _buffer.data(); }
-		constexpr fixed_string() : cstring_view() {  }
-		constexpr fixed_string(const_pointer str, size_type size) : cstring_view(_buffer.data(), 0) { assign(str, size); }
-		constexpr fixed_string(const_pointer str) : cstring_view(_buffer.data(), 0) { assign(str); }
-		constexpr fixed_string(const data_view<char>& str) : cstring_view(_buffer.data(), 0) { assign(str); }
 
+
+		constexpr string_buffer() : _size(0), _capacity(0),_buffer(nullptr) {  }
+		string_buffer(pointer buffer, size_type size) : _size(0), _capacity(size), _buffer(buffer) { _buffer[0] = 0; }
+		string_buffer(pointer buffer, size_type capacity, size_type size) : _size(size), _capacity(capacity), _buffer(buffer) { _buffer[size] = 0; }
+		operator string_view() const { return string_view(_buffer, _size); }
 		// backwards compatablity with all the va around.  fix this or not?  change to streams?
 
 		void push_back(char c) { assert((_size + 1) < (capacity() - 1)); _buffer[_size++] = c; _buffer[_size] = '\0'; }
 		void pop_back() { if (_size > 0) --_size; }
 
-		fixed_string& append(const string_view&  str) {
+		string_buffer& append(const string_view&  str) {
 			assert(str.size() < (capacity() - _size - 1));
-			char_traits::copy(_buffer.data() + _size, str.data(), str.size());
+			char_traits::copy(_buffer + _size, str.data(), str.size());
 			_size += str.size();
 			_buffer[_size] = '\0';
 			return *this;
 		}
-		fixed_string& fill(size_t count, char c = ' ') {
+		string_buffer& fill(size_t count, char c = ' ') {
 			size_t n = std::min(count, (capacity() - _size - 1));
-			std::fill_n(_buffer.data() + _size, n, c);
+			std::fill_n(_buffer + _size, n, c);
 			_size += n;
 			_buffer[_size] = '\0';
 			return *this;
 		}
-		fixed_string& erase(size_type pos = 0, size_type len = npos) {
+		string_buffer& erase(size_type pos = 0, size_type len = npos) {
 			assert(pos < capacity());
 			if (len == npos || (len+pos) >= capacity()) _buffer[_size=pos] = 0;
 			else {
@@ -1128,59 +1165,96 @@ inline type name (const string& str, size_t* idx = nullptr) \
 			}
 			return *this;
 		}
-
+		bool empty() const { return _size == 0; }
 		inline void append(const char* str) { assign(string_view(str)); }
 		inline void append(const char* str, size_type len) { assign(string_view(str, len)); }
-		fixed_string& operator+=(const char* str) { append(str); return *this; }
-		fixed_string& operator+=(char c) { push_back(c); return *this; }
-		fixed_string& operator+=(const string_view& str) { append(str); return *this; }
+		string_buffer& operator+=(const char* str) { append(str); return *this; }
+		string_buffer& operator+=(char c) { push_back(c); return *this; }
+		string_buffer& operator+=(const string_view& str) { append(str); return *this; }
 		reference operator[](size_type i) { return _buffer[i]; }
-		reference at(size_type i) { return _buffer.at(i); }
-		iterator begin() { return _buffer.data(); }
-		iterator end() { return _buffer.data() + _size; }
+		reference at(size_type i) { return _buffer[i]; }
+		const_reference operator[](size_type i) const{ return _buffer[i]; }
+		const_reference at(size_type i) const { return _buffer[i]; }
+		iterator begin() { return _buffer; }
+		iterator end() { return _buffer + _size; }
 		reverse_iterator rbegin() { return reverse_iterator(begin()); }
 		reverse_iterator rend() { return reverse_iterator(end()); }
-
-		void swap(fixed_string& r)
+		const_iterator begin()const { return _buffer; }
+		const_iterator end()const { return _buffer + _size; }
+		const_reverse_iterator rbegin()const { return const_reverse_iterator(begin()); }
+		const_reverse_iterator rend() const { return const_reverse_iterator(end()); }
+		reference front() { return _buffer[0]; }
+		reference back() { return _buffer[_size - 1]; }
+		const_reference front() const { return _buffer[0]; }
+		const_reference back() const { return _buffer[_size-1]; }
+		void swap(string_buffer& r)
 		{	// swap with _Right
 			if (this != std::addressof(r)) {
 				std::swap(_size, r._size);
 				std::swap(_buffer, r._buffer);
+				std::swap(_capacity, r._capacity);
 			}
 		}
+		inline bool operator==(const char* s) const { return string_view(_buffer, _size).compare(s) == 0; }
+		inline bool operator!=(const  char* s) const { return string_view(_buffer, _size).compare(s) != 0; }
+		inline bool operator==(const string_view& s) const { return string_view(_buffer,_size).compare(s) == 0; }
+		inline bool operator!=(const string_view& s) const { return string_view(_buffer, _size).compare(s) != 0; }
+		inline bool operator==(const string_buffer& s) const { return string_view(_buffer, _size).compare(s) == 0; }
+		inline bool operator!=(const string_buffer& s) const { return string_view(_buffer, _size).compare(s) != 0; }
+	protected:
+		pointer _buffer;
+		size_t _capacity;
+		size_t _size;
+	};
+	// fixed buffer string
+	template<size_t _SIZE>
+	class fixed_string : public string_buffer {
+		std::array<string_buffer::value_type, _SIZE> _fbuffer;
+	public:
+		fixed_string() : string_buffer(_fbuffer.data(), _fbuffer.size()) {}
+		fixed_string(const_pointer str) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str); }
+		fixed_string(const_pointer str,size_t len) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str,len); }
+		fixed_string(const string_view& s) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(s); }
+		operator string_buffer&() { return *this; }
+		operator const string_buffer&() const{ return *this; }
+		template<size_t SIZE>
+		inline bool operator==(const fixed_string<SIZE>& s) const { return string_view(_buffer, _size).compare(s) == 0; }
+		template<size_t SIZE>
+		inline bool operator!=(const fixed_string<SIZE>& s) const { return string_view(_buffer, _size).compare(s) != 0; }
 	};
 
 	class fixed_string_buffer : public std::streambuf {
 	public:
 		void clear() {
-			if (_buffer) {
-				setp(_buffer, _buffer + _size - 1);  // always have room for the zero
+			if (_str) {
+				setp(_str, _str + _capacity - 1);  // always have room for the zero
 				*pptr() = 0;
 			} else setp(nullptr, nullptr);
 		} 
-		fixed_string_buffer() : _buffer(nullptr), _size(0) {}
+		//fixed_string_buffer() : _str() { }
 		fixed_string_buffer(const fixed_string_buffer& copy) = delete;
-		fixed_string_buffer(fixed_string_buffer && move) : _buffer(move._buffer), _size(move._size), std::streambuf(move) {}
-		fixed_string_buffer(char* buffer, size_t size) : _buffer(buffer), _size(size) { clear(); }
-		size_t capacity() const { return _size; }
+		fixed_string_buffer(fixed_string_buffer && move) : _str(move._str), std::streambuf(move) {}
+		fixed_string_buffer(char* buffer, size_t size) : _str(buffer), _capacity(size) { clear(); }
+		size_t capacity() const { return _capacity; }
 		size_t size() const { return pbase() ? pptr() - pbase() : 0; }
 		// fuck windows, just fuck them
 		// I had to zero terminate here becuase windows would take the raw buffer pointer
-		cstring_view str() const { 
-			const_cast<char*>(_buffer)[size()] = '\0';
-			return cstring_view(_buffer,size()); 
+		string_buffer str() {
+			return string_buffer(pbase(), capacity(), size());
+		}
+		string_buffer str() const {
+			return string_buffer(pbase(), capacity(),size());
 		}
 		void swap(fixed_string_buffer& r)
 		{	// swap with _Right
 			if (this != std::addressof(r)) {
-				std::swap(_buffer,r._buffer);
-				std::swap(_size,r._size);
+				std::swap(_str,r._str);
 				std::streambuf::swap(r);
 			}
 		}
 	protected:
-		char* _buffer;
-		size_t _size;
+		size_t _capacity;
+		char* _str;
 
 
 		pos_type seekoff(off_type off, std::ios_base::seekdir way, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final {
@@ -1248,8 +1322,8 @@ inline type name (const string& str, size_t* idx = nullptr) \
 				}
 #endif
 		std::streambuf* setbuf(char * buffer, std::streamsize size) override final {
-			_buffer = buffer;
-			_size = (size_t)size;
+			_str = buffer;
+			_capacity = size_t(size);
 			clear();
 			return std::streambuf::setbuf(buffer, size);
 		}
@@ -1279,7 +1353,8 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	class buffer_string_stream : public std::ostream {
 	public:
 		buffer_string_stream(char* buffer, size_t size) :_sbuf(buffer,size), std::ostream(&_sbuf) {  }
-		cstring_view str() const { return _sbuf.str(); }
+		auto str() const { return _sbuf.str(); }
+		auto str()  { return _sbuf.str(); }
 		size_t size() const { return _sbuf.size(); }
 		void clear() { _sbuf.clear(); }
 		fixed_string_buffer* rdbuf() const   { return const_cast<fixed_string_buffer*>(&_sbuf); }
@@ -1291,9 +1366,9 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	class fixed_string_stream : public buffer_string_stream {
 	public:
 		using string_type = fixed_string<SIZE>;
-		fixed_string_stream() : buffer_string_stream(_str.data(), _str.size()) { }
+		fixed_string_stream() : buffer_string_stream(_sbuffer.data(), _sbuffer.size()) { }
 	protected:
-		std::array<char, SIZE> _str;
+		std::array<char, SIZE> _sbuffer;
 	};
 
 	template<typename T>
@@ -1335,13 +1410,13 @@ namespace std {
 	template<>
 	struct hash<quake::string_view> {
 		size_t  operator()(const quake::string_view& s) const {
-			return quake::string_view::hasher(s.data(), s.size());
+			return quake::string_hasher(s.data(), s.size());
 		}
 	};
 	template<>
 	struct hash<quake::symbol> {
 		size_t  operator()(const quake::symbol& s) const {
-			return quake::symbol::hasher(s.data(), s.size());
+			return quake::string_hasher(s.data(), s.size());
 		}
 	};
 }
@@ -1352,16 +1427,47 @@ namespace std {
 
 //============================================================================
 
-class sizebuf_t : public quake::memblock {
+class sizebuf_t { //: public quake::memblock {
 	qboolean	_allowoverflow;	// if false, do a Sys_Error
 	qboolean	_overflowed;	// set to true if the buffer size failed
-	size_t		_maxsize;
+	int			_hunk_low_used;
+	size_t		_cursize;
+	quake::memlink _data;
 public:
-	void* GetSpace(int length);
+	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr,0), _cursize(0U) {}
+	sizebuf_t(byte* data, size_t size, bool allowoverflow=true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U),_cursize(0U), _data(data, size) {}
+	void* GetSpace(size_t length);
+	
 	void Clear();
+	void Free();
+	void Alloc(size_t startsize);
+	void Insert(const void* data, size_t length, size_t pos=0);
+	void Write(const void* data, size_t length);
+	void Print(const quake::string_view& data);
+	void Print(char c);
+	void WriteByte(int c);
+	void WriteChar(int c);
+	void WriteShort(int c);
+	void WriteLong(int c);
+	void WriteFloat(float f);
+	void WriteString(const quake::string_view& data);
+	void WriteCoord(float f);
+	void WriteAngle(float f);
 
+	inline size_t size() const { return _cursize; }
+	
+	inline size_t maxsize() const { return _data.size(); }
+	inline void resize(size_t size) { assert((size + 1) < maxsize()); _data.data()[size] = 0; _cursize = size; }
+	inline const byte* data() const { return (const byte*)_data.data(); }
+	inline byte* data() { return (byte*)_data.data(); }
+	inline bool overflowed() const { return _overflowed; }
+	inline void overflowed(bool value) {  _overflowed = value; }
+	byte* begin() { return data(); }
+	const byte* begin() const { return data(); }
+	byte* end() { return data()+ _cursize; }
+	const byte* end() const { return data()+ _cursize; }
 } ;
-
+#if 0
 void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
 void SZ_Clear (sizebuf_t *buf);
@@ -1369,6 +1475,7 @@ void *SZ_GetSpace (sizebuf_t *buf, int length);
 void SZ_Write (sizebuf_t *buf, const void *data, int length);
 void SZ_Print (sizebuf_t *buf, const quake::string_view& data);	// strcats onto the sizebuf
 void SZ_Print(sizebuf_t *buf, char c);
+#endif
 //============================================================================
 
 typedef struct link_s
@@ -1417,49 +1524,49 @@ extern	float	(*BigFloat) (float l);
 extern	float	(*LittleFloat) (float l);
 
 //============================================================================
-
-void MSG_WriteChar (sizebuf_t *sb, int c);
-void MSG_WriteByte (sizebuf_t *sb, int c);
+#if 0
+void sizebuf_t *sb->WriteChar(int c);
+void sizebuf_t *sb->WriteByte(int c);
 // I put some templates here so we can catch some odd balls
 // alot of stuff in sv_main gets converted to bytes.  We are talking floats?  There
 // are enough warnings for me to think about changing the df file
 template<typename T, typename = std::enable_if<!std::is_same<T,int>::value && std::is_arithmetic<T>::value>>
-void MSG_WriteChar(sizebuf_t *sb, const T c) {
+void sizebuf_t *sb->WriteChar(const T c) {
 	//static_assert("Do you REALLY want to convert this to char?");
-	MSG_WriteChar(sb, static_cast<int>(c));
+	sb->WriteChar(static_cast<int>(c));
 }
 template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
-void MSG_WriteByte(sizebuf_t *sb, const T c) {
+void sizebuf_t *sb->WriteByte(const T c) {
 	//static_assert("Do you REALLY want to convert this to byte?");
-	MSG_WriteByte(sb, static_cast<int>(c));
+	sb->WriteByte(static_cast<int>(c));
 }
 
 
-void MSG_WriteShort (sizebuf_t *sb, int c);
+void sizebuf_t *sb->WriteShort(int c);
 template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
-void MSG_WriteShort(sizebuf_t *sb, const T c) {
+void sizebuf_t *sb->WriteShort(const T c) {
 	//static_assert("Do you REALLY want to convert this to short?");
-	MSG_WriteShort(sb, static_cast<int>(c));
+	sb->WriteShort(static_cast<int>(c));
 }
 
 
-void MSG_WriteLong (sizebuf_t *sb, int c);
+void sizebuf_t *sb->WriteLong(int c);
 template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
-void MSG_WriteLong(sizebuf_t *sb, const T c) {
+void sizebuf_t *sb->WriteLong(const T c) {
 	//static_assert("Do you REALLY want to convert this to long?");
-	MSG_WriteLong(sb, static_cast<int>(c));
+	sb->WriteLong(static_cast<int>(c));
 }
 
 
-void MSG_WriteFloat (sizebuf_t *sb, float f);
-void MSG_WriteString (sizebuf_t *sb, const char *s);
-void MSG_WriteCoord (sizebuf_t *sb, float f);
-void MSG_WriteAngle (sizebuf_t *sb, float f);
-
+void sizebuf_t *sb->WriteFloat(float f);
+void sizebuf_t *sb->WriteString(const char *s);
+void sizebuf_t *sb->WriteCoord(float f);
+void sizebuf_t *sb->WriteAngle(float f);
+#endif
 extern	int			msg_readcount;
 extern	qboolean	msg_badread;		// set if a read goes beyond end of message
 
-void MSG_BeginReading (void);
+void MSG_BeginReading();
 int MSG_ReadChar (void);
 int MSG_ReadByte (void);
 int MSG_ReadShort (void);
@@ -1472,11 +1579,16 @@ float MSG_ReadAngle (void);
 
 //============================================================================
 
-void Q_memset (void *dest, int fill, size_t count);
+void Q_memset (void *dest,int fill, size_t count);
 void Q_memcpy (void *dest, const void * src, size_t count);
 int Q_memcmp (const void * m1, const void * m2, size_t count);
 
-
+template<typename V,size_t N>
+inline void Q_memcpy(V(&dest)[N], const void * src, size_t count) { assert(count < (sizeof(V)*N)); ::memcpy_s(dest, sizeof(V)*N, src, count); }
+template<typename V, size_t N>
+inline void Q_memset(V(&dest)[N], int fill, size_t count) { assert(count < (sizeof(V)*N)); ::memset(dest, fill, count); }
+template<typename V, size_t N>
+inline void Q_memcmp(const V(&dest)[N], const void * m2, size_t count) { assert(count < (sizeof(V)*N)); return ::memcmp(dest, src, count); }
 
 size_t Q_strlen(const char * str);
 void Q_strncpy(char *dest, const char * src, size_t count);

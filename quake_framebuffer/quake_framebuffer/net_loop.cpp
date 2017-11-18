@@ -18,8 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // net_loop.c
-
-#include "quakedef.h"
+#include "icommon.h"
 #include "net_loop.h"
 
 qboolean	localconnectpending = false;
@@ -135,14 +134,14 @@ int Loop_GetMessage (qsocket_t *sock)
 	ret = sock->receiveMessage[0];
 	length = sock->receiveMessage[1] + (sock->receiveMessage[2] << 8);
 	// alignment byte skipped here
-	SZ_Clear (&net_message);
-	SZ_Write (&net_message, &sock->receiveMessage[4], length);
+	net_message.Clear();
+	net_message.Write( &sock->receiveMessage[4], length);
 
 	length = IntAlign(length + 4);
 	sock->receiveMessageLength -= length;
 
 	if (sock->receiveMessageLength)
-		Q_memcpy(sock->receiveMessage, &sock->receiveMessage[length], sock->receiveMessageLength);
+		std::memcpy(sock->receiveMessage, &sock->receiveMessage[length], sock->receiveMessageLength);
 
 	if (sock->driverdata && ret == 1)
 		((qsocket_t *)sock->driverdata)->canSend = true;
@@ -161,7 +160,7 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
-	if ((*bufferLength + data->cursize + 4) > NET_MAXMESSAGE)
+	if ((*bufferLength + data->size() + 4) > NET_MAXMESSAGE)
 		Sys_Error("Loop_SendMessage: overflow\n");
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
@@ -170,15 +169,15 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 	*buffer++ = 1;
 
 	// length
-	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
+	*buffer++ = data->size() & 0xff;
+	*buffer++ = data->size() >> 8;
 
 	// align
 	buffer++;
 
 	// message
-	Q_memcpy(buffer, data->data, data->cursize);
-	*bufferLength = IntAlign(*bufferLength + data->cursize + 4);
+	Q_memcpy(buffer, data->data(), data->size());
+	*bufferLength = IntAlign(*bufferLength + data->size() + 4);
 
 	sock->canSend = false;
 	return 1;
@@ -195,7 +194,7 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
-	if ((*bufferLength + data->cursize + sizeof(byte) + sizeof(short)) > NET_MAXMESSAGE)
+	if ((*bufferLength + data->size() + sizeof(byte) + sizeof(short)) > NET_MAXMESSAGE)
 		return 0;
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
@@ -204,15 +203,15 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 	*buffer++ = 2;
 
 	// length
-	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
+	*buffer++ = data->size() & 0xff;
+	*buffer++ = data->size() >> 8;
 
 	// align
 	buffer++;
 
 	// message
-	Q_memcpy(buffer, data->data, data->cursize);
-	*bufferLength = IntAlign(*bufferLength + data->cursize + 4);
+	std::memcpy(buffer, data->data(), data->size());
+	*bufferLength = IntAlign(*bufferLength + data->size() + 4);
 	return 1;
 }
 

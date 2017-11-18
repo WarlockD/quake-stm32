@@ -2,7 +2,7 @@
 //
 // Copyright (c) 2005 by Mike Sharov <msharov@users.sourceforge.net>
 // This file is free software, distributed under the MIT License.
-
+#include "icommon.h"
 #include "ustring.h"
 #include "strmsize.h"
 #include <stdio.h>	// for vsnprintf (in string::format)

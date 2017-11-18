@@ -19,7 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cl_main.c  -- client main loop
 
-#include "quakedef.h"
+
+#include "icommon.h"
 using namespace std::chrono;
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
@@ -69,7 +70,7 @@ void CL_ClearState (void)
 // wipe the entire cl structure
 	memset (&cl, 0, sizeof(cl));
 
-	SZ_Clear (&cls.message);
+	cls.message.Clear();
 
 // clear other arrays	
 	memset (cl_efrags, 0, sizeof(cl_efrags));
@@ -114,10 +115,10 @@ void CL_Disconnect (void)
 			CL_Stop();
 
 		Con_DPrintf ("Sending clc_disconnect\n");
-		SZ_Clear (&cls.message);
-		MSG_WriteByte (&cls.message, clc_disconnect);
+		cls.message.Clear();
+		cls.message.WriteByte(clc_disconnect);
 		NET_SendUnreliableMessage (cls.netcon, &cls.message);
-		SZ_Clear (&cls.message);
+		cls.message.Clear();;
 		NET_Close (cls.netcon);
 
 		cls.state = ca_disconnected;
@@ -182,36 +183,36 @@ void CL_SignonReply (void)
 	switch (cls.signon)
 	{
 	case 1:
-		MSG_WriteByte (&cls.message, clc_stringcmd);
-		MSG_WriteString (&cls.message, "prespawn");
+		cls.message.WriteByte(clc_stringcmd);
+		cls.message.WriteString("prespawn");
 		break;
 		
 	case 2:		
 	{
 		quake::fixed_string_stream<256> ss;
 
-		MSG_WriteByte(&cls.message, clc_stringcmd);
+		cls.message.WriteByte(clc_stringcmd);
 		ss.rdbuf()->clear();
 		ss << "name \"" << cl_name.string << std::endl;
-		MSG_WriteString(&cls.message, ss.str().c_str());
+		cls.message.WriteString(ss.str().c_str());
 
-		MSG_WriteByte(&cls.message, clc_stringcmd);
+		cls.message.WriteByte(clc_stringcmd);
 
 		ss.rdbuf()->clear();
 		ss << "color " << ((int)cl_color.value >> 4) << ' ' << ((int)cl_color.value & 15) << std::endl;
-		MSG_WriteString(&cls.message, ss.str().c_str());
+		cls.message.WriteString(ss.str().c_str());
 
-		MSG_WriteByte(&cls.message, clc_stringcmd);
+		cls.message.WriteByte(clc_stringcmd);
 
 		ss.rdbuf()->clear();
 		ss << "spawn " << cls.spawnparms << std::endl;
-		MSG_WriteString(&cls.message, ss.str().c_str());
+		cls.message.WriteString(ss.str().c_str());
 	}
 		break;
 		
 	case 3:	
-		MSG_WriteByte (&cls.message, clc_stringcmd);
-		MSG_WriteString (&cls.message, "begin");
+		cls.message.WriteByte(clc_stringcmd);
+		cls.message.WriteString("begin");
 		Cache_Report ();		// print remaining memory
 		break;
 		
@@ -700,12 +701,12 @@ void CL_SendCmd (void)
 
 	if (cls.demoplayback)
 	{
-		SZ_Clear (&cls.message);
+		cls.message.Clear();
 		return;
 	}
 	
 // send the reliable message
-	if (!cls.message.cursize)
+	if (!cls.message.size())
 		return;		// no message at all
 	
 	if (!NET_CanSendMessage (cls.netcon))
@@ -717,7 +718,7 @@ void CL_SendCmd (void)
 	if (NET_SendMessage (cls.netcon, &cls.message) == -1)
 		Host_Error ("CL_WriteToServer: lost server connection");
 
-	SZ_Clear (&cls.message);
+	cls.message.Clear();;
 }
 
 /*
@@ -727,7 +728,7 @@ CL_Init
 */
 void CL_Init (void)
 {	
-	SZ_Alloc (&cls.message, 1024);
+	cls.message.Alloc( 1024);
 
 	CL_InitInput ();
 	CL_InitTEnts ();

@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // console.c
 
+#include "icommon.h"
+
 #ifdef NeXT
 #include <libc.h>
 #endif
@@ -28,7 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <io.h>
 #endif
 #include <fcntl.h>
-#include "quakedef.h"
+
 
 int 		con_linewidth;
 

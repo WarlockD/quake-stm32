@@ -19,7 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 /* crc.c */
 
-#include "quakedef.h"
+
+#include "icommon.h"
 #include "crc.h"
 
 // this is a 16 bit, non-reflected CRC using the polynomial 0x1021

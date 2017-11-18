@@ -23,14 +23,14 @@
     <ProjectGuid>{91702CCD-7BEA-4E89-AA07-22A5363E4572}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>quake_framebuffer</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -88,12 +88,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Create</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <PrecompiledHeaderFile>icommon.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,10 +156,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\ustl-master\cmemlink.cc" />
-    <ClCompile Include="..\ustl-master\memblock.cc" />
-    <ClCompile Include="..\ustl-master\memlink.cc" />
-    <ClCompile Include="..\ustl-master\ustring.cc" />
     <ClCompile Include="cd_null.cpp" />
     <ClCompile Include="chase.cpp" />
     <ClCompile Include="cl_demo.cpp" />
@@ -235,12 +231,6 @@
     <Image Include="quake.gif" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ustl-master\cmemlink.h" />
-    <ClInclude Include="..\ustl-master\memblock.h" />
-    <ClInclude Include="..\ustl-master\memlink.h" />
-    <ClInclude Include="..\ustl-master\metamac.h" />
-    <ClInclude Include="..\ustl-master\ustring.h" />
-    <ClInclude Include="..\ustl-master\uvector.h" />
     <ClInclude Include="adivtab.h" />
     <ClInclude Include="anorms.h" />
     <ClInclude Include="anorm_dots.h" />

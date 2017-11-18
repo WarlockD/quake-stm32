@@ -19,7 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cmd.c -- Quake script command processing module
 
-#include "quakedef.h"
+
+#include "icommon.h"
 
 void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_view args[]);
 
@@ -58,8 +59,9 @@ void Cmd_Wait_f(cmd_source_t source, size_t argc, const quake::string_view args[
 =============================================================================
 */
 
-sizebuf_t	cmd_text;
-
+//sizebuf_t	cmd_text;
+static std::list<std::vector<std::string> > _parsed_commands;
+//static UList<StringList> _parsed_commands;
 /*
 ============
 Cbuf_Init
@@ -67,10 +69,33 @@ Cbuf_Init
 */
 void Cbuf_Init (void)
 {
-	SZ_Alloc (&cmd_text, 8192);		// space for commands and script files
+//	cmd_text.Alloc(8192);		// space for commands and script files
+	_parsed_commands.clear();
 }
 
 
+void ParseCommands(const quake::string_view& text, bool front = false) {
+	_CrtCheckMemory();
+	COM_Parser parser(text);
+	_CrtCheckMemory();
+	quake::string_view token;
+	//StringList args;
+	std::vector<std::string> args;
+	auto start = front ? _parsed_commands.begin() : _parsed_commands.end();
+	do {
+		_CrtCheckMemory();
+		token = parser.Next(true);
+		if (token.empty() || token[0] == '\n') {
+			if (!args.empty()) {
+				start = _parsed_commands.insert(start, args);
+				args.clear();
+			} else 
+			continue;
+		}
+		if (token.empty()) break;
+		args.emplace_back(token.data(), token.size());
+	} while (true);
+}
 /*
 ============
 Cbuf_AddText
@@ -80,13 +105,15 @@ Adds command text at the end of the buffer
 */
 void Cbuf_AddText (const quake::string_view& text)
 {
-	if ((cmd_text.cursize + (int)text.size()) >= cmd_text.maxsize)
+#if 0
+	if ((cmd_text.size() + (int)text.size()) >= cmd_text.maxsize())
 	{
-		Con_Printf ("Cbuf_AddText: overflow\n");
+		quake::con << "Cbuf_AddText: overflow" << std::endl;
 		return;
 	}
-
-	SZ_Write (&cmd_text, text.data(), text.size());
+#endif
+	ParseCommands(text, false);
+	
 }
 
 
@@ -101,27 +128,39 @@ FIXME: actually change the command buffer to do less copying
 */
 void Cbuf_InsertText (const quake::string_view& text)
 {
+	ParseCommands(text, true);
+#if 0
 	char	*temp = nullptr;// shut up compiler
 	int		templen;
 
+	
+
 // copy off any commands still remaining in the exec buffer
-	templen = cmd_text.cursize;
+	templen = cmd_text.size();
 	if (templen)
 	{
-		temp = (char*)Z_Malloc (templen);
-		std::memcpy (temp, cmd_text.data, templen);
-		SZ_Clear (&cmd_text);
+		cmd_text.Insert(text.data(), text.size());
+		quake::debug << quake::string_view((char*)cmd_text.data(), cmd_text.size()) << std::endl;
+	//	temp = (char*)Z_Malloc (templen);
+	//	Q_memcpy (temp, cmd_text.data(), templen);
+	//	cmd_text.Clear();
+		return;
 	}
-		
+	else {
+		cmd_text.Insert(text.data(), text.size());
+	}
+	return;
 // add the entire text of the file
 	Cbuf_AddText (text);
 	
 // add the copied off data
 	if (templen)
 	{
-		SZ_Write (&cmd_text, temp, templen);
+		cmd_text.Write(temp, templen);
+		quake::debug << quake::string_view((char*)cmd_text.data(), cmd_text.size()) << std::endl;
 		Z_Free (temp);
 	}
+#endif
 }
 void execute_args(const quake::string_view* args, size_t count, cmd_source_t src);
 /*
@@ -131,8 +170,21 @@ Cbuf_Execute
 */
 void Cbuf_Execute (void)
 {
-	if (cmd_text.cursize <= 0) return; // nothing?
-	quake::string_view text((const char*)cmd_text.data, cmd_text.cursize);
+	UVector<quake::string_view> test;
+	//std::vector< quake::string_view> test;
+	for (auto it = _parsed_commands.begin(); it != _parsed_commands.end(); ) {
+		if (!it->empty()) {
+			std::transform(it->begin(), it->end(), std::back_inserter(test), [](const std::string&s) -> quake::string_view { return quake::string_view(s.data(), s.size()); });
+			execute_args(test, src_command);
+			it = _parsed_commands.erase(it);
+			test.clear();	
+		}
+		else ++it;
+
+	}
+#if 0
+	if (cmd_text.size() <= 0) return; // nothing?
+	quake::string_view text((const char*)cmd_text.data(), cmd_text.size());
 	quake::string_view token;
 	//UVector<quake::string_view> args;
 	std::vector<quake::string_view> args;
@@ -146,18 +198,19 @@ void Cbuf_Execute (void)
 				{	// skip out while text still remains in buffer, leaving it
 					// for next frame
 					cmd_wait = false;
-					if (parser.pos() == cmd_text.cursize)
-						cmd_text.cursize = 0;
+					if (parser.pos() == cmd_text.size())
+						cmd_text.Clear();
 					else
 					{
-						cmd_text.cursize -= parser.pos();
+						cmd_text.resize(cmd_text.size() - parser.pos());
 						auto r = parser.remaining();
-						r.copy((char*)cmd_text.data, cmd_text.cursize);
+						r.copy((char*)cmd_text.data(), cmd_text.size());
 					}
 					break;
 				}
 				args.clear();
 			}
+			else if (token.empty()) break;
 			continue;
 		}
 		args.emplace_back(token);
@@ -210,6 +263,7 @@ void Cbuf_Execute (void)
 			break;
 		}
 	}
+#endif
 #endif
 }
 
@@ -317,14 +371,8 @@ Creates a new command that executes a command string (possibly ; seperated)
 */
 
 
-char *CopyString(const quake::string_view& in)
-{
-	char	*out;
 
-	out = (char*)Z_Malloc(in.size() +1);
-	std::memcpy(out, in.data(), in.size());
-	return out;
-}
+
 void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	
@@ -359,16 +407,17 @@ void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view arg
 
 	if (!a)
 	{
-		a = (cmdalias_t*)Z_Malloc (sizeof(cmdalias_t));
+		a = new cmdalias_t;
+		a->name.assign(s.data(), s.size());
 		a->next = cmd_alias;
 		cmd_alias = a;
 	}
-	s.copy(a->name, sizeof(a->name));
+
 
 // copy the rest of the command line
 	for (size_t i=2 ; i< argc ; i++)
 	{
-		a->value += args[i];
+		a->value.append(args[i].data(), args[i].size());
 		if (i != argc) a->value += ' ';
 	}
 	a->value += '\n';
@@ -447,7 +496,7 @@ void	Cmd_AddCommand (const quake::string_view& cmd_name, xcommand_t function)
 	}
 
 	cmd = (cmd_function_t*)Hunk_Alloc (sizeof(cmd_function_t) + cmd_name.size() +1);
-	std::memcpy(cmd->name, cmd_name.data(), cmd_name.size());
+	Q_memcpy((void*)cmd->name, cmd_name.data(), cmd_name.size());
 	cmd->name[cmd_name.size()] = 0;
 	cmd->function = function;
 	cmd->next = cmd_functions;
@@ -515,16 +564,16 @@ void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_v
 	if (cls.demoplayback)
 		return;		// not really connected
 
-	MSG_WriteByte (&cls.message, clc_stringcmd);
+	cls.message.WriteByte( clc_stringcmd);
 	if (Q_strcasecmp(args[0], "cmd") != 0)
 	{
-		SZ_Print (&cls.message, args[0]);
-		SZ_Print (&cls.message, ' ');
+		cls.message.Print( args[0]);
+		cls.message.Print(' ');
 	}
 	if(argc > 1)
 	for(size_t i=1; i < argc;i++)
-		SZ_Print(&cls.message, args[i]);
-	SZ_Print (&cls.message, '\n');
+		cls.message.Print(args[i]);
+	cls.message.Print('\n');
 }
 
 void execute_args(const quake::string_view* args, size_t count, cmd_source_t src) {

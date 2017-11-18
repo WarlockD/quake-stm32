@@ -22,8 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Quake is a trademark of Id Software, Inc., (c) 1996 Id Software, Inc. All
 // rights reserved.
 
-#include "quakedef.h"
 
+#include "icommon.h"
 /*
 ===============================================================================
 
@@ -329,28 +329,25 @@ void CL_SendMove (usercmd_t *cmd)
 {
 	int		i;
 	int		bits;
-	sizebuf_t	buf;
+	
 	byte	data[128];
-	
-	buf.maxsize = 128;
-	buf.cursize = 0;
-	buf.data = data;
-	
+	sizebuf_t	buf(data, sizeof(data));
+
 	cl.cmd = *cmd;
 
 //
 // send the movement message
 //
-    MSG_WriteByte (&buf, clc_move);
+    buf.WriteByte(clc_move);
 
-	MSG_WriteFloat (&buf, idCast<float>(cl.mtime[0]));	// so server can get ping times
+	buf.WriteFloat(idCast<float>(cl.mtime[0]));	// so server can get ping times
 
 	for (i=0 ; i<3 ; i++)
-		MSG_WriteAngle (&buf, cl.viewangles[i]);
+		buf.WriteAngle(cl.viewangles[i]);
 	
-    MSG_WriteShort (&buf, cmd->forwardmove);
-    MSG_WriteShort (&buf, cmd->sidemove);
-    MSG_WriteShort (&buf, cmd->upmove);
+    buf.WriteShort(cmd->forwardmove);
+    buf.WriteShort(cmd->sidemove);
+    buf.WriteShort(cmd->upmove);
 
 //
 // send button bits
@@ -365,16 +362,16 @@ void CL_SendMove (usercmd_t *cmd)
 		bits |= 2;
 	in_jump.state &= ~2;
 	
-    MSG_WriteByte (&buf, bits);
+    buf.WriteByte(bits);
 
-    MSG_WriteByte (&buf, in_impulse);
+    buf.WriteByte(in_impulse);
 	in_impulse = 0;
 
 #ifdef QUAKE2
 //
 // light level
 //
-	MSG_WriteByte (&buf, cmd->lightlevel);
+	buf.WriteByte(cmd->lightlevel);
 #endif
 
 //

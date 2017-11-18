@@ -18,8 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // host.c -- coordinates spawning and killing of local servers
-
-#include "quakedef.h"
+#include "icommon.h"
 #include "r_local.h"
 
 /*
@@ -280,8 +279,8 @@ void SV_ClientPrintf (const char *fmt, ...)
 	Q_vsprintf(string, fmt,argptr);
 	va_end (argptr);
 	
-	MSG_WriteByte (&host_client->message, svc_print);
-	MSG_WriteString (&host_client->message, string);
+	host_client->message.WriteByte(svc_print);
+	host_client->message.WriteString(string);
 }
 
 /*
@@ -304,8 +303,8 @@ void SV_BroadcastPrintf (char *fmt, ...)
 	for (i=0 ; i<svs.maxclients ; i++)
 		if (svs.clients[i].active && svs.clients[i].spawned)
 		{
-			MSG_WriteByte (&svs.clients[i].message, svc_print);
-			MSG_WriteString (&svs.clients[i].message, string);
+			svs.clients[i].message.WriteByte(svc_print);
+			svs.clients[i].message.WriteString(string);
 		}
 }
 
@@ -324,8 +323,8 @@ void Host_ClientCommands (char *fmt, ...)
 	Q_vsprintf(string, fmt,argptr);
 	va_end (argptr);
 	
-	MSG_WriteByte (&host_client->message, svc_stufftext);
-	MSG_WriteString (&host_client->message, string);
+	host_client->message.WriteByte(svc_stufftext);
+	host_client->message.WriteString(string);
 }
 
 /*
@@ -347,7 +346,7 @@ void SV_DropClient (qboolean crash)
 		// send any final messages (don't check for errors)
 		if (NET_CanSendMessage (host_client->netconnection))
 		{
-			MSG_WriteByte (&host_client->message, svc_disconnect);
+			host_client->message.WriteByte(svc_disconnect);
 			NET_SendMessage (host_client->netconnection, &host_client->message);
 		}
 	
@@ -379,15 +378,15 @@ void SV_DropClient (qboolean crash)
 	{
 		if (!client->active)
 			continue;
-		MSG_WriteByte (&client->message, svc_updatename);
-		MSG_WriteByte (&client->message, host_client - svs.clients);
-		MSG_WriteString (&client->message, "");
-		MSG_WriteByte (&client->message, svc_updatefrags);
-		MSG_WriteByte (&client->message, host_client - svs.clients);
-		MSG_WriteShort (&client->message, 0);
-		MSG_WriteByte (&client->message, svc_updatecolors);
-		MSG_WriteByte (&client->message, host_client - svs.clients);
-		MSG_WriteByte (&client->message, 0);
+		client->message.WriteByte(svc_updatename);
+		client->message.WriteByte(host_client - svs.clients);
+		client->message.WriteString("");
+		client->message.WriteByte(svc_updatefrags);
+		client->message.WriteByte(host_client - svs.clients);
+		client->message.WriteShort(0);
+		client->message.WriteByte(svc_updatecolors);
+		client->message.WriteByte(host_client - svs.clients);
+		client->message.WriteByte(0);
 	}
 }
 
@@ -422,12 +421,12 @@ void Host_ShutdownServer(qboolean crash)
 		count = 0;
 		for (i=0, host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)
 		{
-			if (host_client->active && host_client->message.cursize)
+			if (host_client->active && host_client->message.size())
 			{
 				if (NET_CanSendMessage (host_client->netconnection))
 				{
 					NET_SendMessage(host_client->netconnection, &host_client->message);
-					SZ_Clear (&host_client->message);
+					host_client->message.Clear();
 				}
 				else
 				{
@@ -442,10 +441,8 @@ void Host_ShutdownServer(qboolean crash)
 	while (count);
 
 // make sure all the clients know we're disconnecting
-	buf.data = (byte*)message;
-	buf.maxsize = 4;
-	buf.cursize = 0;
-	MSG_WriteByte(&buf, svc_disconnect);
+	buf = sizebuf_t((byte*)message, 4);
+	buf.WriteByte(svc_disconnect);
 	count = NET_SendToAll(&buf, 5s);
 	if (count)
 		Con_Printf("Host_ShutdownServer: NET_SendToAll failed for %u clients\n", count);
@@ -457,8 +454,8 @@ void Host_ShutdownServer(qboolean crash)
 //
 // clear structures
 //
-	memset (&sv, 0, sizeof(sv));
-	memset (svs.clients, 0, svs.maxclientslimit*sizeof(client_t));
+	Q_memset (&sv, 0, sizeof(sv));
+	Q_memset (svs.clients, 0, svs.maxclientslimit*sizeof(client_t));
 }
 
 
@@ -905,7 +902,7 @@ void Host_Init (quakeparms_t *parms)
 		IN_Init ();
 #endif
 	}
-
+	_CrtCheckMemory();
 	Cbuf_InsertText ("exec quake.rc\n");
 
 	Hunk_AllocName (0, "-HOST_HUNKLEVEL-");

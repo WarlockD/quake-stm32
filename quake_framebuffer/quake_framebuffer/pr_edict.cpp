@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 	Just watch it as if the file is unloaded all the quake::string_view's suddenly become invalid
 */
-#include "quakedef.h"
+#include "icommon.h"
 
 using namespace std::chrono;
 
@@ -614,9 +614,11 @@ Can parse either fields or globals
 returns false if error
 =============
 */
+
+
 qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 {
-
+	float*  f;
 	int		i;
 	char	string[128];
 	ddef_t	*def;
@@ -633,20 +635,21 @@ qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 		break;
 
 	case etype_t::ev_float:
-		assert(value.to_number(*(float *)d));
+		f = (float*)d;
+		assert(quake::to_number(value, *f));
 		break;
 
 	case etype_t::ev_vector:
 	{
 		COM_Parser parser(value);
-		assert(parser.Next().to_number(((float *)d)[0]));
-		assert(parser.Next().to_number(((float *)d)[1]));
-		assert(parser.Next().to_number(((float *)d)[2]));
+		assert(quake::to_number(parser.Next(), f[0]));
+		assert(quake::to_number(parser.Next(), f[1]));
+		assert(quake::to_number(parser.Next(), f[2]));
 	}
 	break;
 
 	case etype_t::ev_entity:
-		assert(value.to_number(i));
+		assert(quake::to_number(value,i));
 		*(int *)d = EDICT_TO_PROG(EDICT_NUM(i));
 		break;
 

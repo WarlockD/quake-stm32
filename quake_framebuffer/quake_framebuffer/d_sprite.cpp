@@ -20,7 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // d_sprite.c: software top-level rasterization driver module for drawing
 // sprites
 
-#include "quakedef.h"
+
+#include "icommon.h"
 #include "d_local.h"
 
 static int		sprite_height;

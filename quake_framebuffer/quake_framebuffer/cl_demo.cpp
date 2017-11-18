@@ -18,8 +18,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include "quakedef.h"
 
+#include "icommon.h"
 void CL_FinishTimeDemo (void);
 using namespace std::chrono;
 
@@ -68,10 +68,10 @@ void CL_WriteDemoMessage (void)
 	int		len;
 	int		i;
 	id_little_binary_writer bw(cls.demofile);
-	bw << net_message.cursize;
+	bw << net_message.size();
 	for (i = 0; i < 3; i++)
 		bw << cl.viewangles[i];
-	bw.write(net_message.data, net_message.cursize);
+	bw.write(net_message.data(), net_message.size());
 	cls.demofile.flush();
 }
 
@@ -107,14 +107,15 @@ int CL_GetMessage (void)
 			}
 		}
 		id_little_binary_reader br(cls.demofile);
-		br >> net_message.cursize;
+		br >> i;
+		net_message.resize(i);
 		VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
 		for (i = 0; i < 3; i++)
 			br >> cl.mviewangles[0][i];
 
-		if (net_message.cursize > MAX_MSGLEN)
+		if (net_message.size() > MAX_MSGLEN)
 			Sys_Error ("Demo message > MAX_MSGLEN");
-		br.read(net_message.data, net_message.cursize);
+		br.read(net_message.data(), net_message.size());
 		if (!cls.demofile)
 		{
 			CL_StopPlayback ();
@@ -132,7 +133,7 @@ int CL_GetMessage (void)
 			return r;
 	
 	// discard nop keepalive message
-		if (net_message.cursize == 1 && net_message.data[0] == svc_nop)
+		if (net_message.size() == 1 && net_message.data()[0] == svc_nop)
 			Con_Printf ("<-- server to client keepalive\n");
 		else
 			break;
@@ -160,8 +161,8 @@ void CL_Stop() {
 	}
 
 	// write a disconnect message to the demo file
-	SZ_Clear(&net_message);
-	MSG_WriteByte(&net_message, svc_disconnect);
+	net_message.Clear();
+	net_message.WriteByte(svc_disconnect);
 	CL_WriteDemoMessage();
 
 	// finish up

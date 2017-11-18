@@ -1,9 +1,9 @@
 #pragma once
 // internal header for some functions
 
+#include "icommon.h"
+
 #include "quakedef.h"
-
-
 #include <type_traits>
 #include <utility>
 #include <algorithm>

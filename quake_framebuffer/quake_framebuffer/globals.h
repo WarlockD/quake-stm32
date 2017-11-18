@@ -2,7 +2,7 @@
 #define _QUAKE_GLOBALS_H_
 
 // used cproto to cheat and get these all created
-#include "quakedef.h"
+#include "icommon.h"
 #include "r_shared.h"
 #include "d_local.h"
 
@@ -29,9 +29,14 @@ typedef struct
 
 struct cmdalias_t
 {
+	static void* operator new(size_t s){ return Z_Malloc(s); }
+	static void operator delete(void* p) {  Z_Free(p); }
 	cmdalias_t	*next;
-	char	name[MAX_ALIAS_NAME];
-	quake::fixed_string<256> value; // this can be a script.. humm
+	quake::string name;
+	quake::string value;
+
+	//char	name[MAX_ALIAS_NAME];
+	//quake::fixed_string<256> value; // this can be a script.. humm
 } ;
 
 

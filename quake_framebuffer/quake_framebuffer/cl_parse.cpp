@@ -19,7 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cl_parse.c  -- parse a message received from the server
 
-#include "quakedef.h"
+
+#include "icommon.h"
 
 using namespace std::chrono;
 
@@ -160,7 +161,7 @@ void CL_KeepaliveMessage (void)
 
 // read messages from server, should just be nops
 	old = net_message;
-	memcpy (olddata, net_message.data, net_message.cursize);
+	Q_memcpy (olddata, net_message.data(), net_message.size());
 	
 	do
 	{
@@ -182,7 +183,7 @@ void CL_KeepaliveMessage (void)
 	} while (ret);
 
 	net_message = old;
-	memcpy (net_message.data, olddata, net_message.cursize);
+	Q_memcpy (net_message.data(), olddata, net_message.size());
 
 // check time
 	idTime time = Sys_FloatTime ();
@@ -193,9 +194,9 @@ void CL_KeepaliveMessage (void)
 // write out a nop
 	Con_Printf ("--> client to server keepalive\n");
 
-	MSG_WriteByte (&cls.message, clc_nop);
+	cls.message.WriteByte(clc_nop);
 	NET_SendMessage (cls.netcon, &cls.message);
-	SZ_Clear (&cls.message);
+	cls.message.Clear();
 }
 
 /*
@@ -639,7 +640,7 @@ void CL_NewTranslation (int slot)
 		Sys_Error ("CL_NewTranslation: slot > cl.maxclients");
 	dest = cl.scores[slot].translations;
 	source = vid.colormap;
-	memcpy (dest, vid.colormap, sizeof(cl.scores[slot].translations));
+	Q_memcpy (dest, vid.colormap, sizeof(cl.scores[slot].translations));
 	top = cl.scores[slot].colors & 0xf0;
 	bottom = (cl.scores[slot].colors &15)<<4;
 #ifdef GLQUAKE
@@ -649,13 +650,13 @@ void CL_NewTranslation (int slot)
 	for (i=0 ; i<VID_GRADES ; i++, dest += 256, source+=256)
 	{
 		if (top < 128)	// the artists made some backwards ranges.  sigh.
-			memcpy (dest + TOP_RANGE, source + top, 16);
+			Q_memcpy (dest + TOP_RANGE, source + top, 16);
 		else
 			for (j=0 ; j<16 ; j++)
 				dest[TOP_RANGE+j] = source[top+15-j];
 				
 		if (bottom < 128)
-			memcpy (dest + BOTTOM_RANGE, source + bottom, 16);
+			Q_memcpy (dest + BOTTOM_RANGE, source + bottom, 16);
 		else
 			for (j=0 ; j<16 ; j++)
 				dest[BOTTOM_RANGE+j] = source[bottom+15-j];		
@@ -728,7 +729,7 @@ void CL_ParseServerMessage (void)
 // if recording demos, copy the message out
 //
 	if (cl_shownet.value == 1)
-		Con_Printf ("%i ",net_message.cursize);
+		Con_Printf ("%i ",net_message.size());
 	else if (cl_shownet.value == 2)
 		Con_Printf ("------------------\n");
 	

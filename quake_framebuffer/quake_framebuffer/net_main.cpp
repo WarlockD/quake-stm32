@@ -18,8 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // net_main.c
-
-#include "quakedef.h"
+#include "icommon.h"
 #include "net_vcr.h"
 using namespace std::chrono;
 
@@ -586,9 +585,9 @@ int	NET_GetMessage (qsocket_t *sock)
 			vcrGetMessage.op = VCR_OP_GETMESSAGE;
 			vcrGetMessage.session = (long)sock;
 			vcrGetMessage.ret = ret;
-			vcrGetMessage.len = net_message.cursize;
+			vcrGetMessage.len = net_message.size();
 			vcrFile.write(&vcrGetMessage, 24);
-			vcrFile.write(net_message.data, net_message.cursize);
+			vcrFile.write(net_message.data(), net_message.size());
 		}
 	}
 	else
@@ -853,7 +852,7 @@ void NET_Init (void)
 	}
 
 	// allocate space for network message buffer
-	SZ_Alloc (&net_message, NET_MAXMESSAGE);
+	net_message.Alloc (NET_MAXMESSAGE);
 
 	Cvar_RegisterVariable (&net_messagetimeout);
 	Cvar_RegisterVariable (&hostname);

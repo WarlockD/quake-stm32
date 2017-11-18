@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // common.c -- misc functions used in client and server
 
 
+
 #include "icommon.h"
 
 #include <cctype>
@@ -46,7 +47,7 @@ namespace quake {
 		if (len <= 0) return nullptr;
 		return c_str();
 	}
-
+#if 0
 	string_view::size_type string_view::to_number(float& value, size_type offset) const {
 		const char* stazrtp = _data + offset;
 		char* endp = nullptr;
@@ -59,6 +60,7 @@ namespace quake {
 		if (offset < _size) value = strtol(stazrtp, &endp,0);
 		return endp == nullptr || endp == stazrtp || endp > end() ? npos : size_t(endp - _data);
 	}
+#endif
 	/// \brief Attaches the object to pointer \p p of size \p n.
 	///
 	/// If \p p is nullptr and \p n is non-zero, bad_alloc is thrown and current
@@ -76,7 +78,7 @@ namespace quake {
 	constexpr bool cmemlink::operator== (const cmemlink& l) const noexcept
 	{
 		return l._size == _size &&
-			(l._data == _data || 0 == memcmp(l._data, _data, _size));
+			(l._data == _data || 0 == std::memcmp(l._data, _data, _size));
 	}
 
 
@@ -685,7 +687,7 @@ Handles byte ordering and avoids alignment errors
 // writing functions
 //
 
-void MSG_WriteChar (sizebuf_t *sb, int c)
+void sizebuf_t::WriteChar (int c)
 {
 	byte    *buf;
 	
@@ -694,11 +696,11 @@ void MSG_WriteChar (sizebuf_t *sb, int c)
 		Sys_Error ("MSG_WriteChar: range error");
 #endif
 
-	buf = (byte*)SZ_GetSpace (sb, 1);
+	buf = (byte*)GetSpace (1);
 	buf[0] = c;
 }
 
-void MSG_WriteByte (sizebuf_t *sb, int c)
+void sizebuf_t::WriteByte ( int c)
 {
 	byte    *buf;
 	
@@ -707,11 +709,11 @@ void MSG_WriteByte (sizebuf_t *sb, int c)
 		Sys_Error ("MSG_WriteByte: range error");
 #endif
 
-	buf = (byte*)SZ_GetSpace (sb, 1);
+	buf = (byte*)GetSpace(1);
 	buf[0] = c;
 }
 
-void MSG_WriteShort (sizebuf_t *sb, int c)
+void sizebuf_t::WriteShort ( int c)
 {
 	byte    *buf;
 	
@@ -720,23 +722,23 @@ void MSG_WriteShort (sizebuf_t *sb, int c)
 		Sys_Error ("MSG_WriteShort: range error");
 #endif
 
-	buf = (byte*)SZ_GetSpace (sb, 2);
+	buf = (byte*)GetSpace ( 2);
 	buf[0] = c&0xff;
 	buf[1] = c>>8;
 }
 
-void MSG_WriteLong (sizebuf_t *sb, int c)
+void sizebuf_t::WriteLong (int c)
 {
 	byte    *buf;
 	
-	buf = (byte*)SZ_GetSpace (sb, 4);
+	buf = (byte*)GetSpace ( 4);
 	buf[0] = c&0xff;
 	buf[1] = (c>>8)&0xff;
 	buf[2] = (c>>16)&0xff;
 	buf[3] = c>>24;
 }
 
-void MSG_WriteFloat (sizebuf_t *sb, float f)
+void sizebuf_t::WriteFloat ( float f)
 {
 	union
 	{
@@ -748,25 +750,25 @@ void MSG_WriteFloat (sizebuf_t *sb, float f)
 	dat.f = f;
 	dat.l = LittleLong (dat.l);
 	
-	SZ_Write (sb, &dat.l, 4);
+	Write (&dat.l, 4);
 }
 
-void MSG_WriteString (sizebuf_t *sb, const char *s)
+void sizebuf_t::WriteString ( const quake::string_view& s)
 {
-	if (!s)
-		SZ_Write (sb, "", 1);
+	if (s.empty())
+		Write ("", 1);
 	else
-		SZ_Write (sb, s, Q_strlen(s)+1);
+		Write (s.data(),s.size());
 }
 
-void MSG_WriteCoord (sizebuf_t *sb, float f)
+void sizebuf_t::WriteCoord ( float f)
 {
-	MSG_WriteShort (sb, (int)(f*8));
+	WriteShort ( (int)(f*8));
 }
 
-void MSG_WriteAngle (sizebuf_t *sb, float f)
+void sizebuf_t::WriteAngle ( float f)
 {
-	MSG_WriteByte (sb, ((int)f*256/360) & 255);
+	WriteByte ( ((int)f*256/360) & 255);
 }
 
 //
@@ -786,13 +788,13 @@ int MSG_ReadChar (void)
 {
 	int     c;
 	
-	if (msg_readcount+1 > net_message.cursize)
+	if (msg_readcount+1 > net_message.size())
 	{
 		msg_badread = true;
 		return -1;
 	}
 		
-	c = (signed char)net_message.data[msg_readcount];
+	c = (signed char)net_message.data()[msg_readcount];
 	msg_readcount++;
 	
 	return c;
@@ -802,13 +804,13 @@ int MSG_ReadByte (void)
 {
 	int     c;
 	
-	if (msg_readcount+1 > net_message.cursize)
+	if (msg_readcount+1 > net_message.size())
 	{
 		msg_badread = true;
 		return -1;
 	}
 		
-	c = (unsigned char)net_message.data[msg_readcount];
+	c = (unsigned char)net_message.data()[msg_readcount];
 	msg_readcount++;
 	
 	return c;
@@ -818,14 +820,14 @@ int MSG_ReadShort (void)
 {
 	int     c;
 	
-	if (msg_readcount+2 > net_message.cursize)
+	if (msg_readcount+2 > net_message.size())
 	{
 		msg_badread = true;
 		return -1;
 	}
 		
-	c = (short)(net_message.data[msg_readcount]
-	+ (net_message.data[msg_readcount+1]<<8));
+	c = (short)(net_message.data()[msg_readcount]
+	+ (net_message.data()[msg_readcount+1]<<8));
 	
 	msg_readcount += 2;
 	
@@ -836,16 +838,16 @@ int MSG_ReadLong (void)
 {
 	int     c;
 	
-	if (msg_readcount+4 > net_message.cursize)
+	if (msg_readcount+4 > net_message.size())
 	{
 		msg_badread = true;
 		return -1;
 	}
 		
-	c = net_message.data[msg_readcount]
-	+ (net_message.data[msg_readcount+1]<<8)
-	+ (net_message.data[msg_readcount+2]<<16)
-	+ (net_message.data[msg_readcount+3]<<24);
+	c = net_message.data()[msg_readcount]
+	+ (net_message.data()[msg_readcount+1]<<8)
+	+ (net_message.data()[msg_readcount+2]<<16)
+	+ (net_message.data()[msg_readcount+3]<<24);
 	
 	msg_readcount += 4;
 	
@@ -861,10 +863,10 @@ float MSG_ReadFloat (void)
 		int     l;
 	} dat;
 	
-	dat.b[0] =      net_message.data[msg_readcount];
-	dat.b[1] =      net_message.data[msg_readcount+1];
-	dat.b[2] =      net_message.data[msg_readcount+2];
-	dat.b[3] =      net_message.data[msg_readcount+3];
+	dat.b[0] =      net_message.data()[msg_readcount];
+	dat.b[1] =      net_message.data()[msg_readcount+1];
+	dat.b[2] =      net_message.data()[msg_readcount+2];
+	dat.b[3] =      net_message.data()[msg_readcount+3];
 	msg_readcount += 4;
 	
 	dat.l = LittleLong (dat.l);
@@ -906,95 +908,70 @@ float MSG_ReadAngle (void)
 
 //===========================================================================
 
-void SZ_Alloc (sizebuf_t *buf, int startsize)
-{
-	if (startsize < 256)
-		startsize = 256;
-	buf->data = (byte*)Hunk_AllocName (startsize, "sizebuf");
-	buf->maxsize = startsize;
-	buf->cursize = 0;
+
+
+void sizebuf_t::Print(const quake::string_view& data) {
+	size_t 	len = data.size() + 1;
+	if (_data.data()[_cursize - 1])
+		Q_memcpy(GetSpace(len), data.data(), len); // no trailing 0
+	else
+		Q_memcpy(GetSpace(len - 1), data.data(), len);  // write over trailing 0
+	_data.data()[_cursize] = 0;
+}
+
+void sizebuf_t::Print(char c) {
+	if (_data.data()[_cursize - 1])
+		*((byte *)GetSpace(2)) = c; // no trailing 0
+	else
+		*(((byte *)GetSpace(1)) - 1) = c; // no trailing 0
+	_data.data()[_cursize] = 0;
 }
 
 
-void SZ_Free(sizebuf_t *buf)
-{
-	//      Z_Free (buf->data);
-	//      buf->data = NULL;
-	//      buf->maxsize = 0;
-	buf->cursize = 0;
+void sizebuf_t::Clear() { _cursize = 0; }
+void sizebuf_t::Free() { assert(_hunk_low_used); _hunk_low_used = 0; _cursize = 0; }
+void sizebuf_t::Alloc(size_t startsize) {
+	assert(!_hunk_low_used);
+	if (startsize < 256) startsize = 256;
+	_hunk_low_used = Hunk_LowMark(); // debuging mainly
+	_data.link((byte*)Hunk_AllocName(startsize, "sizebuf"), startsize);
+	_cursize = 0;
 }
 
-void SZ_Clear(sizebuf_t *buf)
-{
-	buf->cursize = 0;
+void sizebuf_t::Write(const void* data, size_t length) {
+	assert((length + size()) < maxsize());
+	std::copy((const char*)data,(const char*)data + length, (char*)GetSpace(length));
+	_cursize += length;
 }
-void* sizebuf_t::GetSpace(int length) {
-	if (size() + length > capacity()) {
+void sizebuf_t::Insert(const void* data, size_t n, size_t pos) {
+	quake::memlink::const_iterator start(_data.begin() + pos);
+	const size_t ipmi = std::distance(quake::memlink::const_iterator(_data.begin()), start);
+	const ptrdiff_t ip = start - quake::memlink::const_iterator(begin());
+	assert(ip <= maxsize());
+	_data.insert(_data.iat(ip), n);
+	std::copy((const byte*)data, (const byte*)data+n, _data.iat(ip));
+	_cursize += n;
+}
+void* sizebuf_t::GetSpace(size_t length) {
+	void    *data;
+
+	if (_cursize + length > maxsize())
+	{
 		if (!_allowoverflow)
 			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
 
-		if (length > capacity())
+		if (length >maxsize())
 			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
 
 		_overflowed = true;
 		Con_Printf("SZ_GetSpace: overflow");
 		Clear();
 	}
-	size_t pos = size();
-	resize(length + size());
-	return data() + pos;
-}
-void *SZ_GetSpace(sizebuf_t *buf, int length)
-{
-	void    *data;
 
-	if (buf->cursize + length > buf->maxsize)
-	{
-		if (!_allowoverflow)
-			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
-
-		if (length > buf->maxsize)
-			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
-
-		buf->overflowed = true;
-		Con_Printf("SZ_GetSpace: overflow");
-		SZ_Clear(buf);
-	}
-
-	data = buf->data + buf->cursize;
-	buf->cursize += length;
-
+	data = _data.data() + _cursize;
+	_cursize += length;
 	return data;
 }
-
-void SZ_Write(sizebuf_t *buf, const void *data, int length)
-{
-	Q_memcpy(SZ_GetSpace(buf, length), data, length);
-}
-
-
-
-void SZ_Print(sizebuf_t *buf, const  quake::string_view& data)
-{
-	size_t 	len = data.size() + 1;
-	if (buf->data[buf->cursize - 1])
-		Q_memcpy((byte *)SZ_GetSpace(buf, len), data.data(), len); // no trailing 0
-	else
-		Q_memcpy((byte *)SZ_GetSpace(buf, len - 1) - 1, data.data(), len); // write over trailing 0
-}
-
-void SZ_Print(sizebuf_t *buf, char c) {
-	if (buf->data[buf->cursize - 1])
-		*((byte *)SZ_GetSpace(buf, 2)) = c; // no trailing 0
-	else
-		*(((byte *)SZ_GetSpace(buf, 1)) - 1) = c; // no trailing 0
-}
-
-
-
-
-
-
 
 
 inline static bool isComPunc(int c) {
@@ -1070,6 +1047,7 @@ quake::string_view COM_Parser::Next(bool test_eol) {
 		//    @label_codes = {"a"=>0, "\""=>1, "/"=>2, "0"=>3, "c"=>4, "b"=>5, :other=>6}
 		// I could built a 256 charater table for this, but seriously, for this few tokens?
 		int ch = _pos < _data.size() ? _data[_pos] : -1;
+
 		switch (ch) { // get the charater class
 		case '"': current_read = 1; break;
 		case '/': current_read = 2; break;
@@ -1435,10 +1413,10 @@ namespace quake {
 	memblock::size_type memblock::minimumFreeCapacity(void) const noexcept { return 0; }
 
 
-	bool operator==(const symbol& l, const string_view& r) {
-		if (l.size() != r.size()) return false;
-		for (size_t i = 0; i < l.size(); i++)
-			if (std::tolower(l[i]) != std::tolower(r[i])) return false;
+	bool symbol::operator==(const string_view& r) const {
+		if (_view.size() != r.size()) return false;
+		for (size_t i = 0; i < _view.size(); i++)
+			if (std::tolower(_view[i]) != std::tolower(r[i])) return false;
 		return true;
 	}
 	std::ostream& operator<<(std::ostream& os, const string_view& sv) {
@@ -1456,8 +1434,6 @@ namespace quake {
 	stream_buffer::pos_type stream_buffer::_seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode) {
 			if (!_file.is_open())
 				return pos_type(off_type(-1));
-
-
 
 			off_type new_off = 0;
 			switch (dir) {
@@ -1649,7 +1625,7 @@ namespace quake {
 	bool string::operator== (const_pointer s) const noexcept
 	{
 		if (!s) s = "";
-		return size() == strlen(s) && 0 == memcmp(c_str(), s, size());
+		return size() == std::strlen(s) && 0 == std::memcmp(c_str(), s, size());
 	}
 #if 0
 	/// Returns the beginning of character \p i.
@@ -2214,7 +2190,8 @@ static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 		for (const auto& path : com_searchpaths) {
 			netpath.clear();
 			netpath << path << '/' << filename;
-			temp_file.open(netpath.str().c_str());
+			auto test = netpath.str();
+			temp_file.open(test.c_str());
 			if (temp_file.is_open()) return &temp_file;
 #if 0
 			findtime = Sys_FileTime(netpath.data());

@@ -484,7 +484,7 @@
 // block (s) which adds it to the free list.
 //
 // ----------------------------------------------------------------------------
-
+#include "icommon.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -493,8 +493,7 @@
 
 #include "umm_malloc.h"
 
-#include "umm_malloc_cfg.h"   //-- user-dependent
-#include "quakedef.h"
+#include "umm_malloc_cfg.h"   //-- user-dependent#include "icommon.h"
 
 
 #ifndef UMM_MALLOC_CFG__DONT_BUILD
@@ -503,8 +502,8 @@
 static int stupid_lock = 0;
 int test_and_set() { int lock = stupid_lock; stupid_lock = 1; return lock; }
 
-#undef UMM_CRITICAL_ENTRY()
-#undef UMM_CRITICAL_EXIT()
+#undef UMM_CRITICAL_ENTRY
+#undef UMM_CRITICAL_EXIT
 
 void UMM_CRITICAL_ENTRY() {
 	while (test_and_set());

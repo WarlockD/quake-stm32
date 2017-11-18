@@ -18,8 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // net_vcr.c
-
-#include "quakedef.h"
+#include "icommon.h"
 #include "net_vcr.h"
 
 sys_file vcrFile;
@@ -88,9 +87,13 @@ int VCR_GetMessage (qsocket_t *sock)
 		VCR_ReadNext ();
 		return ret;
 	}
+	int size;
 
-	vcrFile.read( &net_message.cursize, sizeof(int));
-	vcrFile.read( net_message.data, net_message.cursize);
+	vcrFile.read( &size, sizeof(int));
+	assert(net_message.maxsize() < size);
+
+	vcrFile.read( net_message.data(), size);
+	net_message.resize(size);
 
 	VCR_ReadNext ();
 

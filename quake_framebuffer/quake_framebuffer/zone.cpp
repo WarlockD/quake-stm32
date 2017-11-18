@@ -18,8 +18,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // Z_zone.c
-
-#include "quakedef.h"
+#define _CRTDBG_MAP_ALLOC  
+#include <stdlib.h>  
+#include <crtdbg.h>
+#include "icommon.h"
 static constexpr size_t alignment_bits = sizeof(ptrdiff_t) / 8;
 static inline size_t AllignSize(size_t size) { return  ((size + (alignment_bits-1))&~(alignment_bits - 1)); }
 
@@ -78,6 +80,7 @@ void Z_ClearZone (memzone_t *zone, size_t size)
 	block->size = size - sizeof(memzone_t);
 }
 
+static std::unordered_map<void*, _CrtMemState> _checkpoints;
 
 /*
 ========================
@@ -87,11 +90,26 @@ Z_Free
 void Z_Free (void *ptr)
 {
 	memblock_t	*block, *other;
-	
+	assert(_CrtCheckMemory());
+
 	if (!ptr)
 		Sys_Error ("Z_Free: NULL pointer");
-	//umm_free(ptr);
+	auto& checkpoint = _checkpoints.find(ptr);
+	assert(checkpoint != _checkpoints.end());
+	_CrtMemState prev = checkpoint->second;
+	_CrtMemState test,ans;
 	free(ptr);
+	_CrtMemCheckpoint(&test);
+	if (_CrtMemDifference(&ans, &prev, &test)) {
+		quake::con << "fuck me " << std::endl;
+		_CrtMemDumpStatistics(&ans);
+	}
+
+	_checkpoints.erase(checkpoint);
+	assert(_CrtCheckMemory());
+	//_malloc_dbg()
+	//umm_free(ptr);
+	//free(ptr);
 #if 0
 	block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
 	if (block->id != ZONEID)
@@ -132,22 +150,31 @@ Z_Malloc
 */
 void *Z_Malloc (size_t size)
 {
-
-//Z_CheckHeap ();	// DEBUG
+	//size += 3;
+	//size &= 0x3;
+//
 // tag malloc is never really used
+	assert(_CrtCheckMemory());
 	//void	*buf =  umm_malloc(size);
 	void	*buf = malloc(size);
-	//void	*buf = Z_TagMalloc (size, 1);
+	_CrtMemState stat;
+	_CrtMemCheckpoint(&stat);
+	_CrtMemDumpStatistics(&stat);
+	_checkpoints.emplace(buf, stat);
+	assert(_CrtCheckMemory());
+#if 0
+	Z_CheckHeap();	// DEBUG
+
+	void	*buf = Z_TagMalloc (size, 1);
 	if (!buf)
 		Sys_Error ("Z_Malloc: failed on allocation of %i bytes",size);
 	Q_memset (buf, 0, size);
-
+#endif
 	return buf;
 }
 
 void *Z_TagMalloc (size_t size, int tag)
 {
-	assert(0);
 	int		extra;
 	memblock_t	*start, *rover, *new_ptr, *base;
 

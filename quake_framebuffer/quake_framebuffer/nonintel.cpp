@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // nonintel.c: code for non-Intel processors only
 //
 
-#include "quakedef.h"
+#include "icommon.h"
 #include "r_local.h"
 #include "d_local.h"
 

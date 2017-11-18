@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // wad.c
 
-#include "quakedef.h"
+#include "icommon.h"
 
 #if 0
 int			wad_numlumps;
@@ -101,7 +101,6 @@ void WadFile::load(const char* filename) {
 }
 
 lumpinfo_t* WadFile::findinfo(const quake::string_view& name) {
-	int		i;
 
 	auto it = wad_lookup.find(name);
 	if (it != wad_lookup.end()) return it->second;

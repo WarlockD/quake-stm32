@@ -152,35 +152,38 @@ public:
 	using const_pointer = const value_type*;
 	using reference = value_type&;
 	using const_reference = const value_type&;
+	using propagate_on_container_move_assignment = std::true_type;
 	template <class U>
 	struct rebind { using other =  UAllocator<U> ; };
 
-	UAllocator() {}
-	UAllocator(const UAllocator&) {}
+	UAllocator() noexcept = default;
+	UAllocator(const UAllocator&) noexcept {}
+	UAllocator(UAllocator&& move) noexcept {}
 	template <class U>
-	UAllocator(const UAllocator<U>&) {}
+	UAllocator(const UAllocator<U>&) noexcept {}
 	template <class U>
-	UAllocator& operator=(const UAllocator<U>&) { return *this; }
+	UAllocator& operator=(const UAllocator<U>&) noexcept { return *this; }
+	~UAllocator() noexcept {}
 
-
-	pointer   allocate(size_type n, const void* ptr = 0) {
-		assert(ptr == 0);
+	pointer   allocate(size_type n)  {
+		assert(n >0);
 		//void* ret = umm_malloc(n);
-		void* ret = Z_Malloc(n);
-		assert(ret != 0);
-		return (T*)ret;
+		void* ptr = Z_Malloc(n*sizeof(T));
+		assert(ptr != 0);
+		return reinterpret_cast<T*>(ptr);
 	}
 	void   deallocate(void* p, size_type n) { 
 		//(void)n; umm_free(p); 
 		(void)n; Z_Free(p);
 	}
+#if 0
 	pointer           address(reference x) const { return &x; }
 	const_pointer     address(const_reference x) const { return &x; }
+
 
 	void              construct(pointer p, const T& val) { new ((T*)p) T(val); }
 	void              destroy(pointer p) { p->~T(); }
 	size_type         max_size() const { return size_t(-1); }
-#if 0
 
 	pointer           address(reference x) const { return &x; }
 	const_pointer     address(const_reference x) const { return &x; }
@@ -191,11 +194,17 @@ public:
 	size_type         max_size() const { return umm_maxsize(); }
 #endif
 
-
-
-
-
 };
+template <typename T, typename U>
+inline bool operator == (const UAllocator<T>&, const UAllocator<U>&) {
+	return true;
+}
+
+template <typename T, typename U>
+inline bool operator != (const UAllocator<T>&, const UAllocator<U>&) {
+	return false;
+}
+
 
 template <typename  T>
 class ZAllocator
@@ -369,7 +378,15 @@ using ZStringStream = std::basic_stringstream<char, std::char_traits<char>, UAll
 using UString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
 template<typename T>
 using UVector = std::vector<T, UAllocator<T>>;
-using StringList = std::vector<UString, UAllocator<UString>>;
+template<typename T>
+using UList = std::list<T, UAllocator<T>>;
+
+template<typename T>
+using USVector = std::vector<T, std::scoped_allocator_adaptor<T>>;
+//using StringList = std::vector<UString, UAllocator<UString>>;
+using StringList = std::list<UString, UAllocator<UString>>;
+using SStringList = std::vector<UString, std::scoped_allocator_adaptor<UString>>;
+using SStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
 
 template<typename T>
 using ZVector = std::vector<T, UAllocator<T>>;

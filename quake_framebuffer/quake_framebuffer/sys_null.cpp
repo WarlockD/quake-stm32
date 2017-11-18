@@ -18,8 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // sys_null.h -- null system driver to aid porting efforts
-
-#include "quakedef.h"
+#include "icommon.h"
 
 #include "errno.h"
 
@@ -364,16 +363,36 @@ void Sys_HighFPPrecision (void)
 void Sys_LowFPPrecision (void)
 {
 }
-
+#define MEMORY_SIZE (8*1024*1024)
 //=============================================================================
+static char test_block[MEMORY_SIZE];
 
 void main (int argc, const char **argv)
 {
 	idTime		time, oldtime, newtime;
 	quakeparms_t    parms;
+	// Get current flag  
+	// Send all reports to STDOUT
+	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
+	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
+	// fucking memory leaks
+	int tmpFlag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
 
-	parms.memsize = 8*1024*1024;
-	parms.membase = malloc (parms.memsize);
+	// Turn on leak-checking bit.  
+	tmpFlag |= _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF; 
+
+	// Turn off CRT block checking bit.  
+	//tmpFlag &= ~_CRTDBG_CHECK_CRT_DF;
+
+	// Set flag to the new value.  
+	_CrtSetDbgFlag(tmpFlag);
+
+	parms.memsize = MEMORY_SIZE;
+	parms.membase = test_block;// malloc(parms.memsize);
 	parms.basedir = ".";
 	
 	for (int i = 0; i < argc; i++)
@@ -381,6 +400,8 @@ void main (int argc, const char **argv)
 
 
 	//COM_GArgs.InitArgv(argc, argv);
+
+	quake::memblock block;
 
 
 	printf ("Host_Init\n");
