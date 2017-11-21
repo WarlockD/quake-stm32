@@ -18,22 +18,27 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // server.h
+#ifndef _QUAKE_SERVER_H_
+#define _QUAKE_SERVER_H_
 
-typedef struct
+struct client_t;
+
+ struct server_static_t
 {
 	int			maxclients;
 	int			maxclientslimit;
-	struct client_s	*clients;		// [maxclients]
+	client_t	*clients;		// [maxclients]
 	int			serverflags;		// episode completion information
 	qboolean	changelevel_issued;	// cleared when at SV_SpawnServer
-} server_static_t;
+} ;
 
 //=============================================================================
 
 typedef enum {ss_loading, ss_active} server_state_t;
 
-typedef struct
+struct server_t
 {
+	server_t();
 	qboolean	active;				// false if only a net client
 
 	qboolean	paused;
@@ -69,13 +74,14 @@ typedef struct
 
 	sizebuf_t	signon;
 	byte		signon_buf[8192];
-} server_t;
+} ;
 
 
 #define	NUM_PING_TIMES		16
 #define	NUM_SPAWN_PARMS		16
+struct qsocket_t;
 
-typedef struct client_s
+struct client_t
 {
 	qboolean		active;				// false = client is free
 	qboolean		spawned;			// false = don't send datagrams
@@ -86,7 +92,7 @@ typedef struct client_s
 	idTime			last_message;		// reliable messages must be sent
 										// periodically
 
-	struct qsocket_s *netconnection;	// communications handle
+	qsocket_t *netconnection;	// communications handle
 
 	usercmd_t		cmd;				// movement
 	vec3_t			wishdir;			// intended motion calced from cmd
@@ -106,7 +112,7 @@ typedef struct client_s
 
 // client known data for deltas	
 	int				old_frags;
-} client_t;
+} ;
 
 
 //=============================================================================
@@ -233,7 +239,7 @@ void SV_SetIdealPitch (void);
 void SV_AddUpdates (void);
 
 void SV_ClientThink (void);
-void SV_AddClientToServer (struct qsocket_s	*ret);
+void SV_AddClientToServer (qsocket_t	*ret);
 
 void SV_ClientPrintf (const char *fmt, ...);
 void SV_BroadcastPrintf (char *fmt, ...);
@@ -254,4 +260,6 @@ void SV_SaveSpawnparms ();
 void SV_SpawnServer (char *server, char *startspot);
 #else
 void SV_SpawnServer (const char *server);
+#endif
+
 #endif

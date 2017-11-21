@@ -59,8 +59,50 @@ void Cmd_Wait_f(cmd_source_t source, size_t argc, const quake::string_view args[
 =============================================================================
 */
 
+std::default_delete<char> meh;
+
+using StringPtr = std::unique_ptr<char, z_delete<char>>;
+using StringViewList = UVector<quake::string_view>;
+
+
+
 //sizebuf_t	cmd_text;
-static std::list<std::vector<std::string> > _parsed_commands;
+class SafeArgs {
+	ZUniquePtr<char> _text;
+	UList<StringViewList> _list;
+public:
+	static UList<StringViewList> ParseArgs(const quake::string_view& text);
+	SafeArgs(ZUniquePtr<char>&& text) :_text(std::move(text)), _list(std::move(ParseArgs(_text.get()))) {}
+	SafeArgs(const quake::string_view& text) :_text((char*)Z_Malloc(text.size()+1)) {
+		text.copy(_text.get(), text.size());
+		_text.get()[text.size()] = 0; // make a copy
+		_list = ParseArgs(_text.get());
+	}
+	SafeArgs(const SafeArgs& copy) = delete;
+	SafeArgs(SafeArgs&& move) :_text(std::move(move._text)),  _list(std::move(move._list)) {}
+	UList<StringViewList>& list() { return _list; }
+	const UList<StringViewList>& list() const { return _list; }
+	UList<StringViewList>* operator->() { return &_list; }
+	const UList<StringViewList>* operator->() const { return &_list; }
+};
+UList<StringViewList> SafeArgs::ParseArgs(const quake::string_view& text) {
+	COM_Parser parser(text);
+	quake::string_view token;
+	StringViewList args;
+	UList<StringViewList> list;
+	while (parser.Next(token, true)) {
+		if (token[0] == '\n') {
+			if (!args.empty()) {
+				list.push_back(args);
+				args.clear();
+			}
+		}
+		else args.emplace_back(token.data(), token.size());
+	};
+	if (!args.empty())list.push_back(args);
+	return std::move(list);
+}
+static UList<SafeArgs> _parsed_commands;
 //static UList<StringList> _parsed_commands;
 /*
 ============
@@ -74,27 +116,11 @@ void Cbuf_Init (void)
 }
 
 
+
 void ParseCommands(const quake::string_view& text, bool front = false) {
-	_CrtCheckMemory();
-	COM_Parser parser(text);
-	_CrtCheckMemory();
-	quake::string_view token;
-	//StringList args;
-	std::vector<std::string> args;
+
 	auto start = front ? _parsed_commands.begin() : _parsed_commands.end();
-	do {
-		_CrtCheckMemory();
-		token = parser.Next(true);
-		if (token.empty() || token[0] == '\n') {
-			if (!args.empty()) {
-				start = _parsed_commands.insert(start, args);
-				args.clear();
-			} else 
-			continue;
-		}
-		if (token.empty()) break;
-		args.emplace_back(token.data(), token.size());
-	} while (true);
+	_parsed_commands.insert(start, SafeArgs(text));
 }
 /*
 ============
@@ -103,17 +129,8 @@ Cbuf_AddText
 Adds command text at the end of the buffer
 ============
 */
-void Cbuf_AddText (const quake::string_view& text)
-{
-#if 0
-	if ((cmd_text.size() + (int)text.size()) >= cmd_text.maxsize())
-	{
-		quake::con << "Cbuf_AddText: overflow" << std::endl;
-		return;
-	}
-#endif
+void Cbuf_AddText (const quake::string_view& text){
 	ParseCommands(text, false);
-	
 }
 
 
@@ -126,43 +143,10 @@ Adds a \n to the text
 FIXME: actually change the command buffer to do less copying
 ============
 */
-void Cbuf_InsertText (const quake::string_view& text)
-{
+void Cbuf_InsertText (const quake::string_view& text) {
 	ParseCommands(text, true);
-#if 0
-	char	*temp = nullptr;// shut up compiler
-	int		templen;
-
-	
-
-// copy off any commands still remaining in the exec buffer
-	templen = cmd_text.size();
-	if (templen)
-	{
-		cmd_text.Insert(text.data(), text.size());
-		quake::debug << quake::string_view((char*)cmd_text.data(), cmd_text.size()) << std::endl;
-	//	temp = (char*)Z_Malloc (templen);
-	//	Q_memcpy (temp, cmd_text.data(), templen);
-	//	cmd_text.Clear();
-		return;
-	}
-	else {
-		cmd_text.Insert(text.data(), text.size());
-	}
-	return;
-// add the entire text of the file
-	Cbuf_AddText (text);
-	
-// add the copied off data
-	if (templen)
-	{
-		cmd_text.Write(temp, templen);
-		quake::debug << quake::string_view((char*)cmd_text.data(), cmd_text.size()) << std::endl;
-		Z_Free (temp);
-	}
-#endif
 }
-void execute_args(const quake::string_view* args, size_t count, cmd_source_t src);
+
 /*
 ============
 Cbuf_Execute
@@ -170,101 +154,22 @@ Cbuf_Execute
 */
 void Cbuf_Execute (void)
 {
-	UVector<quake::string_view> test;
-	//std::vector< quake::string_view> test;
-	for (auto it = _parsed_commands.begin(); it != _parsed_commands.end(); ) {
-		if (!it->empty()) {
-			std::transform(it->begin(), it->end(), std::back_inserter(test), [](const std::string&s) -> quake::string_view { return quake::string_view(s.data(), s.size()); });
-			execute_args(test, src_command);
-			it = _parsed_commands.erase(it);
-			test.clear();	
-		}
-		else ++it;
+	while (!_parsed_commands.empty()) {
+		auto it = _parsed_commands.begin();
+		auto& list = it->list();
 
-	}
-#if 0
-	if (cmd_text.size() <= 0) return; // nothing?
-	quake::string_view text((const char*)cmd_text.data(), cmd_text.size());
-	quake::string_view token;
-	//UVector<quake::string_view> args;
-	std::vector<quake::string_view> args;
-	COM_Parser parser(text);
-	do {
-		token = parser.Next(true);
-		if (token.empty() || token[0] == '\n') {
-			if (!args.empty()) {
-				execute_args(args.data(),args.size(), src_command);
-				if (cmd_wait)
-				{	// skip out while text still remains in buffer, leaving it
-					// for next frame
-					cmd_wait = false;
-					if (parser.pos() == cmd_text.size())
-						cmd_text.Clear();
-					else
-					{
-						cmd_text.resize(cmd_text.size() - parser.pos());
-						auto r = parser.remaining();
-						r.copy((char*)cmd_text.data(), cmd_text.size());
-					}
-					break;
-				}
-				args.clear();
+		while (!list.empty()) {
+			execute_args(list.front(), src_command);
+			list.pop_front();
+			if (cmd_wait)
+			{	// skip out while text still remains in buffer, leaving it
+				// for next frame
+				cmd_wait = false;
+				return;
 			}
-			else if (token.empty()) break;
-			continue;
 		}
-		args.emplace_back(token);
-	} while (true);
-#if 0
-	int		i;
-	char	*text;
-	ZString line;
-	line.reserve(1024);
-
-	int		quotes;
-	int		spaces = 0;
-	while (cmd_text.cursize)
-	{
-// find a \n or ; line break
-		text = (char *)cmd_text.data;
-		spaces = 0;
-		quotes = 0;
-		for (i=0 ; i< cmd_text.cursize ; i++) {
-			
-			if (text[i] == '"')
-				quotes++;
-			if ( !(quotes&1) &&  text[i] == ';')
-				break;	// don't break if inside a quoted string
-			if (text[i] == '\n')
-				break;
-			if (!spaces && !::isspace(text[i])) ++spaces;
-			if(text[i] == '/' && text[i+1] == '/')
-		}
-
-		
-// delete the text from the command buffer and move remaining commands down
-// this is necessary because commands (exec, alias) can insert data at the
-// beginning of the text buffer
-
-
-
-// execute the command line
-		if (spaces) {
-			assert(i < 1024);
-			line.append(text, i);
-			tokenizer.execute(line.data(), src_command);
-			line.clear();
-		}
-
-		if (cmd_wait)
-		{	// skip out while text still remains in buffer, leaving it
-			// for next frame
-			cmd_wait = false;
-			break;
-		}
+		_parsed_commands.erase(it);
 	}
-#endif
-#endif
 }
 
 /*
@@ -316,7 +221,7 @@ void Cmd_StuffCmds_f (cmd_source_t source, size_t argc, const quake::string_view
 		Cbuf_InsertText (build.c_str());
 }
 
-
+byte *COM_LoadZFile(const quake::string_view& path);
 /*
 ===============
 Cmd_Exec_f
@@ -332,18 +237,31 @@ void Cmd_Exec_f (cmd_source_t source, size_t argc, const quake::string_view args
 		Con_Printf ("exec <filename> : execute a script file\n");
 		return;
 	}
+	// because we arn't saving the memory in a seperate buffer lets just allocate the file 
+	// at the start
+	f = (char*)COM_LoadZFile(args[1]);
+	if (f) {
+		quake::con << "execing " << args[1] << std::endl;
+		_parsed_commands.emplace_front(ZUniquePtr<char>(f));
+	}
+	else 
+		quake::con << "couldn't exec " << args[1] << std::endl;
 
+#if 0
 	mark = Hunk_LowMark ();
 	f = (char *)COM_LoadHunkFile (args[1]);
 	if (!f)
 	{
-		Con_Printf ("couldn't exec %s\n",args[1]);
+		quake::con << "couldn't exec " << args[1] << std::endl;
 		return;
 	}
-	Con_Printf ("execing %s\n",args[1]);
+	quake::con << "execing " << args[1] << std::endl;
+
+
 	
 	Cbuf_InsertText (f);
 	Hunk_FreeToLowMark (mark);
+#endif
 }
 
 
@@ -456,7 +374,7 @@ void Cmd_Init (void)
 
 
 
- char *CopyString(const quake::string_view& in); // from cmd.c
+
 /*
 ============
 Cmd_TokenizeString
@@ -575,42 +493,8 @@ void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_v
 		cls.message.Print(args[i]);
 	cls.message.Print('\n');
 }
+#define DEBUG_ARGS
 
-void execute_args(const quake::string_view* args, size_t count, cmd_source_t src) {
-	cmd_function_t	*cmd;
-	cmdalias_t		*a;
-
-	// execute the command line
-	if (count == 0)
-		return;		// no tokens
-	quake::symbol lower = args[0];
-	// FIX, replace with array
-
-	// check functions
-	for (cmd = cmd_functions; cmd; cmd = cmd->next)
-	{
-		if (lower == cmd->name)
-		{
-			cmd->function(src, count, args);
-			return;
-		}
-	}
-
-	// check alias
-	for (a = cmd_alias; a; a = a->next)
-	{
-		if (lower == a->name)
-		{
-			Cbuf_InsertText(a->value.c_str());
-			return;
-		}
-	}
-
-	// check cvars
-	if (!Cvar_Command(count, args)) {
-		quake::con << "Unknown command \"" << args[0] << "\"" << std::endl;
-	}
-}
 
 void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 	cmd_function_t	*cmd;
@@ -628,6 +512,14 @@ void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 		if (lower == cmd->name)
 		{
 			cmd->function(src, args.size(), args.data());
+#ifdef DEBUG_ARGS
+			quake::debug << "CALL: " << lower << '(';
+			for (size_t i = 1; i < args.size(); i++) {
+				if (i != 1) quake::debug << ',';
+				quake::debug << args[i];
+			}
+			quake::debug << std::endl;
+#endif
 			return;
 		}
 	}
@@ -644,22 +536,19 @@ void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 
 	// check cvars
 	if (!Cvar_Command(args.size(), args.data())) {
-		quake::con << "Unknown command \"" << args[0] << "\"" << std::endl;
+		quake::con << "Unknown command \"" << lower << "\"" << std::endl;
+	}
+	else {
+#ifdef DEBUG_ARGS
+		if (args.size() > 1) {
+			quake::debug << "SET: " << lower << " = " << args[1] << std::endl;
+		}
+#endif
 	}
 }
 void execute_args(const  quake::string_view& text, cmd_source_t src) {
-	quake::string_view token;
-	UVector<quake::string_view> args;
-	COM_Parser parser(text);
-	do {
-		token = parser.Next(true);
-		if (!token.empty() || token[0] == '\n') {
-			if (!args.empty()) {
-				execute_args(args, src_command);
-				args.clear();
-			}
-			continue;
-		}
-		args.emplace_back(token);
-	} while (true);
+	auto list = SafeArgs::ParseArgs(text);
+	for (const auto& args : list) {
+		execute_args(args, src_command);
+	}
 }

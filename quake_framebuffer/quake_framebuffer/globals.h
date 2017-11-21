@@ -123,6 +123,7 @@ typedef struct {
 	int	index1;
 } aedge_t;
 
+#if 0
 // pr_edict 
 #define	MAX_FIELD_LEN	64
 #define GEFV_CACHESIZE	2
@@ -131,7 +132,9 @@ typedef struct {
 	ddef_t	*pcache;
 	char	field[MAX_FIELD_LEN];
 } gefv_cache;
+#endif
 
+// don't need the cache now that we use map to look up fields
 // model.c
 
 #define	MAX_MOD_KNOWN	256

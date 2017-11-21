@@ -152,7 +152,7 @@ public:
 	using const_pointer = const value_type*;
 	using reference = value_type&;
 	using const_reference = const value_type&;
-	using propagate_on_container_move_assignment = std::true_type;
+	//using propagate_on_container_move_assignment = std::true_type;
 	template <class U>
 	struct rebind { using other =  UAllocator<U> ; };
 
@@ -366,6 +366,12 @@ private:
 };
 #include <allocators>
 #include <scoped_allocator>
+template<typename T>
+struct z_delete {
+	void operator()(T *ptr) const noexcept { if (ptr) Z_Free(ptr); }
+};
+template<typename T>
+using ZUniquePtr = std::unique_ptr<T, z_delete<T>>;
 
 
 // some basic wrappers to use the doom memory system
@@ -386,6 +392,7 @@ using USVector = std::vector<T, std::scoped_allocator_adaptor<T>>;
 //using StringList = std::vector<UString, UAllocator<UString>>;
 using StringList = std::list<UString, UAllocator<UString>>;
 using SStringList = std::vector<UString, std::scoped_allocator_adaptor<UString>>;
+
 using SStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
 
 template<typename T>

@@ -373,6 +373,7 @@ void main (int argc, const char **argv)
 	quakeparms_t    parms;
 	// Get current flag  
 	// Send all reports to STDOUT
+#ifdef DEBUG_HEAP
 	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
 	_CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
 	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
@@ -390,7 +391,7 @@ void main (int argc, const char **argv)
 
 	// Set flag to the new value.  
 	_CrtSetDbgFlag(tmpFlag);
-
+#endif
 	parms.memsize = MEMORY_SIZE;
 	parms.membase = test_block;// malloc(parms.memsize);
 	parms.basedir = ".";

@@ -17,7 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-
+#ifndef _QUAKE_PR_COMP_H_
+#define _QUAKE_PR_COMP_H_
 // this file is shared by quake and qcc
 #include <type_traits>
 
@@ -159,18 +160,16 @@ struct dstatement_t
 	short	a,b,c;
 } ;
 
-typedef struct
+struct ddef_t
 {
 	union {
 		unsigned short	itype;		// if DEF_SAVEGLOBGAL bit is set
 									// the variable needs to be saved in savegames
 		etype_t type;
 	};
-
-
 	unsigned short	ofs;
 	int			s_name;
-} ddef_t;
+} ;
 
 
 #define	MAX_PARMS	8
@@ -192,7 +191,7 @@ typedef struct
 
 
 #define	PROG_VERSION	6
-typedef struct
+struct dprograms_t
 {
 	int		version;
 	int		crc;			// check of header file
@@ -216,5 +215,18 @@ typedef struct
 	int		numglobals;
 	
 	int		entityfields;
-} dprograms_t;
 
+	dfunction_t * GetFunction(int offs)  { return reinterpret_cast<dfunction_t*>(reinterpret_cast<byte*>(this) + ofs_functions); }
+	quake::string_view GetString(int offs)  { return (reinterpret_cast<const char*>(this) + ofs_strings); }
+	ddef_t* GetGlobalDef(int offs)  { return reinterpret_cast<ddef_t*>(reinterpret_cast<byte*>(this) + ofs_globaldefs); }
+	ddef_t* GetFieldDefs(int offs)  { return reinterpret_cast<ddef_t*>(reinterpret_cast<byte*>(this) + ofs_fielddefs); }
+	//globalvars_t* GetGlobalVars(int offs)  { return reinterpret_cast<globalvars_t*>(reinterpret_cast<byte*>(this) + ofs_globals); }
+	//dstatement_t* GetStatements(int offs)  { return reinterpret_cast<dstatement_t*>(reinterpret_cast<byte*>(this) + ofs_statements); }
+
+	// debugging, going to be used for lookup
+	static std::unordered_map<quake::string_view, ddef_t*> globals;
+	static std::unordered_map<quake::string_view, ddef_t*> fields;
+	static std::unordered_map<quake::string_view, dfunction_t*> functions;
+} ;
+
+#endif

@@ -160,7 +160,7 @@ void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source
 	cls.netcon = NET_Connect (host);
 	if (!cls.netcon)
 		Host_Error ("CL_Connect: connect failed\n");
-	Con_DPrintf ("CL_EstablishConnection: connected to %s\n", host);
+	quake::dcon << "CL_EstablishConnection: connected to  "<<  host << std::endl;
 	
 	cls.demonum = -1;			// not in the demo loop now
 	cls.state = ca_connected;

@@ -65,7 +65,7 @@
 // ----------------------------------------------------------------------------
 // Size of the heap in bytes
 #define UMM_MALLOC_CFG__HEAP_SIZE 32768
-
+//#define UMM_DBG_LOG_LEVEL 6
 // ----------------------------------------------------------------------------
 // A couple of macros to make packing structures less compiler dependent
 

@@ -151,7 +151,7 @@ void CL_KeepaliveMessage (void)
 	
 	static idTime lastmsg;
 	int		ret;
-	sizebuf_t	old;
+	sizebuf_t	old(net_message); 
 	byte		olddata[8192];
 	
 	if (sv.active)
@@ -159,8 +159,8 @@ void CL_KeepaliveMessage (void)
 	if (cls.demoplayback)
 		return;
 
-// read messages from server, should just be nops
 	old = net_message;
+	// read messages from server, should just be nops
 	Q_memcpy (olddata, net_message.data(), net_message.size());
 	
 	do

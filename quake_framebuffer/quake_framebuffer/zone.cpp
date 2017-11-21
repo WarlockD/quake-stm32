@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static constexpr size_t alignment_bits = sizeof(ptrdiff_t) / 8;
 static inline size_t AllignSize(size_t size) { return  ((size + (alignment_bits-1))&~(alignment_bits - 1)); }
 
+//#define PARANOID
 
 #define	DYNAMIC_SIZE	0xc000
 
@@ -89,16 +90,19 @@ Z_Free
 */
 void Z_Free (void *ptr)
 {
+#if 0
 	memblock_t	*block, *other;
 	assert(_CrtCheckMemory());
-
+#endif
 	if (!ptr)
 		Sys_Error ("Z_Free: NULL pointer");
+#if 0
 	auto& checkpoint = _checkpoints.find(ptr);
 	assert(checkpoint != _checkpoints.end());
 	_CrtMemState prev = checkpoint->second;
 	_CrtMemState test,ans;
-	free(ptr);
+#endif
+#if 0
 	_CrtMemCheckpoint(&test);
 	if (_CrtMemDifference(&ans, &prev, &test)) {
 		quake::con << "fuck me " << std::endl;
@@ -107,8 +111,9 @@ void Z_Free (void *ptr)
 
 	_checkpoints.erase(checkpoint);
 	assert(_CrtCheckMemory());
+#endif
 	//_malloc_dbg()
-	//umm_free(ptr);
+	umm_free(ptr);
 	//free(ptr);
 #if 0
 	block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
@@ -154,14 +159,14 @@ void *Z_Malloc (size_t size)
 	//size &= 0x3;
 //
 // tag malloc is never really used
-	assert(_CrtCheckMemory());
-	//void	*buf =  umm_malloc(size);
-	void	*buf = malloc(size);
-	_CrtMemState stat;
-	_CrtMemCheckpoint(&stat);
-	_CrtMemDumpStatistics(&stat);
-	_checkpoints.emplace(buf, stat);
-	assert(_CrtCheckMemory());
+//	assert(_CrtCheckMemory());
+	void	*buf =  umm_malloc(size);
+//	void	*buf = malloc(size);
+//	_CrtMemState stat;
+//	_CrtMemCheckpoint(&stat);
+//	_CrtMemDumpStatistics(&stat);
+//	_checkpoints.emplace(buf, stat);
+//	assert(_CrtCheckMemory());
 #if 0
 	Z_CheckHeap();	// DEBUG
 
@@ -444,6 +449,7 @@ void *Hunk_AllocName (int size, const quake::string_view& name)
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
 	name.copy(h->name, sizeof(h->name));
+	h->name[7] = 0; 
 
 	
 	return (void *)(h+1);
@@ -468,7 +474,7 @@ void Hunk_FreeToLowMark (int mark)
 {
 	if (mark < 0 || mark > hunk_low_used)
 		Sys_Error ("Hunk_FreeToLowMark: bad mark %i", mark);
-	memset (hunk_base + mark, 0, hunk_low_used - mark);
+	Q_memset (hunk_base + mark, 0, hunk_low_used - mark);
 	hunk_low_used = mark;
 }
 
@@ -578,14 +584,14 @@ CACHE MEMORY
 ===============================================================================
 */
 
-typedef struct cache_system_s
+struct cache_system_t
 {
-	size_t						size;		// including this header
+	size_t					size;		// including this header
 	cache_user_t			*user;
 	char					name[16];
-	struct cache_system_s	*prev, *next;
-	struct cache_system_s	*lru_prev, *lru_next;	// for LRU flushing	
-} cache_system_t;
+	cache_system_t	*prev, *next;
+	cache_system_t	*lru_prev, *lru_next;	// for LRU flushing	
+} ;
 
 cache_system_t *Cache_TryAlloc (int size, qboolean nobottom);
 
@@ -606,9 +612,9 @@ void Cache_Move ( cache_system_t *c)
 	{
 //		Con_Printf ("cache_move ok\n");
 
-		Q_memcpy (new_ptr +1, c+1, c->size - sizeof(cache_system_t));
+		std::memcpy (new_ptr +1, c+1, c->size - sizeof(cache_system_t));
 		new_ptr->user = c->user;
-		Q_memcpy (new_ptr->name, c->name, sizeof(new_ptr->name));
+		std::memcpy (new_ptr->name, c->name, sizeof(new_ptr->name));
 		Cache_Free (c->user);
 		new_ptr->user->data = (void *)(new_ptr +1);
 	}

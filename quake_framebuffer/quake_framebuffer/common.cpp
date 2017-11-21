@@ -69,7 +69,7 @@ namespace quake {
 	void cmemlink::link(const void* p, size_type n)
 	{
 		if (!p && n)
-			throw std::exception();
+			Sys_Error("Linking a zero argument");
 		unlink();
 		relink(p, n);
 	}
@@ -239,6 +239,9 @@ void InsertLinkAfter (link_t *l, link_t *after)
 
 void Q_memset (void *dest, int fill, size_t count)
 {
+
+	::memset(dest, fill, count);
+#if 0
 	int             i;
 	
 	if ( (((long)dest | (int)count) & 3) == 0)
@@ -251,10 +254,14 @@ void Q_memset (void *dest, int fill, size_t count)
 	else
 		for (i=0 ; i<count ; i++)
 			((byte *)dest)[i] = fill;
+#endif
 }
 
 void Q_memcpy (void *dest, const void * src, size_t count)
 {
+
+	::memcpy(dest, src, count);
+#if 0
 	int             i;
 	
 	if (( ( (long)dest | (long)src | (int)count) & 3) == 0 )
@@ -266,10 +273,13 @@ void Q_memcpy (void *dest, const void * src, size_t count)
 	else
 		for (i=0 ; i<count ; i++)
 			((byte *)dest)[i] = ((byte *)src)[i];
+#endif
 }
 
 int Q_memcmp (const void * m1, const void * m2, size_t count)
 {
+	return ::memcmp(m1, m2, count) == 0 ? 0: -1;
+#if 0
 	while(count)
 	{
 		count--;
@@ -277,6 +287,7 @@ int Q_memcmp (const void * m1, const void * m2, size_t count)
 			return -1;
 	}
 	return 0;
+#endif
 }
 
 void Q_strcpy (char *dest, const char * src)
@@ -912,29 +923,28 @@ float MSG_ReadAngle (void)
 
 void sizebuf_t::Print(const quake::string_view& data) {
 	size_t 	len = data.size() + 1;
-	if (_data.data()[_cursize - 1])
+	if (back())
 		Q_memcpy(GetSpace(len), data.data(), len); // no trailing 0
 	else
 		Q_memcpy(GetSpace(len - 1), data.data(), len);  // write over trailing 0
-	_data.data()[_cursize] = 0;
 }
 
 void sizebuf_t::Print(char c) {
-	if (_data.data()[_cursize - 1])
+	if (back())
 		*((byte *)GetSpace(2)) = c; // no trailing 0
 	else
 		*(((byte *)GetSpace(1)) - 1) = c; // no trailing 0
-	_data.data()[_cursize] = 0;
 }
 
 
 void sizebuf_t::Clear() { _cursize = 0; }
-void sizebuf_t::Free() { assert(_hunk_low_used); _hunk_low_used = 0; _cursize = 0; }
+void sizebuf_t::Free() { assert(_hunk_low_used); Hunk_FreeToLowMark(_hunk_low_used);  _hunk_low_used = 0; _cursize = 0; _capacity = 0;   }
 void sizebuf_t::Alloc(size_t startsize) {
 	assert(!_hunk_low_used);
 	if (startsize < 256) startsize = 256;
 	_hunk_low_used = Hunk_LowMark(); // debuging mainly
-	_data.link((byte*)Hunk_AllocName(startsize, "sizebuf"), startsize);
+	_data = (byte*)Hunk_AllocName(startsize, "sizebuf");
+	_capacity = startsize;
 	_cursize = 0;
 }
 
@@ -943,13 +953,34 @@ void sizebuf_t::Write(const void* data, size_t length) {
 	std::copy((const char*)data,(const char*)data + length, (char*)GetSpace(length));
 	_cursize += length;
 }
+/// Shifts the data in the linked block from \p start to \p start + \p n.
+/// The contents of the uncovered bytes is undefined.
+void sizebuf_t::InsertArea(const_iterator cstart, size_type n)
+{
+	assert(data() || !n);
+	assert(begin() || !n);
+	assert(cstart >= begin() && cstart + n <= end());
+	iterator start = const_cast<iterator>(cstart);
+	std::rotate(start, end() - n, end());
+}
+
+/// Shifts the data in the linked block from \p start + \p n to \p start.
+/// The contents of the uncovered bytes is undefined.
+void sizebuf_t::EraseArea(const_iterator cstart, size_type n)
+{
+	assert(data() || !n);
+	assert(begin() || !n);
+	assert(cstart >= begin() && cstart + n <= end());
+	iterator start = const_cast<iterator>(cstart);
+	std::rotate(start, start + n, end());
+}
 void sizebuf_t::Insert(const void* data, size_t n, size_t pos) {
-	quake::memlink::const_iterator start(_data.begin() + pos);
-	const size_t ipmi = std::distance(quake::memlink::const_iterator(_data.begin()), start);
-	const ptrdiff_t ip = start - quake::memlink::const_iterator(begin());
+	const_iterator start(begin() + pos);
+	const size_t ipmi = std::distance(const_iterator(begin()), start);
+	const ptrdiff_t ip = start - const_iterator(begin());
 	assert(ip <= maxsize());
-	_data.insert(_data.iat(ip), n);
-	std::copy((const byte*)data, (const byte*)data+n, _data.iat(ip));
+	InsertArea(begin() + ip, n);
+	std::copy((const byte*)data, (const byte*)data+n, begin() + ip);
 	_cursize += n;
 }
 void* sizebuf_t::GetSpace(size_t length) {
@@ -968,7 +999,7 @@ void* sizebuf_t::GetSpace(size_t length) {
 		Clear();
 	}
 
-	data = _data.data() + _cursize;
+	data = _data + _cursize;
 	_cursize += length;
 	return data;
 }
@@ -1020,9 +1051,9 @@ enum class Class {
 	Discard
 };
 //http://hackingoff.com/compilers/scanner-generator
-static constexpr const Entry lex_table[][7] = {
+static constexpr const Entry lex_table_accept_eol[][7] = {
 	//   S				"						/						eof					'\n'				    Other
-	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),		HALT0(Class::NewLine),	ACCEPT(6) },
+	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),			ACCEPT(7),		ACCEPT(6) },
 	// symbol state
 	{ ACCEPT(1),	HALT(0,Class::Symbol),	ACCEPT(1),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
 	// string state
@@ -1033,17 +1064,38 @@ static constexpr const Entry lex_table[][7] = {
 	{ ACCEPT(5),	ACCEPT(5),				ACCEPT(5),			RESTART(0),				RESTART(0),		ACCEPT(5), },
 	// whitespace
 	{ RESTART(0),	RESTART(0),				RESTART(0),			 	RESTART(0),			RESTART(0),				ACCEPT(6), },
+	// new line
+	{ HALT0(Class::NewLine),	HALT0(Class::NewLine),	  HALT0(Class::NewLine),			HALT0(Class::NewLine),		HALT0(Class::NewLine),	HALT0(Class::NewLine) },
 };
+static constexpr const Entry lex_table_ignore_eol[][7] = {
+	//   S				"						/						eof					'\n'				    Other
+	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),			ACCEPT(7),				ACCEPT(6) },
+	// symbol state
+	{ ACCEPT(1),	HALT(0,Class::Symbol),	ACCEPT(1),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+	// string state
+	{ ACCEPT(2),	GOTO(3),				ACCEPT(2), 			ERROR0('"'),			ACCEPT(2),		ACCEPT(2) },
+	{ HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String) },
+	// comment
+	{ ACCEPT(1),	ERROR0('"'),			ACCEPT(5),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+	{ ACCEPT(5),	ACCEPT(5),				ACCEPT(5),			RESTART(0),				RESTART(0),		ACCEPT(5), },
+	// whitespace
+	{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				ACCEPT(6), },
+	// new line
+	{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				RESTART(0), },
+};
+static quake::string_view eol_token("\n");
+
 
 // switched to more state based
-quake::string_view COM_Parser::Next(bool test_eol) {
-	quake::string_view token;
+bool COM_Parser::Next(quake::string_view& token, bool test_eol){
+	token = quake::string_view();
+	while (_pos >= _data.size()) return false;
 	size_t start = _pos;
 	size_t len = 0;
 	int current_read;
 	bool buffered = false;
-	auto getc = [this]() -> int { return _pos < _data.size() ? _data[_pos] : -1; };
-	do {
+	const auto& lex_table = test_eol ? lex_table_accept_eol : lex_table_ignore_eol;
+	while(1){
 		//    @label_codes = {"a"=>0, "\""=>1, "/"=>2, "0"=>3, "c"=>4, "b"=>5, :other=>6}
 		// I could built a 256 charater table for this, but seriously, for this few tokens?
 		int ch = _pos < _data.size() ? _data[_pos] : -1;
@@ -1072,22 +1124,26 @@ quake::string_view COM_Parser::Next(bool test_eol) {
 			len = 0;
 			break;
 		case Action::Halt:
-			if ((!test_eol && action.arg == (int)Class::NewLine)){
-				_state = 0;
-				len = 0;
-				continue; // restart
-			}
-			if (_pos > start && len > 0)
+			switch ((Class)action.arg) {
+			case Class::Eof: 
+				return false;
+			case Class::NewLine:
+				token = eol_token;
+				break;
+			default:
+				assert(_pos > start && len > 0);
 				token = _data.substr(start, len);
-			return token;
+				break;
+
+			}
+			return true;
 		default:
 			assert(0);
 			break; // error ugh
 
 		} 
-
-	} while (true);
-	return token;
+	};
+	return false; // compiler meh
 }
 
 #if 0
@@ -2180,7 +2236,7 @@ static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 	auto& it = com_packfilesearch.find(filename);
 	if (it != com_packfilesearch.end()) { // its a pack file
 		auto& pfile = it->second.get();		
-		quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
+	//	quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
 		return &pfile.getstream();
 	}
 	else { // not a pack file
@@ -2203,7 +2259,7 @@ static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 #endif
 		}
 	}
-	quake::con << "FindFile: can't find " << filename;
+	quake::con << "FindFile: can't find " << filename << std::endl;
 
 	return nullptr;
 }
@@ -2302,6 +2358,10 @@ static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 	Draw_EndDisc ();
 
 	return buf;
+}
+byte *COM_LoadZFile(const quake::string_view& path)
+{
+	return COM_LoadFile(path, 0);
 }
 
 byte *COM_LoadHunkFile (const quake::string_view& path)

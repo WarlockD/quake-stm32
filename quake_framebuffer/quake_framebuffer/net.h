@@ -122,9 +122,9 @@ struct qsockaddr
 #define CCREP_PLAYER_INFO	0x84
 #define CCREP_RULE_INFO		0x85
 
-typedef struct qsocket_s
+struct qsocket_t
 {
-	struct qsocket_s	*next;
+	qsocket_t		*next;
 	idTime			connecttime;
 	idTime			lastMessageTime;
 	idTime			lastSendTime;
@@ -152,13 +152,13 @@ typedef struct qsocket_s
 	struct qsockaddr	addr;
 	char				address[NET_NAMELEN];
 
-} qsocket_t;
+} ;
 
 extern qsocket_t	*net_activeSockets;
 extern qsocket_t	*net_freeSockets;
 extern int			net_numsockets;
 
-typedef struct
+struct net_landriver_t
 {
 	char		*name;
 	qboolean	initialized;
@@ -181,13 +181,13 @@ typedef struct
 	int			(*AddrCompare) (struct qsockaddr *addr1, struct qsockaddr *addr2);
 	int			(*GetSocketPort) (struct qsockaddr *addr);
 	int			(*SetSocketPort) (struct qsockaddr *addr, int port);
-} net_landriver_t;
+} ;
 
 #define	MAX_NET_DRIVERS		8
 extern int 				net_numlandrivers;
 extern net_landriver_t	net_landrivers[MAX_NET_DRIVERS];
 
-typedef struct
+struct net_driver_t
 {
 	char		*name;
 	qboolean	initialized;
@@ -204,7 +204,7 @@ typedef struct
 	void		(*Close) (qsocket_t *sock);
 	void		(*Shutdown) (void);
 	int			controlSock;
-} net_driver_t;
+} ;
 
 extern int			net_numdrivers;
 extern net_driver_t	net_drivers[MAX_NET_DRIVERS];
@@ -229,7 +229,7 @@ idTime SetNetTime(void);
 
 #define HOSTCACHESIZE	8
 
-typedef struct
+struct hostcache_t
 {
 	char	name[16];
 	char	map[16];
@@ -239,7 +239,7 @@ typedef struct
 	int		driver;
 	int		ldriver;
 	struct qsockaddr addr;
-} hostcache_t;
+} ;
 
 extern int hostCacheCount;
 extern hostcache_t hostcache[HOSTCACHESIZE];
@@ -276,25 +276,25 @@ extern	int			net_activeconnections;
 void		NET_Init (void);
 void		NET_Shutdown (void);
 
-struct qsocket_s	*NET_CheckNewConnections (void);
+qsocket_t	*NET_CheckNewConnections (void);
 // returns a new connection number if there is one pending, else -1
 
-struct qsocket_s	*NET_Connect (quake::string_view host);
+qsocket_t	*NET_Connect (quake::string_view host);
 // called by client to connect to a host.  Returns -1 if not able to
 
 qboolean NET_CanSendMessage (qsocket_t *sock);
 // Returns true or false if the given qsocket can currently accept a
 // message to be transmitted.
 
-int			NET_GetMessage (struct qsocket_s *sock);
+int			NET_GetMessage (qsocket_t *sock);
 // returns data in net_message sizebuf
 // returns 0 if no data is waiting
 // returns 1 if a message was received
 // returns 2 if an unreliable message was received
 // returns -1 if the connection died
 
-int			NET_SendMessage (struct qsocket_s *sock, sizebuf_t *data);
-int			NET_SendUnreliableMessage (struct qsocket_s *sock, sizebuf_t *data);
+int			NET_SendMessage (qsocket_t *sock, sizebuf_t *data);
+int			NET_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data);
 // returns 0 if the message connot be delivered reliably, but the connection
 //		is still considered valid
 // returns 1 if the message was sent properly
@@ -304,7 +304,7 @@ int			NET_SendToAll(sizebuf_t *data, idTime blocktime);
 // This is a reliable *blocking* send to all attached clients.
 
 
-void		NET_Close (struct qsocket_s *sock);
+void		NET_Close (qsocket_t *sock);
 // if a dead connection is returned by a get or send function, this function
 // should be called when it is convenient
 

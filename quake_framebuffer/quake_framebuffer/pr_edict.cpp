@@ -62,8 +62,6 @@ cvar_t	saved4 = {"saved4", "0", true};
 
 
 
-static gefv_cache	gefvCache[GEFV_CACHESIZE] = {{NULL, ""}, {NULL, ""}};
-
 
 
 /*
@@ -140,7 +138,7 @@ void edict_t::Free ()
 	v.frame = 0;
 	VectorCopy (vec3_origin, v.origin);
 	VectorCopy (vec3_origin, v.angles);
-	v.nextthink = -1s;
+	v.nextthink = idTime(-1s);
 	v.solid = 0;
 
 	freetime = sv.time;
@@ -193,14 +191,20 @@ ED_FindField
 */
 ddef_t *ED_FindField (const quake::string_view& name)
 {
-	ddef_t		*def;
+	ddef_t		*def = nullptr;
+	assert(!dprograms_t::fields.empty());
+	auto it = dprograms_t::fields.find(name);
+	if (it != dprograms_t::fields.end()) def= it->second;
+#if 0
+	
 	for (int i =0 ; i<progs->numfielddefs ; i++)
 	{
 		def = &pr_fielddefs[i];
 		const char* def_name = pr_strings + def->s_name;
 		if (name == def_name) return def;
 	}
-	return nullptr;
+#endif
+	return def;
 }
 
 
@@ -211,7 +215,11 @@ ED_FindGlobal
 */
 ddef_t *ED_FindGlobal (const quake::string_view& name)
 {
-	ddef_t		*def;
+	ddef_t		*def = nullptr;
+	assert(!dprograms_t::globals.empty());
+	auto it = dprograms_t::globals.find(name);
+	if (it != dprograms_t::globals.end()) def = it->second;
+#if 0
 	int			i;
 	
 	for (i=0 ; i<progs->numglobaldefs ; i++)
@@ -220,7 +228,8 @@ ddef_t *ED_FindGlobal (const quake::string_view& name)
 		const char* def_name = pr_strings + def->s_name;
 		if (name == def_name) return def;
 	}
-	return nullptr;
+#endif
+	return def;
 }
 
 
@@ -231,49 +240,27 @@ ED_FindFunction
 */
 dfunction_t *ED_FindFunction (const quake::string_view& name)
 {
-	dfunction_t		*func;
-	int				i;
-	
-	for (i=0 ; i<progs->numfunctions ; i++)
+	dfunction_t		*func = nullptr;
+	assert(!dprograms_t::functions.empty());
+	auto it = dprograms_t::functions.find(name);
+	if (it != dprograms_t::functions.end()) func = it->second;
+#if 0
+	for (int i=0 ; i<progs->numfunctions ; i++)
 	{
 		func = &pr_functions[i];
 		const char* func_name = pr_strings + func->s_name;
 		if (name == func_name) return func;
 	}
-	return nullptr;
+#endif
+	return func;
 }
 
 
 eval_t *GetEdictFieldValue(edict_t *ed, const quake::string_view& field)
 {
-	ddef_t			*def = NULL;
-	int				i;
-	static int		rep = 0;
-
-	for (i=0 ; i<GEFV_CACHESIZE ; i++)
-	{
-		if (field ==  gefvCache[i].field)
-		{
-			def = gefvCache[i].pcache;
-			goto Done;
-		}
-	}
-
-	def = ED_FindField (field);
-
-	assert(field.size() < MAX_FIELD_LEN);
-	if (field.size() < MAX_FIELD_LEN)
-	{
-		gefvCache[rep].pcache = def;
-		field.copy(gefvCache[rep].field,sizeof(gefvCache[rep].field));
-		rep ^= 1;
-	}
-
-Done:
-	if (!def)
-		return nullptr;
-
-	return (eval_t *)((char *)&ed->v + def->ofs*4);
+	ddef_t* def = ED_FindField(field);
+	if (!def) return nullptr;
+	return (eval_t *)((uint8_t *)&ed->v + def->ofs*sizeof(uint32_t));
 }
 
 
@@ -542,17 +529,16 @@ ED_ParseGlobals
 */
 void ED_ParseGlobals (COM_Parser& parser)
 {
-	while (1)
+	quake::string_view keyname,value;
+	while (parser.Next(keyname))
 	{	
-		auto keyname = parser.Next();
 		if (keyname.empty())
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
 		if (keyname[0]  == '}')
 			break;
 
-		auto value = parser.Next();
-		if (value.empty())
+		if (parser.Next(value))
 			Sys_Error("ED_ParseEntity: closing brace without data");
 
 		if (value[0] == '}')
@@ -581,26 +567,20 @@ ED_NewString
 */
 char *ED_NewString (const quake::string_view& string)
 {
-	char	*new_ptr, *new_p;
-	int		i,l;
-	
-	l = string.size() + 1;
+	char	*new_ptr, *new_p;	
+	size_t l = string.size() + 1;
 	new_ptr = (char*)Hunk_Alloc (l);
 	new_p = new_ptr;
-
-	for (i=0 ; i< l ; i++)
-	{
-		if (string[i] == '\\' && i < l-1)
-		{
-			i++;
-			if (string[i] == 'n')
+	for (auto it = string.begin(); it != string.end();it++) {
+		if (*it == '\\') {
+			if (*++it == 'n')
 				*new_p++ = '\n';
 			else
 				*new_p++ = '\\';
 		}
-		else
-			*new_p++ = string[i];
+		else *new_p++ = *it;
 	}
+	*new_p = 0;
 	
 	return new_ptr;
 }
@@ -625,7 +605,13 @@ qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 	char	*v, *w;
 	void	*d;
 	dfunction_t	*func;
-
+	union {
+		void* base;
+		int* i;
+		float* f;
+		char* s;
+	} vd;
+	vd.base = (void *)((int *)base + key->ofs);
 	d = (void *)((int *)base + key->ofs);
 	idType type = key->type;
 	switch (type)
@@ -642,9 +628,14 @@ qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 	case etype_t::ev_vector:
 	{
 		COM_Parser parser(value);
-		assert(quake::to_number(parser.Next(), f[0]));
-		assert(quake::to_number(parser.Next(), f[1]));
-		assert(quake::to_number(parser.Next(), f[2]));
+		quake::string_view fv;
+		f = (float*)d;
+		assert(parser.Next(fv)); 
+		assert(quake::to_number(fv, f[0]));
+		assert(parser.Next(fv)); 
+		assert(quake::to_number(fv, f[1]));
+		assert(parser.Next(fv)); 
+		assert(quake::to_number(fv, f[2]));
 	}
 	break;
 
@@ -695,7 +686,7 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 	qboolean	init;
 	
 	int			n;
-
+	quake::string_view keyname, value;
 	init = false;
 	//COM_Parser parser(data);
 
@@ -704,10 +695,11 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		memset(&ent->v, 0, progs->entityfields * 4);
 
 	// go through all the dictionary pairs
+	// debugging
+	std::unordered_map<quake::string_view, quake::string_view> values_debug;
 	while (1)
 	{
-		auto keyname = parser.Next();
-		if (keyname.empty())
+		if (!parser.Next(keyname))
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		if (keyname[0] == '}') break;
@@ -715,10 +707,10 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		// and allow them to be turned into vectors. (FIXME...)
 		anglehack = false;
 
-		if (keyname == "angles")
+		if (keyname == "angle")
 		{
 			keyname =  "angles";
-			anglehack = true;
+			anglehack = true; 
 		}
 		// FIXME: change light to _light to get rid of this hack
 		else if (keyname == "light") {
@@ -728,13 +720,12 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		// this shouldn't happen with the parser
 		assert(keyname.back() != ' ');
 
-		auto value = parser.Next();
 		// parse value	
-		if (value.empty() || value[0] == '}')
+		if (!parser.Next(value) || value[0] == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		init = true;
-
+		values_debug.emplace(keyname, value);
 		// keynames with a leading underscore are used for utility comments,
 		// and are immediately discarded by quake
 		if (keyname.front() == '_')
@@ -750,7 +741,7 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		{
 			quake::fixed_string_stream<128> buf;
 
-			buf << "0 " << keyname << " 0";
+			buf << "0 " << value << " 0";
 			if (!ED_ParseEpair((void *)&ent->v, key, buf.str()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
@@ -792,13 +783,12 @@ void ED_LoadFromFile (const quake::string_view& data)
 	inhibit = 0;
 	pr_global_struct->time = sv.time;
 	COM_Parser parser(data);
-
+	quake::string_view token;
 // parse ents
 	while (1)
 	{
 // parse the opening brace	
-		auto token = parser.Next();
-		if (token.empty()) break;
+		if (!parser.Next(token,false)) break;
 
 		if (token[0] != '{') {
 			Sys_Error("ED_LoadFromFile:  expecting {");
@@ -859,38 +849,38 @@ void ED_LoadFromFile (const quake::string_view& data)
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
 }
 
-
+ std::unordered_map<quake::string_view, ddef_t*> dprograms_t::globals;
+ std::unordered_map<quake::string_view, ddef_t*> dprograms_t::fields;
+ std::unordered_map<quake::string_view, dfunction_t*> dprograms_t::functions;
 /*
 ===============
 PR_LoadProgs
 ===============
 */
-void PR_LoadProgs (void)
+void PR_LoadProgs(void)
 {
 	int		i;
 
-// flush the non-C variable lookup cache
-	for (i=0 ; i<GEFV_CACHESIZE ; i++)
-		gefvCache[i].field[0] = 0;
-
-	CRC_Init (&pr_crc);
-
-	progs = (dprograms_t *)COM_LoadHunkFile ("progs.dat");
+	CRC_Init(&pr_crc);
+	dprograms_t::fields.clear();
+	dprograms_t::globals.clear();
+	dprograms_t::functions.clear();
+	progs = (dprograms_t *)COM_LoadHunkFile("progs.dat");
 	if (!progs)
-		Sys_Error ("PR_LoadProgs: couldn't load progs.dat");
-	Con_DPrintf ("Programs occupy %iK.\n", com_filesize/1024);
+		Sys_Error("PR_LoadProgs: couldn't load progs.dat");
+	Con_DPrintf("Programs occupy %iK.\n", com_filesize / 1024);
 
-	for (i=0 ; i<com_filesize ; i++)
-		CRC_ProcessByte (&pr_crc, ((byte *)progs)[i]);
+	for (i = 0; i < com_filesize; i++)
+		CRC_ProcessByte(&pr_crc, ((byte *)progs)[i]);
 
-// byte swap the header
-	for (i=0 ; i<sizeof(*progs)/4 ; i++)
-		((int *)progs)[i] = LittleLong ( ((int *)progs)[i] );		
+	// byte swap the header
+	for (i = 0; i < sizeof(*progs) / 4; i++)
+		((int *)progs)[i] = LittleLong(((int *)progs)[i]);
 
 	if (progs->version != PROG_VERSION)
-		Sys_Error ("progs.dat has wrong version number (%i should be %i)", progs->version, PROG_VERSION);
+		Sys_Error("progs.dat has wrong version number (%i should be %i)", progs->version, PROG_VERSION);
 	if (progs->crc != PROGHEADER_CRC)
-		Sys_Error ("progs.dat system vars have been modified, progdefs.h is out of date");
+		Sys_Error("progs.dat system vars have been modified, progdefs.h is out of date");
 
 	pr_functions = (dfunction_t *)((byte *)progs + progs->ofs_functions);
 	pr_strings = (char *)progs + progs->ofs_strings;
@@ -900,33 +890,41 @@ void PR_LoadProgs (void)
 
 	pr_global_struct = (globalvars_t *)((byte *)progs + progs->ofs_globals);
 	pr_globals = (float *)pr_global_struct;
-	
-	pr_edict_size = progs->entityfields * 4 + sizeof (edict_t) - sizeof(entvars_t);
-	
-// byte swap the lumps
-	for (i=0 ; i<progs->numstatements ; i++)
+
+	pr_edict_size = progs->entityfields * 4 + sizeof(edict_t) - sizeof(entvars_t);
+
+	// byte swap the lumps
+	for (i = 0; i < progs->numstatements; i++)
 	{
-		pr_statements[i].op = LittleShort(pr_statements[i].op);
-		pr_statements[i].a = LittleShort(pr_statements[i].a);
-		pr_statements[i].b = LittleShort(pr_statements[i].b);
-		pr_statements[i].c = LittleShort(pr_statements[i].c);
+		auto pr_statement = pr_statements + i;
+		pr_statement->op = LittleShort(pr_statement->op);
+		pr_statement->a = LittleShort(pr_statement->a);
+		pr_statement->b = LittleShort(pr_statement->b);
+		pr_statement->c = LittleShort(pr_statement->c);
+
 	}
 
-	for (i=0 ; i<progs->numfunctions; i++)
+	for (i = 0; i < progs->numfunctions; i++)
 	{
-	pr_functions[i].first_statement = LittleLong (pr_functions[i].first_statement);
-	pr_functions[i].parm_start = LittleLong (pr_functions[i].parm_start);
-	pr_functions[i].s_name = LittleLong (pr_functions[i].s_name);
-	pr_functions[i].s_file = LittleLong (pr_functions[i].s_file);
-	pr_functions[i].numparms = LittleLong (pr_functions[i].numparms);
-	pr_functions[i].locals = LittleLong (pr_functions[i].locals);
-	}	
+		pr_functions[i].first_statement = LittleLong(pr_functions[i].first_statement);
+		pr_functions[i].parm_start = LittleLong(pr_functions[i].parm_start);
+		pr_functions[i].s_name = LittleLong(pr_functions[i].s_name);
+		pr_functions[i].s_file = LittleLong(pr_functions[i].s_file);
+		pr_functions[i].numparms = LittleLong(pr_functions[i].numparms);
+		pr_functions[i].locals = LittleLong(pr_functions[i].locals);
+		const char* name = pr_strings + pr_functions[i].s_name;
+		dprograms_t::functions.emplace(name, &pr_functions[i]);
+
+	}
+
 
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
 		pr_globaldefs[i].type = static_cast<etype_t>(LittleShort (static_cast<uint16_t>(pr_globaldefs[i].type)));
 		pr_globaldefs[i].ofs = LittleShort (pr_globaldefs[i].ofs);
 		pr_globaldefs[i].s_name = LittleLong (pr_globaldefs[i].s_name);
+		const char* name = pr_strings + pr_globaldefs[i].s_name;
+		dprograms_t::globals.emplace(name, &pr_globaldefs[i]);
 	}
 
 	for (i=0 ; i<progs->numfielddefs ; i++)
@@ -936,6 +934,8 @@ void PR_LoadProgs (void)
 			Sys_Error ("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
 		pr_fielddefs[i].ofs = LittleShort (pr_fielddefs[i].ofs);
 		pr_fielddefs[i].s_name = LittleLong (pr_fielddefs[i].s_name);
+		const char* name = pr_strings + pr_fielddefs[i].s_name;
+		dprograms_t::fields.emplace(name, &pr_fielddefs[i]);
 	}
 
 	for (i=0 ; i<progs->numglobals ; i++)

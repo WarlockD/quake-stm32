@@ -78,6 +78,8 @@ namespace quake {
 	};
 	extern std::ostream con; // this is the console out
 	extern std::ostream debug; // this is the console out
+	extern std::ostream dcon; // console out only when developer flag is on
+
 	
 }
 //

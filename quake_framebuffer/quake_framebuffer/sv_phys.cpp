@@ -710,9 +710,9 @@ void SV_Physics_Pusher (edict_t *ent)
 	oldltime = ent->v.ltime;
 	
 	thinktime = ent->v.nextthink;
-	if (thinktime < ent->v.ltime + host_frametime)
+	if (thinktime < idCast<idTime>(ent->v.ltime) + host_frametime)
 	{
-		movetime = thinktime - ent->v.ltime;
+		movetime = thinktime - idCast<idTime>(ent->v.ltime);
 		if (movetime < idTime::zero())
 			movetime = idTime::zero();
 	}

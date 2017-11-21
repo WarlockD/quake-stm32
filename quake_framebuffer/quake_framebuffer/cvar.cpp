@@ -189,6 +189,7 @@ Cvar_Command
 Handles variable inspection and changing from the console
 ============
 */
+
 qboolean	Cvar_Command (size_t argc, const quake::string_view argv[])
 {
 	cvar_t			*v;
@@ -204,6 +205,7 @@ qboolean	Cvar_Command (size_t argc, const quake::string_view argv[])
 		quake::con << "\"" << v->name << "\" is \"" << v->string << "\"" << std::endl;
 		return true;
 	}
+
 
 	Cvar_Set (v->name, argv[1]);
 	return true;

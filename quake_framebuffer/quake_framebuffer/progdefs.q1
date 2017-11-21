@@ -6,13 +6,13 @@ typedef struct
 	int	self;
 	int	other;
 	int	world;
-	idTime	time;
-	idTime	frametime;
+	float	time;
+	float	frametime;
 	float	force_retouch;
 	string_t	mapname;
 	float	deathmatch;
 	float	coop;
-	idTime	teamplay;
+	float	teamplay;
 	float	serverflags;
 	float	total_secrets;
 	float	total_monsters;
@@ -64,7 +64,7 @@ typedef struct
 	float	modelindex;
 	vec3_t	absmin;
 	vec3_t	absmax;
-	idTime	ltime;
+	float	ltime;
 	float	movetype;
 	float	solid;
 	vec3_t	origin;
@@ -85,7 +85,7 @@ typedef struct
 	func_t	use;
 	func_t	think;
 	func_t	blocked;
-	idTime	nextthink;
+	float	nextthink;
 	int	groundentity;
 	float	health;
 	float	frags;
@@ -115,7 +115,7 @@ typedef struct
 	float	colormap;
 	float	team;
 	float	max_health;
-	idTime	teleport_time;
+	float	teleport_time;
 	float	armortype;
 	float	armorvalue;
 	float	waterlevel;

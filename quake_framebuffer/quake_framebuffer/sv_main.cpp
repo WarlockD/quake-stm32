@@ -25,6 +25,9 @@ using namespace std::chrono;
 server_t		sv;
 server_static_t	svs;
 
+server_t::server_t() : datagram(datagram_buf, sizeof(datagram_buf)), reliable_datagram(reliable_datagram_buf, sizeof(reliable_datagram_buf)), signon(signon_buf, sizeof(signon_buf)){
+
+}
 char	localmodels[MAX_MODELS][5];			// inline model names for precache
 
 //============================================================================
@@ -246,7 +249,7 @@ void SV_ConnectClient (int clientnum)
 	edict_t			*ent;
 	client_t		*client;
 	int				edictnum;
-	struct qsocket_s *netconnection;
+	qsocket_t *netconnection;
 	int				i;
 	float			spawn_parms[NUM_SPAWN_PARMS];
 
@@ -300,7 +303,7 @@ SV_CheckForNewClients
 */
 void SV_CheckForNewClients (void)
 {
-	struct qsocket_s	*ret;
+	qsocket_t	*ret;
 	int				i;
 		
 //
@@ -1093,11 +1096,13 @@ void SV_SpawnServer (const char *server)
 	
 	sv.edicts = (decltype(sv.edicts))Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
 
-	sv.datagram = sizebuf_t(sv.datagram_buf, sizeof(sv.datagram_buf));
+	sv.datagram=sizebuf_t(sv.datagram_buf, sizeof(sv.datagram_buf));
 	sv.reliable_datagram = sizebuf_t(sv.reliable_datagram_buf, sizeof(sv.reliable_datagram_buf));
 	sv.signon = sizebuf_t(sv.signon_buf , sizeof(sv.signon_buf));
+	sv.signon.Clear();
+	sv.reliable_datagram.Clear();
+	sv.datagram.Clear();
 
-	
 // leave slots at start for clients only
 	sv.num_edicts = svs.maxclients+1;
 	for (i=0 ; i<svs.maxclients ; i++)

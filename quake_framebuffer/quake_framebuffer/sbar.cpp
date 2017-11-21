@@ -468,7 +468,7 @@ void Sbar_SoloScoreboard (void)
 	Sbar_DrawString (8, 12, str);
 
 // time
-	auto time = std::chrono::duration_cast<std::chrono::seconds>(cl.time).count();
+	auto time = cl.time.seconds();
 	minutes = (int)time / 60;
 	seconds = (int)time - 60 * minutes;
 	tens = seconds / 10;

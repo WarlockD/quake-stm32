@@ -228,6 +228,9 @@
     <ClCompile Include="umm_malloc.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="icommon.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">

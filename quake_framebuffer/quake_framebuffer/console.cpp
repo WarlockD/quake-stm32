@@ -498,7 +498,19 @@ void Con_Printf (const char *fmt, ...)
 		}
 	}
 }
-
+namespace quake{
+	class quake_developer_console_buffer : public quake_console_buffer {
+	public:
+		quake_developer_console_buffer() : quake_console_buffer() {}
+		void text_out(const char* text, size_t size) override final{
+			if (developer.value) {
+				Sys_WriteConsole(text);
+			}
+		}
+	};
+	static quake_developer_console_buffer dconbuf;
+	std::ostream dcon(&dconbuf);
+}
 /*
 ================
 Con_DPrintf

@@ -441,7 +441,7 @@ void Host_ShutdownServer(qboolean crash)
 	while (count);
 
 // make sure all the clients know we're disconnecting
-	buf = sizebuf_t((byte*)message, 4);
+	buf=sizebuf_t((byte*)message, 4);
 	buf.WriteByte(svc_disconnect);
 	count = NET_SendToAll(&buf, 5s);
 	if (count)
@@ -497,10 +497,11 @@ qboolean Host_FilterTime (idTime time)
 	static constexpr idTime max_framerate = idCast<idTime>(1.0f / 72.0f);
 	realtime += time;
 
-	if (!cls.timedemo && (realtime - oldrealtime) < max_framerate)
+	const idTime new_time = (realtime - oldrealtime);
+	if (!cls.timedemo && new_time < max_framerate)
 		return false;		// framerate is too high
 
-	host_frametime = realtime - oldrealtime;
+	host_frametime = new_time;
 	oldrealtime = realtime;
 
 	if (host_framerate.value > 0)

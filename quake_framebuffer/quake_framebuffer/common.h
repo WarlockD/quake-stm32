@@ -46,9 +46,69 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef max
 #undef max
 #endif
-using idTime = std::chrono::milliseconds;
-using idTimef = std::chrono::duration<float, std::milli>;
-#if !defined BYTE_DEFINED
+//using idTime = std::chrono::milliseconds;
+class idTime  {
+public:
+	
+	using time_t = std::chrono::milliseconds;
+	using timef_t = std::chrono::duration<float, std::milli>;
+	constexpr idTime() :_time(time_t::zero()) {}
+	//constexpr idTime(int f) : _time(f*1000) {} 	// seconds are int
+	constexpr idTime(float f) : _time(std::chrono::duration_cast<time_t>(timef_t(f)*1000.0f)) {}
+	//constexpr idTime(double f) : _time(std::chrono::duration_cast<time_t>(timef_t(static_cast<float>(f))*1000.0f)) {}
+	template<typename T, typename R>
+	constexpr idTime(const std::chrono::duration<T, R>& f) : _time(std::chrono::duration_cast<time_t>(f)) {}
+	constexpr auto count() const { return _time.count(); }
+	constexpr int seconds() const { return std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
+	
+//	explicit constexpr operator time_t&()  { return _time; }
+//	explicit constexpr operator const time_t&() const { return _time; }
+	constexpr operator float() const { return std::chrono::duration_cast<timef_t>(_time).count() / 1000.0f; }
+	static constexpr idTime zero() { return idTime(); }
+	idTime& operator+=(const idTime& other) { _time += other._time; return *this; }
+	idTime& operator-=(const idTime& other) { _time -= other._time; return *this; }
+	
+	//template<typename T, typename R>
+	//idTime& operator+=(const std::chrono::duration<T,R>& other) { _time += std::chrono::duration_cast<time_t>(other); return *this; }
+	//template<typename T, typename R>
+	//idTime& operator-=(const std::chrono::duration<T, R>& other) { _time -= std::chrono::duration_cast<time_t>(other); return *this; }
+private:
+	time_t _time;
+};
+constexpr static inline idTime operator+(const idTime& s1, const idTime& s2) { return idTime(idTime::time_t(s1.count() + s2.count())); }
+constexpr static inline idTime operator+(float s1, const idTime& s2) { return idTime(idTime::time_t(idTime::time_t::rep(s1 * 1000.0f) + s2.count())); }
+constexpr static inline idTime operator+(const idTime& s1, float s2) { return idTime(idTime::time_t(s1.count() + idTime::time_t::rep(s2 * 1000.0f))); }
+
+constexpr static inline idTime operator-(const idTime& s1, const idTime& s2) { return idTime(idTime::time_t(s1.count() - s2.count())); }
+constexpr static inline idTime operator-(float s1, const idTime& s2) { return idTime(idTime::time_t(idTime::time_t::rep(s1 * 1000.0f) - s2.count())); }
+constexpr static inline idTime operator-(const idTime& s1, float s2) { return idTime(idTime::time_t(s1.count() - idTime::time_t::rep(s2 * 1000.0f))); }
+#if 0
+#define TIME_MATH_OPS(op) \
+constexpr static inline idTime operator##op (const idTime& s1, const idTime& s2) {	return idTime( static_cast<idTime::time_t>(s1) op static_cast<idTime::time_t>(s2) ); } \
+template<typename T> constexpr static inline idTime operator##op (const idTime& s1, const T& s2) {  return s1 op idTime(s2); } \
+template<typename T> constexpr static inline idTime operator##op (const T& s1, const idTime& s2) { return idTime(s1) op s2; } 
+
+TIME_MATH_OPS(+)
+TIME_MATH_OPS(-)
+//TIME_MATH_OPS(*)
+//TIME_MATH_OPS(/)
+#undef TIME_MATH_OPS
+#endif
+
+#define TIME_CMP_OPS(op)	\
+constexpr static inline bool operator##op (const idTime& s1, const idTime& s2) { return s1.count() op s2.count(); } \
+constexpr static inline bool operator##op(float s1, const idTime& s2) { return idTime::time_t::rep(s1 * 1000.0f) op s2.count(); } \
+constexpr static inline bool operator##op(const idTime& s1, float s2) { return s1.count() op idTime::time_t::rep(s2 * 1000.0f); } 
+TIME_CMP_OPS(==)
+TIME_CMP_OPS(!= )
+TIME_CMP_OPS(>= )
+TIME_CMP_OPS(<= )
+TIME_CMP_OPS(> )
+TIME_CMP_OPS(<)
+#undef TIME_CMP_OPS
+
+
+#ifndef BYTE_DEFINED
 typedef uint8_t 		byte;
 #define BYTE_DEFINED 1
 #endif
@@ -1432,12 +1492,47 @@ class sizebuf_t { //: public quake::memblock {
 	qboolean	_overflowed;	// set to true if the buffer size failed
 	int			_hunk_low_used;
 	size_t		_cursize;
-	quake::memlink _data;
+	size_t		_capacity;
+	byte*		_data;
 public:
-	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr,0), _cursize(0U) {}
-	sizebuf_t(byte* data, size_t size, bool allowoverflow=true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U),_cursize(0U), _data(data, size) {}
+	using refrence = byte&;
+	using const_refrence = const byte&;
+	using iterator = byte*;
+	using const_iterator = const byte*;
+	using size_type = size_t;
+	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr), _capacity(0U), _cursize(0U) {}
+	sizebuf_t(byte* data, size_t size, bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data(data), _capacity(size), _cursize(0U) {}
 	void* GetSpace(size_t length);
-	
+	sizebuf_t(sizebuf_t&& move) = default;
+	sizebuf_t(const sizebuf_t& copy) = default;
+	sizebuf_t& operator=(sizebuf_t&& move) = default;
+	sizebuf_t& operator=(const sizebuf_t& copy) = default;
+	refrence operator[](size_t i) { return _data[i]; }
+	const_refrence operator[](size_t i) const { return _data[i]; }
+	const_refrence front() const { return _data[0]; }
+	const_refrence back() const { return _data[_cursize-1]; }
+	refrence front()  { return _data[0]; }
+	refrence back()  { return _data[_cursize - 1]; }
+	inline size_t size() const { return _cursize; }
+	inline size_t maxsize() const { return _capacity; }
+	inline void resize(size_t size) { assert((size + 1) < maxsize()); _data[size] = 0; _cursize = size; }
+	inline const byte* data() const { return _data; }
+	inline byte* data() { return _data; }
+	inline bool overflowed() const { return _overflowed; }
+	inline void overflowed(bool value) { _overflowed = value; }
+	inline iterator begin() { return data(); }
+	inline const_iterator begin() const { return data(); }
+	inline iterator end() { return data() + _cursize; }
+	inline const_iterator end() const { return data() + _cursize; }
+
+	/// Shifts the data in the linked block from \p start to \p start + \p n.
+	/// The contents of the uncovered bytes is undefined.
+	void InsertArea(const_iterator cstart, size_type n);
+
+	/// Shifts the data in the linked block from \p start + \p n to \p start.
+	/// The contents of the uncovered bytes is undefined.
+	void EraseArea(const_iterator cstart, size_type n);
+
 	void Clear();
 	void Free();
 	void Alloc(size_t startsize);
@@ -1454,18 +1549,6 @@ public:
 	void WriteCoord(float f);
 	void WriteAngle(float f);
 
-	inline size_t size() const { return _cursize; }
-	
-	inline size_t maxsize() const { return _data.size(); }
-	inline void resize(size_t size) { assert((size + 1) < maxsize()); _data.data()[size] = 0; _cursize = size; }
-	inline const byte* data() const { return (const byte*)_data.data(); }
-	inline byte* data() { return (byte*)_data.data(); }
-	inline bool overflowed() const { return _overflowed; }
-	inline void overflowed(bool value) {  _overflowed = value; }
-	byte* begin() { return data(); }
-	const byte* begin() const { return data(); }
-	byte* end() { return data()+ _cursize; }
-	const byte* end() const { return data()+ _cursize; }
 } ;
 #if 0
 void SZ_Alloc (sizebuf_t *buf, int startsize);
@@ -1849,7 +1932,7 @@ class COM_Parser {
 public:
 	COM_Parser() : _data(""), _state(0) {}
 	COM_Parser(const quake::string_view& data) : _data(data), _pos(0), _state(0) {}
-	quake::string_view Next(bool test_eol=false);
+	bool Next(quake::string_view& token,bool test_eol=false);
 	operator const quake::string_view&() const { return _data; }
 	size_t pos() const { return _pos; }
 	quake::string_view remaining() const { return _data.substr(_pos); }
@@ -1885,19 +1968,19 @@ template<typename TO, typename FROM> constexpr TO idCast(FROM f);
 
 template<>
 constexpr inline int idCast<int,idTime>(idTime f) {
-	return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(f).count());
+	return f.seconds();
 }
 template<>
 constexpr inline float idCast<float, idTime>(idTime f) {
-	return std::chrono::duration_cast<idTimef>(f).count()/1000.0f;
+	return static_cast<float>(f);
 }
 template<>
 constexpr inline idTime idCast<idTime, float>(float f) {
-	return std::chrono::duration_cast<idTime>(idTimef(f)*1000.0f);
+	return idTime(f);
 }
 template<>
 constexpr inline idTime idCast<idTime, double>(double f) {
-	return idCast<idTime,float>(static_cast<float>(f));
+	return  idTime(static_cast<float>(f));
 }
 
 template<typename T> T Q_sin(T t) { return std::sin(t); }

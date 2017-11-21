@@ -230,7 +230,7 @@ void Host_Ping_f(cmd_source_t source, size_t argc, const quake::string_view argv
 		total = idTime::zero();
 		for (j=0 ; j<NUM_PING_TIMES ; j++)
 			total+=client->ping_times[j];
-		total /= NUM_PING_TIMES;
+		total = static_cast<float>(total) / ((float)NUM_PING_TIMES / 1000.0f);
 		SV_ClientPrintf ("%4i %s\n", idCast<int>(total), client->name);
 	}
 }
@@ -650,8 +650,8 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		str[i] = 0;
 		start = str;
 		COM_Parser parser(str);
-		auto token = parser.Next();
-		if (token.empty()) break; // end of file
+		quake::string_view token;
+		if (!parser.Next(token)) break; // end of file
 
 		if (token[0] != '{')
 			Sys_Error ("First token isn't a brace");
@@ -1784,7 +1784,7 @@ void Host_Startdemos_f(cmd_source_t source, size_t argc, const quake::string_vie
 		Con_Printf ("Max %i demos in demoloop\n", MAX_DEMOS);
 		c = MAX_DEMOS;
 	}
-	Con_Printf ("%i demo(s) in loop\n", c);
+	quake::con << c << " demo(s) in loop" << std::endl;
 
 	for (size_t i = 1; i < c + 1; i++)
 		argv[i].copy(cls.demos[i - 1], sizeof(cls.demos[i - 1]));

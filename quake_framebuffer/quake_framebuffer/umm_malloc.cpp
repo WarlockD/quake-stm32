@@ -493,7 +493,8 @@
 
 #include "umm_malloc.h"
 
-#include "umm_malloc_cfg.h"   //-- user-dependent#include "icommon.h"
+#include "umm_malloc_cfg.h"   //-- user-dependent
+
 
 
 #ifndef UMM_MALLOC_CFG__DONT_BUILD
@@ -521,9 +522,9 @@ void UMM_CRITICAL_EXIT() {
 
 #ifndef UMM_DBG_LOG_LEVEL
 #  undef  DBG_LOG_LEVEL
-#  define DBG_LOG_LEVEL 6
+#  define  DBG_LOG_LEVEL 0
 #else
-#  undef  DBG_LOG_LEVEL
+
 #  define DBG_LOG_LEVEL UMM_DBG_LOG_LEVEL
 #endif
 
