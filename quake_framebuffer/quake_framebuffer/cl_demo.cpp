@@ -263,6 +263,7 @@ CL_PlayDemo_f
 play [demoname]
 ====================
 */
+
 void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	int c;
@@ -289,14 +290,17 @@ void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view ar
 	quake::path_string name(args[1]);
 
 	COM_DefaultExtension (name, ".dem");
+	
 
-	Con_Printf ("Playing demo from %s.\n", name.c_str());
-	cls.demofile.open(name.c_str(),std::ios_base::in);
+	cls.demofile = COM_FindFile(name.c_str());
 	if (!cls.demofile.is_open())
 	{
-		Con_Printf ("ERROR: couldn't open.\n");
+		quake::con << "ERROR: couldn't open demo " << name << std::endl;
 		cls.demonum = -1;		// stop demo loop
 		return;
+	}
+	else {
+		quake::con << "Playing demo from " << name << std::endl;
 	}
 
 	cls.demoplayback = true;

@@ -45,8 +45,10 @@ public:
 	using ios_base = std::ios_base;
 	sys_file();
 	sys_file(const char* filename, ios_base::openmode mode = ios_base::in | ios_base::binary) :sys_file() { open(filename, mode); }
+	void swap(sys_file& other); // this just needs implmented for move to work
 	sys_file(const sys_file&) = delete; // no copy
-	sys_file(sys_file&& move); // move is needed though
+	sys_file(sys_file&& move) { swap(move); }
+	sys_file& operator=(sys_file&& move) { swap(move); return *this; }
 	~sys_file();
 	// most common option in quake
 	bool open(const char* filename, std::ios_base::openmode mode = ios_base::in | ios_base::binary);

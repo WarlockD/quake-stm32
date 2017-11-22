@@ -200,10 +200,10 @@ void R_ReadPointFile_f(cmd_source_t source, size_t argc, const quake::string_vie
 	int		c;
 	particle_t	*p;
 	char	name[MAX_OSPATH];
-	size_t file_length;
+
 	Q_sprintf (name,"maps/%s.pts", sv.name);
 
-	auto f = COM_OpenFile (name, file_length);
+	auto f = COM_FindFile(name);
 	if (!f)
 	{
 		Con_Printf ("couldn't open %s\n", name);
@@ -212,15 +212,15 @@ void R_ReadPointFile_f(cmd_source_t source, size_t argc, const quake::string_vie
 	
 	Con_Printf ("Reading %s...\n", name);
 	c = 0;
-	while(f->good())
+	while(f.good())
 	{
 
-		*f >> org[0];
-		assert(f->good());
-		*f >> org[1];
-		assert(f->good());
-		*f >> org[2];
-		assert(f->good());
+		f >> org[0];
+		assert(f.good());
+		f >> org[1];
+		assert(f.good());
+		f >> org[2];
+		assert(f.good());
 		if (r != 3)
 			break;
 		c++;

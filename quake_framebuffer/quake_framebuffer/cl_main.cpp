@@ -249,6 +249,8 @@ void CL_NextDemo (void)
 	}
 	quake::fixed_string_stream<256> ss;
 	ss << "playdemo " << cls.demos[cls.demonum] << std::endl;
+
+	Cbuf_InsertText(ss.str());
 	cls.demonum++;
 }
 

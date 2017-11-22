@@ -68,9 +68,10 @@ struct sys_file_handle {
 };
 
 sys_file::sys_file() : _handle((void*)-1) {}
-sys_file::~sys_file() { if (_handle== (void*)-1) close(); }
-sys_file::sys_file(sys_file&& move) : _handle(move._handle) {
-	move._handle = (void*)-1;
+sys_file::~sys_file() { if (_handle == (void*)-1) close(); }
+
+void sys_file::swap(sys_file& other) {
+	std::swap(_handle, other._handle);
 }
 
 bool sys_file::open(const char* filename, std::ios_base::openmode mode) {
@@ -114,9 +115,11 @@ size_t sys_file::write(const void* src, size_t count) {
 }
 
 void sys_file::close() {
-	if ((int)_handle != -1) _close((int)_handle);
-//	clear();
-	_handle = (void*)-1;
+	if (_handle != (void*)-1) {
+		_close((int)_handle);
+		_handle = (void*)-1;
+	}
+
 }
 size_t sys_file::seek(int32_t offset, ios_base::seekdir dir) {
 	int r = _lseek((int)_handle, offset, dir == ios_base::end ? SEEK_END : dir == ios_base::cur ? SEEK_CUR : SEEK_SET);

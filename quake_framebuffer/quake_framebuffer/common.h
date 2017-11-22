@@ -212,46 +212,178 @@ namespace quake {
 	inline typename std::enable_if<std::is_base_of<stream_output, T>::value, std::ostream&>::type
 		operator<<(std::ostream& os, const T& vs) { vs.text_output(os); return os; }
 
-
+	class file {
+		size_t _length;
+		size_t _offset;
+		sys_file _file;
+	public:
+		using ios_base = std::ios_base;
+		void set_offset(size_t offset, size_t length) {
+			if (_offset != offset && _length != length) {
+				_offset = offset;
+				_length = length;
+				if (is_open())  _file.seek(_offset);
+			}
+		}
+		void swap(file& other) {
+			if (std::addressof(other) != this) {
+				_file.swap(other._file);
+				std::swap(_length, other._length);
+				std::swap(_offset, other._offset);
+			}
+		}
+		file()  : _file(), _offset(0U), _length(0) { }
+		explicit operator sys_file&() { return _file; }
+		explicit operator const sys_file&() const { return _file; }
+		
+		file(const char* filename, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(0U), _offset(0U), _file(filename, mode) {
+			if (_file.is_open())  _length = _file.file_size(); 
+		}
+		file(const char* filename, size_t offset, size_t length, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(length), _offset(offset), _file(filename, mode) {
+			if (_file.is_open())  _file.seek(offset);
+		}
+		file(const file&) = delete; // no copy
+		file& operator=(const file&) = delete; // no copy
+		file(file&& move) { swap(move); }
+		file& operator=(file&& move) { swap(move); return *this; }
+		bool open(const char* filename, std::ios_base::openmode mode = ios_base::in | ios_base::binary) {
+			if (_file.open(filename, mode)) {
+				if(_length == 0)
+					_length = _file.file_size();
+				else
+					_file.seek(_offset);
+				return true;
+			}
+			return false;
+		}
+		size_t read(void* dest, size_t count) { return _file.read(dest, count); }
+		size_t write(const void* src, size_t count) { return _file.write(src, count); }
+		size_t seek(int32_t offset) {
+			assert(offset < _length);
+			return _file.seek(_offset + offset);
+		}
+		void close() { _file.close(); }
+		bool is_open() const { return _file.is_open(); }
+		size_t file_size() const { return _length; }
+		size_t offset() const { return _offset; }
+	};
 	class stream_buffer : public std::basic_streambuf<char_type, char_traits> {
-
+	private:
+		file _file;
+		int_type _putback;
 	public:
 		using streambuf_t = std::basic_streambuf<char_type, char_traits>;
-		stream_buffer() : _mode(0), _offset(0), _current(0), _length(0) {}
-		sys_file& file() { return _file; }
+		void swap(stream_buffer& other) {
+			if (std::addressof(other) != this) {
+				_file.swap(other._file);
+				std::swap(_putback, other._putback);
+			}
+		}
+		stream_buffer() :_putback(-1) { setp(nullptr, nullptr); setg(nullptr, nullptr, nullptr); }
+		stream_buffer(const stream_buffer&) = delete; // no copy
+		stream_buffer& operator=(const stream_buffer&) = delete; // no copy
+		stream_buffer(stream_buffer&& move) { swap(move); }
+		stream_buffer& operator=(stream_buffer&& move) { swap(move); return *this; }
+
+		~stream_buffer() { if (_file.is_open()) _file.close(); }
+
+		file& file() { return _file; }
 		bool is_open() const { return _file.is_open(); }
-		void close();
-		bool open(const char* filename, std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
-		void set_offset(off_type offset, off_type length);
-		size_t file_length() const { return (size_t)_length; }
+		void close() { _file.close(); }
+		bool open(const char* filename, std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary) {
+			return _file.open(filename, mode);
+		}
+		void set_offset(off_type offset, off_type length) { _file.set_offset(offset, length); }
+		size_t file_length() const { return _file.file_size(); }
 	protected:
 		pos_type seekpos(pos_type pos, std::ios_base::openmode which
-			= std::ios_base::in | std::ios_base::out) override final;
+			= std::ios_base::in | std::ios_base::out) override final {
+			return _file.seek(pos);
+		}
 		std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way,
-			std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final;
-		int_type overflow(int_type c) override final;
-		int_type underflow() override final;
-		int sync() override;
-	private:
-		std::array<char, DEFAULT_STREAM_BUFFER_SIZE> _buffer;
-		sys_file _file;
-		std::ios_base::openmode _mode; // we can only be reading or writing
-		off_type _offset; // used to override file location in seeks;
-		off_type _length; // used to override end of file
-		off_type _current; // current file position
-		pos_type _seekoff(off_type off, std::ios_base::seekdir dir,
-			std::ios_base::openmode /* which */ = std::ios_base::in | std::ios_base::out);
+			std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final {
+			return static_cast<sys_file&>(_file).seek(off, way);
+		}
+		int_type overflow(int_type c) override final { assert(0); return EOF; }
+		int_type underflow() override final {
+			if (_putback < 0) {
+				char c;
+				size_t count = _file.read(&c, 1);
+				if (count == 0)  return char_traits::eof();
+				_putback = (uint8_t)c;
+			}
+			return _putback;
+		}
+		int_type uflow() override final {
+			int_type ret = underflow();
+			_putback = -1;
+			return _putback;
+		}
+		int sync() override final { assert(0); return char_traits::eof(); }
+		std::streamsize showmanyc()override final { return _file.file_size(); }
+		std::streamsize xsgetn(char* s, std::streamsize n) override final { 
+			assert(n > 0 && s);
+			std::streamsize ret = 0;
+			if (_putback >= 0) {
+				*s++ = char_traits::to_char_type(_putback);
+				--n;
+				_putback = -1;
+				ret = 1;
+			}
+			ret+= _file.read(s, n);
+			return ret;
+		}
+		std::streamsize xsputn(const char* s, std::streamsize n) override final { return _file.write(s, n); }
 	};
 
 	class ifstream : public std::basic_istream<char_type, char_traits> {
 	public:
 		using stream_t = std::basic_istream<char_type, char_traits>;
+
 		ifstream() : stream_t(&_buffer) {}
-		ifstream(const char* str) : stream_t(&_buffer) { open(str); }
+		ifstream(const char* str) : stream_t(&_buffer) { _buffer.open(str,std::ios_base::in | std::ios_base::binary); }
+		ifstream(ifstream&& move) : _buffer(std::move(move._buffer)), stream_t(&_buffer) { this->set_rdbuf(&_buffer); }
+		ifstream& operator=(ifstream&& move) {
+			_buffer = std::move(move._buffer);
+			this->set_rdbuf(&_buffer);
+			return *this;
+		}
 		bool is_open() const { return _buffer.is_open(); }
 		void close() { _buffer.close(); }
 		void open(const char* filename) {
 			if (_buffer.open(filename, std::ios_base::in | std::ios_base::binary))
+				clear();
+			else
+				setstate(failbit);
+		}
+		void set_offset(off_type offset, off_type length) { _buffer.set_offset(offset, length); }
+		size_t file_length() const { return _buffer.file_length(); }
+		// if this goes in the heep, then we are using Zmalloc
+
+	protected:
+		stream_buffer _buffer;
+	};
+	class iofstream : public std::basic_iostream<char_type, char_traits> {
+	public:
+		using stream_t = std::basic_iostream<char_type, char_traits>;
+		void swap(iofstream& other) {
+			if (std::addressof(other) != this) {
+				_buffer.swap(other._buffer);
+				this->set_rdbuf(&_buffer);
+				other.set_rdbuf(&other._buffer);
+			}
+		}
+		iofstream() : stream_t(&_buffer) {}
+		iofstream(const char* str, int mode= std::ios_base::in | std::ios_base::binary) : stream_t(&_buffer) { _buffer.open(str, mode); }
+		iofstream(const iofstream&) = delete; // no copy
+		iofstream& operator=(const iofstream&) = delete; // no copy
+		iofstream(iofstream&& move) : stream_t(&_buffer) { swap(move); }
+		iofstream& operator=(iofstream&& move) { swap(move); return *this; }
+
+		bool is_open() const { return _buffer.is_open(); }
+		void close() { _buffer.close(); }
+		void open(const char* filename, int mode = std::ios_base::in | std::ios_base::binary) {
+			if (_buffer.open(filename, mode))
 				clear();
 			else
 				setstate(failbit);
@@ -1791,7 +1923,8 @@ template<size_t SIZE>
 inline void COM_DefaultExtension(quake::fixed_string<SIZE>& path, const quake::string_view&  extension) {
 	auto pos = COM_FindFileBasePos(path);
 	if (pos.second == quake::string_view::npos) {
-		path += '.';
+		if(extension[0] != '.')		path += '.';
+
 		path += extension;
 	}
 }
@@ -1893,14 +2026,14 @@ struct cache_user_t;
 
 
 void COM_WriteFile (const quake::string_view& filename, const void * data, int len);
-std::istream* COM_OpenFile (const quake::string_view& filename, size_t& length);
+//std::istream* COM_OpenFile (const quake::string_view& filename, size_t& length);
 
 
 byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize);
 byte *COM_LoadTempFile (const quake::string_view& path);
 byte *COM_LoadHunkFile (const quake::string_view& path);
 void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu);
-
+quake::iofstream COM_FindFile(const quake::string_view& filename);
 
 
 

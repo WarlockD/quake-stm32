@@ -1199,10 +1199,10 @@ void COM_CheckRegistered (void)
 	unsigned short  check[128];
 	size_t                     i;
 
-	auto h = COM_OpenFile("gfx/pop.lmp",i);
+	auto h = COM_FindFile("gfx/pop.lmp");
 	static_registered = 0;
 
-	if (!h)
+	if (!h.is_open())
 	{
 #if WINDED
 	Sys_Error ("This dedicated server requires a full registered copy of Quake");
@@ -1212,7 +1212,7 @@ void COM_CheckRegistered (void)
 			Sys_Error ("You must have the registered version to use modified games");
 		return;
 	}
-	h->read((char*)check, sizeof(check));
+	h.read((char*)check, sizeof(check));
 
 	for (i=0 ; i<128 ; i++)
 		if (pop[i] != (unsigned short)BigShort (check[i]))
@@ -1485,7 +1485,7 @@ namespace quake {
 		for (auto c : sv) os << (char)std::tolower(c);
 		return os;
 	}
-
+#if 0
 	static  std::streambuf::pos_type STREAM_ERROR_RETURN = std::streambuf::pos_type(std::streambuf::off_type(-1)); 
 	stream_buffer::pos_type stream_buffer::_seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode) {
 			if (!_file.is_open())
@@ -1528,7 +1528,6 @@ namespace quake {
 	stream_buffer::pos_type stream_buffer::seekpos(pos_type pos, std::ios_base::openmode which)  { return _seekoff(pos, std::ios_base::beg, which); }
 	std::streampos stream_buffer::seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which) { return _seekoff(off, way, which); }
 	bool stream_buffer::open(const char* filename, std::ios_base::openmode mode) {
-		_offset = 0; _length = 0; 
 		_current = 0;
 		setg(nullptr, nullptr, nullptr); // flush buffer
 		setp(nullptr, nullptr, nullptr); // flush buffer
@@ -1536,6 +1535,24 @@ namespace quake {
 			_length = _file.file_size();
 			return true;
 		} return false;
+	}
+	std::streamsize stream_buffer::showmanyc() {
+		return _length - _current;
+	}
+	std::streamsize stream_buffer::xsgetn(char* s, std::streamsize n) {
+		n = std::min(std::streamoff(n), std::streamoff(_length - _current));
+		n = _file.read(s, n);
+		_current += n;
+		return n;
+	}
+	stream_buffer::int_type stream_buffer::underflow() {
+		assert(0);
+		// only reason to get here is if the buffer is empty
+		if (_current >= _length) return -1;
+		size_t size = std::min(_buffer.size(), size_t(_length - _current));
+		_current += _file.read(_buffer.data(), size);
+		setg(_buffer.data(), _buffer.data(), _buffer.data() + size); // flush buffer
+		return traits_type::to_int_type(_buffer[0]);
 	}
 	void stream_buffer::close() {
 		sync();
@@ -1555,19 +1572,13 @@ namespace quake {
 		_file.seek(_offset);
 		setg(nullptr, nullptr, nullptr); // flush buffer
 	}
-	stream_buffer::int_type stream_buffer::underflow()  {
-		// only reason to get here is if the buffer is empty
-		if (_current >= _length) return -1;
-		size_t size = std::min(_buffer.size(), size_t(_length - _current));
-		_current+= _file.read(_buffer.data(), size);
-		setg(_buffer.data(), _buffer.data(), _buffer.data() + size); // flush buffer
-		return traits_type::to_int_type(_buffer[0]);
-	}
+
 	stream_buffer::int_type stream_buffer::overflow(int_type c) {
 		sync();
 		return this->sputc(c);
 	}
 
+#endif
 
 	//----------------------------------------------------------------------
 
@@ -2001,35 +2012,23 @@ struct dpackheader_t
 
 struct pack_t;
 struct search_value_t {
-	pack_t* handler;
+	pack_t* pack; 
+	char filename[MAX_QPATH];
 	int offset;
 	int length;
-	char filename[MAX_QPATH];
-	quake::ifstream& getstream();
-	operator quake::string_view() const { return (const char*)filename; }
+	sys_file handler;
 };
 
 
 struct pack_t {
 	int file_count;
-	quake::ifstream handler;
 	char filename[MAX_OSPATH];
 	search_value_t files[1];
 	operator quake::string_view() const { return (const char*)filename; }
 	static void operator delete(void*) {} // itsloaded as a hunk
 };
 
-quake::ifstream& search_value_t::getstream() {
-	assert(handler);
-	auto& stream = handler->handler;
 
-	if (!stream.is_open()) {
-		stream.open(handler->filename);// | std::ios_base::binary);
-		if (!stream.is_open()) Sys_Error("Cannot open pack file!");
-	}
-	stream.set_offset(offset, length);
-	return stream;
-}
 #include <unordered_set>
 
 
@@ -2116,7 +2115,7 @@ static bool COM_LoadPackFile(const quake::string_view& packfile)
 		::strncpy(psearch.filename, pfile.name, sizeof(psearch.filename) - 1);
 		psearch.length = pfile.filelen;
 		psearch.offset = pfile.filepos;
-		psearch.handler = pack;
+		psearch.pack = pack;
 
 		quake::string_view filename(psearch.filename);
 
@@ -2220,10 +2219,11 @@ Sets com_filesize and one of handle or file
 */
 
 
-static quake::ifstream* COM_FindFile(const quake::string_view& filename)
+quake::iofstream COM_FindFile(const quake::string_view& filename)
 {
 	quake::fixed_string_stream<MAX_OSPATH>   cachepath;
 	quake::fixed_string_stream<MAX_OSPATH>   netpath;
+	quake::iofstream stream;
 #if 0
 	if (file && handle)
 		Sys_Error("COM_FindFile: both handle and file set");
@@ -2237,18 +2237,18 @@ static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 	if (it != com_packfilesearch.end()) { // its a pack file
 		auto& pfile = it->second.get();		
 	//	quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
-		return &pfile.getstream();
+		stream.set_offset(pfile.offset, pfile.length);
+		stream.open(pfile.pack->filename);
+		assert(stream.is_open());
 	}
 	else { // not a pack file
 		// hack for now
-		static quake::ifstream temp_file;
-		temp_file.close();
 		for (const auto& path : com_searchpaths) {
 			netpath.clear();
 			netpath << path << '/' << filename;
 			auto test = netpath.str();
-			temp_file.open(test.c_str());
-			if (temp_file.is_open()) return &temp_file;
+			stream.open(test.c_str());
+			if (stream.is_open()) break;
 #if 0
 			findtime = Sys_FileTime(netpath.data());
 			if (findtime == -1) continue;
@@ -2259,9 +2259,11 @@ static quake::ifstream* COM_FindFile(const quake::string_view& filename)
 #endif
 		}
 	}
-	quake::con << "FindFile: can't find " << filename << std::endl;
+	if (!stream.is_open()) 
+		 quake::con << "FindFile: can't find " << filename << std::endl;
 
-	return nullptr;
+
+	return stream;
 }
 
 
@@ -2276,14 +2278,6 @@ returns a handle and a length
 it may actually be inside a pak file
 ===========
 */
-std::istream* COM_OpenFile(const quake::string_view& filename, size_t& length)
-{
-	auto ret = COM_FindFile (filename);
-	if (ret == nullptr) return nullptr;
-	length = ret->file_length();
-	return ret;
-}
-
 
 
 enum class AllocType {
@@ -2311,9 +2305,8 @@ static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 	size_t len;
 // look for it in the filesystem or pack files
 	auto is = COM_FindFile(path);
-	if (is == nullptr)
-		return nullptr;
-	len = is->file_length();
+	if (!is.is_open()) return nullptr;
+	len = is.file_length();
 // extract the filename base name for hunk tag
 	auto base = COM_FileBase (path);
 	
@@ -2349,12 +2342,12 @@ static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 		buf[i] = (uint8_t)c;
 	}
 #else
-	is->read((char*)buf, len);
+	is.read((char*)buf, len);
 #endif
 	//std::ios_base
 
 	//assert(is->good());
-//	is->close();
+	is.close();
 	Draw_EndDisc ();
 
 	return buf;
