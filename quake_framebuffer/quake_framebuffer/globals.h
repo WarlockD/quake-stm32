@@ -29,12 +29,14 @@ typedef struct
 
 struct cmdalias_t
 {
-	static void* operator new(size_t s){ return Z_Malloc(s); }
-	static void operator delete(void* p) {  Z_Free(p); }
+private:
+	cmdalias_t(const char* name, const char* value) : next(nullptr), name(name), value(value) {}
+public:
 	cmdalias_t	*next;
-	quake::string name;
-	quake::string value;
-
+	const char* name;
+	const char* value;
+	static void operator delete(void *ptr);
+	static cmdalias_t* create(const quake::string_view& name, const quake::string_view& value);
 	//char	name[MAX_ALIAS_NAME];
 	//quake::fixed_string<256> value; // this can be a script.. humm
 } ;
@@ -56,11 +58,11 @@ typedef struct {
 	void* temp;
 } global_constants_t;
 // pr_exec.c privates
-typedef struct
+struct prstack_t
 {
 	int				s;
 	dfunction_t		*f;
-} prstack_t;
+} ;
 
 #define	PR_MAX_STACK_DEPTH		32
 #define	PR_LOCALSTACK_SIZE		2048

@@ -410,7 +410,7 @@ qsocket_t *NET_Connect (quake::string_view host)
 		if (hostCacheCount != 1)
 			return NULL;
 		host = hostcache[0].cname;
-		Con_Printf("Connecting to...\n%s @ %s\n\n", hostcache[0].name, host);
+		quake::con << "Connecting to... " << hostcache[0].name << " @ " << host << std::endl;
 	}
 
 	if (hostCacheCount)

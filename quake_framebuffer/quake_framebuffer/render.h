@@ -26,17 +26,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	BOTTOM_RANGE	96
 
 //=============================================================================
-
-typedef struct efrag_s
+struct mleaf_t;
+struct entity_t;
+struct efrag_t
 {
-	struct mleaf_s		*leaf;
-	struct efrag_s		*leafnext;
-	struct entity_s		*entity;
-	struct efrag_s		*entnext;
-} efrag_t;
+	mleaf_t		*leaf;
+	efrag_t		*leafnext;
+	entity_t		*entity;
+	efrag_t		*entnext;
+} ;
 
-
-typedef struct entity_s
+struct model_t;
+struct mnode_t;
+struct entity_t
 {
 	qboolean				forcelink;		// model changed
 
@@ -49,8 +51,8 @@ typedef struct entity_s
 	vec3_t					origin;
 	vec3_t					msg_angles[2];	// last two updates (0 is newest)
 	vec3_t					angles;	
-	struct model_s			*model;			// NULL = no model
-	struct efrag_s			*efrag;			// linked list of efrags
+	model_t			*model;			// NULL = no model
+	efrag_t			*efrag;			// linked list of efrags
 	int						frame;
 	float					syncbase;		// for client-side animations
 	byte					*colormap;
@@ -64,13 +66,13 @@ typedef struct entity_s
 	
 // FIXME: could turn these into a union
 	int						trivial_accept;
-	struct mnode_s			*topnode;		// for bmodels, first world node
+	mnode_t			*topnode;		// for bmodels, first world node
 											//  that splits bmodel, or NULL if
 											//  not split
-} entity_t;
+} ;
 
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
-typedef struct
+struct refdef_t
 {
 	vrect_t		vrect;				// subwindow in video for refresh
 									// FIXME: not need vrect next field here?
@@ -98,7 +100,7 @@ typedef struct
 	float		fov_x, fov_y;
 
 	int			ambientlight;
-} refdef_t;
+} ;
 
 
 //
@@ -110,7 +112,8 @@ extern	int		reinit_surfcache;
 extern	refdef_t	r_refdef;
 extern vec3_t	r_origin, vpn, vright, vup;
 
-extern	struct texture_s	*r_notexture_mip;
+struct texture_t;
+extern	texture_t	*r_notexture_mip;
 
 
 void R_Init (void);
@@ -118,8 +121,8 @@ void R_InitTextures (void);
 void R_InitEfrags (void);
 void R_RenderView (void);		// must set r_refdef first
 void R_ViewChanged (vrect_t *pvrect, int lineadj, float aspect);
-								// called whenever r_refdef or vid change
-void R_InitSky (struct texture_s *mt);	// called at level load
+struct 		texture_t;				// called whenever r_refdef or vid change
+void R_InitSky (texture_t *mt);	// called at level load
 
 void R_AddEfrags (entity_t *ent);
 void R_RemoveEfrags (entity_t *ent);

@@ -288,14 +288,22 @@ Creates a new command that executes a command string (possibly ; seperated)
 ===============
 */
 
-
+void cmdalias_t::operator delete(void *ptr) { Z_Free(ptr); }
+cmdalias_t* cmdalias_t::create(const quake::string_view&  name, const quake::string_view&  value) {
+	char* ptr = (char*)Z_Malloc(value.size() + name.size() + sizeof(cmdalias_t) + 2);
+	char* n_name = ptr + sizeof(cmdalias_t);
+	char* n_value = n_name + name.size() + 1;
+	::memcpy(n_name, name.data(), name.size()); n_name[name.size()] = 0;
+	::memcpy(n_value, value.data(), value.size()); n_value[value.size()] = 0;
+	return new(ptr) cmdalias_t(n_name, n_value);
+}
 
 
 void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view args[])
 {
 	
-	cmdalias_t	*a;
-	quake::data_view<quake::string_view> view(args, argc);
+	cmdalias_t	*a,*p;
+
 
 	if (argc == 1)
 	{
@@ -314,31 +322,31 @@ void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view arg
 
 
 	// if the alias allready exists, reuse it
-	for (a = cmd_alias ; a ; a=a->next)
+	for (a = cmd_alias, p = nullptr ; a ; p =a, a=a->next)
 	{
 		if (s == a->name)
 		{
-			a->value.clear();
+			if (p) p->next = a->next;
+			else cmd_alias = a->next;
+			delete a;
 			break;
 		}
 	}
 
-	if (!a)
-	{
-		a = new cmdalias_t;
-		a->name.assign(s.data(), s.size());
-		a->next = cmd_alias;
-		cmd_alias = a;
-	}
 
-
+	std::stringstream ss;
+		ZStringStream zs;
 // copy the rest of the command line
 	for (size_t i=2 ; i< argc ; i++)
 	{
-		a->value.append(args[i].data(), args[i].size());
-		if (i != argc) a->value += ' ';
+		if (i != 2)zs << ' ';
+		zs << args[i];
+
 	}
-	a->value += '\n';
+	zs << std::endl;
+	a = cmdalias_t::create(args[1], zs.str());
+	a->next = cmd_alias;
+	cmd_alias = a;
 }
 
 /*
@@ -518,7 +526,7 @@ void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 				if (i != 1) quake::debug << ',';
 				quake::debug << args[i];
 			}
-			quake::debug << std::endl;
+			quake::debug << ")" << std::endl;
 #endif
 			return;
 		}
@@ -529,7 +537,7 @@ void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 	{
 		if (lower == a->name)
 		{
-			Cbuf_InsertText(a->value.c_str());
+			Cbuf_InsertText(a->value);
 			return;
 		}
 	}

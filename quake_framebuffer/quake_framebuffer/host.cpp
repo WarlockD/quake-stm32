@@ -476,6 +476,9 @@ void Host_ClearMemory (void)
 		Hunk_FreeToLowMark (host_hunklevel);
 
 	cls.signon = 0;
+	for (size_t i = 0; i < sv.num_edicts; i++) {
+		if (sv.edicts[i].vars) delete(sv.edicts[i].vars);
+	}
 	memset (&sv, 0, sizeof(sv));
 	memset (&cl, 0, sizeof(cl));
 }

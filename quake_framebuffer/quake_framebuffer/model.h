@@ -44,10 +44,10 @@ BRUSH MODELS
 // in memory representation
 //
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
-typedef struct
+ struct mvertex_t
 {
 	vec3_t		position;
-} mvertex_t;
+} ;
 
 #define	SIDE_FRONT	0
 #define	SIDE_BACK	1
@@ -56,25 +56,25 @@ typedef struct
 
 // plane_t structure
 // !!! if this is changed, it must be changed in asm_i386.h too !!!
-typedef struct mplane_s
+struct mplane_t
 {
 	vec3_t	normal;
 	float	dist;
 	byte	type;			// for texture axis selection and fast side tests
 	byte	signbits;		// signx + signy<<1 + signz<<1
 	byte	pad[2];
-} mplane_t;
+} ;
 
-typedef struct texture_s
+struct texture_t
 {
 	char		name[16];
 	unsigned	width, height;
 	int			anim_total;				// total tenths in sequence ( 0 = no)
 	int			anim_min, anim_max;		// time for this frame min <=time< max
-	struct texture_s *anim_next;		// in the animation sequence
-	struct texture_s *alternate_anims;	// bmodels in frmae 1 use these
+	texture_t *anim_next;		// in the animation sequence
+	texture_t *alternate_anims;	// bmodels in frmae 1 use these
 	unsigned	offsets[MIPLEVELS];		// four mip maps stored
-} texture_t;
+} ;
 
 
 #define	SURF_PLANEBACK		2
@@ -125,7 +125,7 @@ typedef struct msurface_s
 	byte		*samples;		// [numstyles*surfsize]
 } msurface_t;
 
-typedef struct mnode_s
+struct mnode_t
 {
 // common with leaf
 	int			contents;		// 0, to differentiate from leafs
@@ -133,19 +133,19 @@ typedef struct mnode_s
 	
 	short		minmaxs[6];		// for bounding box culling
 
-	struct mnode_s	*parent;
+	mnode_t	*parent;
 
 // node specific
 	mplane_t	*plane;
-	struct mnode_s	*children[2];	
+	mnode_t	*children[2];
 
 	unsigned short		firstsurface;
 	unsigned short		numsurfaces;
-} mnode_t;
+} ;
 
 
 
-typedef struct mleaf_s
+ struct mleaf_t
 {
 // common with node
 	int			contents;		// wil be a negative contents number
@@ -153,7 +153,7 @@ typedef struct mleaf_s
 
 	short		minmaxs[6];		// for bounding box culling
 
-	struct mnode_s	*parent;
+	mnode_t	*parent;
 
 // leaf specific
 	byte		*compressed_vis;
@@ -163,7 +163,7 @@ typedef struct mleaf_s
 	int			nummarksurfaces;
 	int			key;			// BSP sequence number for leaf's contents
 	byte		ambient_sound_level[NUM_AMBIENTS];
-} mleaf_t;
+} ;
 
 // !!! if this is changed, it must be changed in asm_i386.h too !!!
 typedef struct
@@ -297,7 +297,7 @@ typedef enum {mod_brush, mod_sprite, mod_alias} modtype_t;
 #define	EF_TRACER2	64			// orange split trail + rotate
 #define	EF_TRACER3	128			// purple trail
 
-typedef struct model_s
+struct model_t
 {
 	char		name[MAX_QPATH];
 	qboolean	needload;		// bmodels and sprites don't cache normally
@@ -366,7 +366,7 @@ typedef struct model_s
 //
 	cache_user_t	cache;		// only access through Mod_Extradata
 
-} model_t;
+} ;
 
 //============================================================================
 

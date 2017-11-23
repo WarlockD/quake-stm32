@@ -88,13 +88,14 @@ typedef struct
 
 
 #define	MAX_BEAMS	24
-typedef struct
+struct model_t;
+struct beam_t
 {
 	int		entity;
-	struct model_s	*model;
+	model_t	*model;
 	idTime	endtime;
 	vec3_t	start, end;
-} beam_t;
+} ;
 
 #define	MAX_EFRAGS		640
 
@@ -113,7 +114,7 @@ ca_connected		// valid netcon, talking to a server
 // the client_static_t structure is persistant through an arbitrary number
 // of server connections
 //
-typedef struct
+struct client_static_t
 {
 	cactive_t	state;
 
@@ -142,7 +143,7 @@ typedef struct
 	qsocket_t	*netcon;
 	sizebuf_t	message;		// writing buffer to send to server
 	
-} client_static_t;
+} ;
 
 extern client_static_t	cls;
 
@@ -150,7 +151,11 @@ extern client_static_t	cls;
 // the client_state_t structure is wiped completely at every
 // server signon
 //
-typedef struct
+
+struct model_t;
+struct sfx_t;
+
+struct client_state_t
 {
 	int			movemessages;	// since connecting to this server
 								// throw out the first couple, so the player
@@ -211,8 +216,8 @@ typedef struct
 //
 // information that is static for the entire time connected to a server
 //
-	struct model_s		*model_precache[MAX_MODELS];
-	struct sfx_s		*sound_precache[MAX_SOUNDS];
+	model_t*	model_precache[MAX_MODELS];
+	sfx_t*		sound_precache[MAX_SOUNDS];
 
 	char		levelname[40];	// for display on solo scoreboard
 	int			viewentity;		// cl_entitites[cl.viewentity] = player
@@ -220,8 +225,8 @@ typedef struct
 	int			gametype;
 
 // refresh related state
-	struct model_s	*worldmodel;	// cl_entitites[0].model
-	struct efrag_s	*free_efrags;
+	model_t	*worldmodel;	// cl_entitites[0].model
+	efrag_t	*free_efrags;
 	int			num_entities;	// held in cl_entities array
 	int			num_statics;	// held in cl_staticentities array
 	entity_t	viewent;			// the gun model
@@ -237,7 +242,7 @@ typedef struct
 // architectually ugly but it works
 	int			light_level;
 #endif
-} client_state_t;
+} ;
 
 
 //

@@ -174,7 +174,7 @@ struct ddef_t
 
 #define	MAX_PARMS	8
 
-typedef struct
+struct dfunction_t
 {
 	int		first_statement;	// negative numbers are builtins
 	int		parm_start;
@@ -187,7 +187,7 @@ typedef struct
 	
 	int		numparms;
 	byte	parm_size[MAX_PARMS];
-} dfunction_t;
+} ;
 
 
 #define	PROG_VERSION	6

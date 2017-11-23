@@ -34,6 +34,10 @@ union eval_t
 } ;	
 
 #define	MAX_ENT_LEAFS	16
+// ok, this took a while.  So this is just a big enity with random space at the end that contain stuff
+// so I am putting in a map to trace down how often things are set and such
+#include <functional>
+
 struct edict_t
 {
 	qboolean	free;
@@ -45,6 +49,26 @@ struct edict_t
 	entity_state_t	baseline;
 	
 	idTime		freetime;			// sv.time when the object was freed
+	struct vector_t {
+		float value[3];
+		vector_t() : value { 0.0f, 0.0f, 0.0f } {}
+		vector_t(float* f) { ::memcpy(value, f, sizeof(value)); }
+	};
+	struct value_t {
+		std::variant<nullptr_t, quake::string_view, float, vector_t, edict_t*, int, dfunction_t*> value;
+		etype_t type;
+		template<typename T>
+		value_t(etype_t t, T&& v) :value(std::forward<T>(v)), type(t) {}
+		value_t(nullptr_t) :value(nullptr), type(etype_t::ev_void) {}
+		value_t(quake::string_view v) :value(v), type(etype_t::ev_string) {}
+		value_t(float v) :value(v), type(etype_t::ev_float) {}
+		value_t(vector_t v) :value(v), type(etype_t::ev_vector) {}
+		value_t(edict_t* v) :value(v), type(etype_t::ev_entity) {}
+		value_t(int v) :value(v), type(etype_t::ev_field) {}
+		value_t(dfunction_t* v) :value(v), type(etype_t::ev_function) {}
+	};
+	using map_t = std::unordered_map<quake::string_view, value_t>;
+	map_t* vars;
 	entvars_t	v;					// C exported fields from progs
 	void Free();
 	void Unlink();
@@ -111,7 +135,7 @@ void PR_Profile_f(cmd_source_t source, size_t argc, const quake::string_view arg
 edict_t *ED_Alloc (void);
 //void ED_Free (edict_t *ed);
 
-char	*ED_NewString (const char *string);
+ char	*ED_NewString (const char *string);
 // returns a copy of the string allocated from the server's string heap
 
 //void ED_Print (edict_t *ed);

@@ -74,6 +74,8 @@ Sets everything to NULL
 void edict_t::Clear ()
 {
 	memset (&v, 0, progs->entityfields * 4);
+	if (vars) vars->clear();
+	else vars = new map_t;
 	free = false;
 }
 
@@ -140,7 +142,10 @@ void edict_t::Free ()
 	VectorCopy (vec3_origin, v.angles);
 	v.nextthink = idTime(-1s);
 	v.solid = 0;
-
+	if (vars) {
+		delete(vars);
+		vars = nullptr;
+	}
 	freetime = sv.time;
 }
 
@@ -471,8 +476,12 @@ void ED_Count(cmd_source_t source, size_t argc, const quake::string_view argv[])
 		active++;
 		if (ent->v.solid)
 			solid++;
-		if (ent->v.model)
+		if (ent->v.model) {
 			models++;
+			assert(ent->vars->find("model") != ent->vars->end());
+
+		}
+
 		if (ent->v.movetype == MOVETYPE_STEP)
 			step++;
 	}
@@ -596,6 +605,96 @@ returns false if error
 */
 
 
+qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& value)
+{
+	const char* key_name = key->s_name + pr_strings;
+	float*  f;
+	int		i;
+	char	string[128];
+	ddef_t	*def;
+	char	*v, *w;
+	void	*d;
+	dfunction_t	*func;
+	union {
+		void* base;
+		int* i;
+		float* f;
+		char* s;
+	} vd;
+	void* base = (void*)(&ent->v);
+	vd.base = (void *)((int *)base + key->ofs);
+	d = (void *)((int *)base + key->ofs);
+	idType type = key->type;
+	if (!ent->vars) ent->vars = new edict_t::map_t;
+	switch (type)
+	{
+	case etype_t::ev_string:
+	{
+		const char* v = ED_NewString(value);
+		ent->vars->emplace(key_name,edict_t::value_t( quake::string_view(v)));
+		*(string_t *)d = v - pr_strings;
+	}
+		break;
+
+	case etype_t::ev_float:
+	{
+		float v;
+		assert(quake::to_number(value, v));
+		ent->vars->emplace(key_name, edict_t::value_t(v));
+	}
+		break;
+
+	case etype_t::ev_vector:
+	{
+		edict_t::vector_t v;
+		quake::string_view fv;
+		COM_Parser parser(value);
+		assert(parser.Next(fv));
+		assert(quake::to_number(fv, v.value[0]));
+		assert(parser.Next(fv));
+		assert(quake::to_number(fv, v.value[1]));
+		assert(parser.Next(fv));
+		assert(quake::to_number(fv, v.value[2]));
+		ent->vars->emplace(key_name, edict_t::value_t(v));
+		::memcpy(d, v.value, sizeof(v.value));
+	}
+	break;
+
+	case etype_t::ev_entity:
+		assert(quake::to_number(value, i));
+		ent->vars->emplace(key_name, edict_t::value_t(EDICT_NUM(i)));
+		*(int *)d = EDICT_TO_PROG(EDICT_NUM(i));
+		break;
+
+	case etype_t::ev_field:
+		def = ED_FindField(value);
+		if (!def)
+		{
+			quake::con << "Can't find field " << value << std::endl;
+			return false;
+		}
+		ent->vars->emplace(key_name, edict_t::value_t(G_INT(def->ofs)));
+		*(int *)d = G_INT(def->ofs);
+		break;
+
+	case etype_t::ev_function:
+		func = ED_FindFunction(value);
+		if (!func)
+		{
+			quake::con << "Can't find function " << value << std::endl;
+			return false;
+		}
+		ent->vars->emplace(key_name, edict_t::value_t(func));
+		*(func_t *)d = func - pr_functions;
+		break;
+
+	default:
+		assert(0);
+		break;
+	}
+	return true;
+}
+
 qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 {
 	float*  f;
@@ -679,6 +778,7 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
+static std::unordered_map<quake::string_view, edict_t*> loaded_edicts;
 void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 {
 	ddef_t		*key;
@@ -691,12 +791,18 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 	//COM_Parser parser(data);
 
 	// clear it
-	if (ent != sv.edicts)	// hack
+	if (ent != sv.edicts) {
+		//ent = new(ent) edict_t;
 		memset(&ent->v, 0, progs->entityfields * 4);
+		if (!ent->vars)
+			ent->vars = new edict_t::map_t;
+	}
+		// hack
+		
 
 	// go through all the dictionary pairs
 	// debugging
-	std::unordered_map<quake::string_view, quake::string_view> values_debug;
+	
 	while (1)
 	{
 		if (!parser.Next(keyname))
@@ -725,7 +831,6 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		init = true;
-		values_debug.emplace(keyname, value);
 		// keynames with a leading underscore are used for utility comments,
 		// and are immediately discarded by quake
 		if (keyname.front() == '_')
@@ -742,11 +847,11 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 			quake::fixed_string_stream<128> buf;
 
 			buf << "0 " << value << " 0";
-			if (!ED_ParseEpair((void *)&ent->v, key, buf.str()))
+			if (!ED_ParseEpair(ent, key, buf.str()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 		else {
-			if (!ED_ParseEpair((void *)&ent->v, key, value))
+			if (!ED_ParseEpair(ent, key, value))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 
@@ -755,6 +860,11 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 
 	if (!init)
 		ent->free = true;
+
+	assert(ent->v.classname);
+
+	const char* classname = pr_strings + ent->v.classname; 
+	loaded_edicts[classname] = ent;
 }
 
 

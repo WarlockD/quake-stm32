@@ -540,6 +540,7 @@ void Host_Savegame_f(cmd_source_t source, size_t argc, const quake::string_view 
 Host_Loadgame_f
 ===============
 */
+
 void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	quake::fixed_string<MAX_OSPATH>	name;
@@ -664,6 +665,7 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		{	// parse an edict
 
 			ent = EDICT_NUM(entnum);
+			if (!ent->vars) ent->vars = new edict_t::map_t;
 			std::memset (&ent->v, 0, progs->entityfields * 4);
 			ent->free = false;
 			ED_ParseEdict (parser, ent);

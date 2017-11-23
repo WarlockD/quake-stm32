@@ -45,7 +45,7 @@ int		pr_argc;
 ddef_t *ED_GlobalAtOfs(int ofs);
 ddef_t *ED_FieldAtOfs(int ofs);
 
-char *pr_opnames[] =
+static const char *pr_opnames[] =
 {
 "DONE",
 

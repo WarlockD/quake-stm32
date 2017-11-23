@@ -220,7 +220,7 @@ void	VID_UnlockBuffer (void);
 //#include "zone.h"
 #include "mathlib.h"
 
-typedef struct
+struct entity_state_t
 {
 	vec3_t	origin;
 	vec3_t	angles;
@@ -229,7 +229,7 @@ typedef struct
 	int		colormap;
 	int		skin;
 	int		effects;
-} entity_state_t;
+} ;
 
 
 #include "wad.h"
