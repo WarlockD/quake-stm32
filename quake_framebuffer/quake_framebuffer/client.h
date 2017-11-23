@@ -73,7 +73,7 @@ typedef struct
 #define	SIGNONS		4			// signon messages to receive before connected
 
 #define	MAX_DLIGHTS		32
-typedef struct
+ struct dlight_t
 {
 	vec3_t	origin;
 	float	radius;
@@ -84,7 +84,7 @@ typedef struct
 #ifdef QUAKE2
 	qboolean	dark;			// subtracts light instead of adding
 #endif
-} dlight_t;
+} ;
 
 
 #define	MAX_BEAMS	24
@@ -116,8 +116,8 @@ ca_connected		// valid netcon, talking to a server
 //
 struct client_static_t
 {
+	//quake::debug_t<cactive_t>	state;
 	cactive_t	state;
-
 // personalization data sent to server	
 	char		mapstring[MAX_QPATH];
 	char		spawnparms[MAX_MAPSTRING];	// to restart a level
@@ -225,7 +225,7 @@ struct client_state_t
 	int			gametype;
 
 // refresh related state
-	model_t	*worldmodel;	// cl_entitites[0].model
+	quake::debug_t<model_t	*> worldmodel;	// cl_entitites[0].model
 	efrag_t	*free_efrags;
 	int			num_entities;	// held in cl_entities array
 	int			num_statics;	// held in cl_staticentities array

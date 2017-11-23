@@ -211,6 +211,69 @@ namespace quake {
 	template<typename T>
 	inline typename std::enable_if<std::is_base_of<stream_output, T>::value, std::ostream&>::type
 		operator<<(std::ostream& os, const T& vs) { vs.text_output(os); return os; }
+	// for debuging data changes
+	template<typename T>
+	class debug_value_t {
+	public:
+		using value_type = T;
+		void set(const T& v) { 
+			if (v != _value) {
+				_value = v; // value changed
+			}
+		}
+		T& get() {  return _value; }
+		const T& get() const { return _value; }
+		debug_value_t() : _value{} {}
+		debug_value_t(const T& value) : _value{ } { set(value); }
+	private:
+		T _value;
+	};
+	template<typename T, typename E = void> class debug_t;
+
+	template<typename T>
+	class debug_t <T, typename std::enable_if<std::is_arithmetic_v<T> && !std::is_pointer_v<T>>::type> {
+		debug_value_t<T> _value;
+	public:
+		constexpr debug_t() : _value() {}
+		constexpr debug_t(const T& value) : _value(value) {}
+		debug_t& operator=(const T& value) { _value.set(value); return *this; }
+		constexpr operator T&() { return _value.get(); }
+		constexpr operator const T&() const { return _value.get(); }
+	};
+
+	template<typename T>
+	class debug_t <T, typename std::enable_if<!std::is_arithmetic_v<T> && std::is_pointer_v<T>>::type> {
+		debug_value_t<T> _value;
+	public:
+		constexpr debug_t() : _value() {}
+		constexpr debug_t(const T& value) : _value(value) {}
+		debug_t& operator=(const T& value) { _value.set(value); return *this; }
+		T operator->() { return _value.get(); }
+		const T operator->() const { return _value.get(); }
+		constexpr operator T&() { return _value.get(); }
+		constexpr operator const T&() const { return _value.get(); }
+	};
+
+#define DEBUG_OP(op)	\
+template<typename T,typename E> static inline bool operator##op (const T& s1, const debug_t<T,E>& s2) { return s1 op static_cast<T>(s2); } \
+template<typename T,typename E> static inline bool operator##op (const debug_t<T,E>& s1, const T& s2) { return static_cast<T>(s2) op s2; } 
+	DEBUG_OP(==)
+		DEBUG_OP(!= )
+		DEBUG_OP(> )
+		DEBUG_OP(< )
+		DEBUG_OP(>= )
+		DEBUG_OP(<= )
+#undef DEBUG_OP
+#define DEBUG_MATH(op)	\
+template<typename T,typename E> static inline T operator##op (const T& s1, const debug_t<T,E>& s2) { return s1 op static_cast<T>(s2); } \
+template<typename T,typename E> static inline T operator##op (const debug_t<T,E>& s1, const T& s2) { return static_cast<T>(s2) op s2; } 
+		DEBUG_MATH(& )
+		DEBUG_MATH(|)
+		DEBUG_MATH(+)
+		DEBUG_MATH(-)
+		DEBUG_MATH(* )
+		DEBUG_MATH(/ )
+#undef DEBUG_MATH
 
 	class file {
 		size_t _length;
