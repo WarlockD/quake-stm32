@@ -69,7 +69,7 @@
 #include <mmsystem.h>
 #include <dinput.h>
 #include <xinput.h>
-#include <dbt.h>
+#include <Dbt.h>
 
 #if defined(_MSC_VER)
  #include <malloc.h>

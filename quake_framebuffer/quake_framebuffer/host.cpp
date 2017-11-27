@@ -100,13 +100,13 @@ void Host_EndGame (char *message, ...)
 	if (sv.active)
 		Host_ShutdownServer (false);
 
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		Sys_Error ("Host_EndGame: %s\n",string);	// dedicated servers exit
 	
-	if (cls.demonum != -1)
-		CL_NextDemo ();
+	if (quake::cls.demonum != -1)
+		quake::cls.next_demo();
 	else
-		CL_Disconnect ();
+		quake::cls.disconnect();
 
 	longjmp (host_abortserver, 1);
 }
@@ -138,11 +138,11 @@ void Host_Error (char *error, ...)
 	if (sv.active)
 		Host_ShutdownServer (false);
 
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		Sys_Error ("Host_Error: %s\n",string);	// dedicated servers exit
 
-	CL_Disconnect ();
-	cls.demonum = -1;
+	quake::cls.disconnect();
+	quake::cls.demonum = -1;
 
 	inerror = false;
 
@@ -169,11 +169,11 @@ void	Host_FindMaxClients (void)
 			svs.maxclients = 8;
 	}
 	else
-		cls.state = ca_disconnected;
+		quake::cls.state = ca_disconnected;
 
 	if (host_parms.COM_CheckParmValue("-listen", value))
 	{
-		if (cls.state == ca_dedicated)
+		if (quake::cls.state == ca_dedicated)
 			Sys_Error ("Only one of -dedicated or -listen can be specified");
 		if (!value.empty())
 			svs.maxclients = Q_atoi(value);
@@ -411,8 +411,8 @@ void Host_ShutdownServer(qboolean crash)
 	sv.active = false;
 
 // stop all client sounds immediately
-	if (cls.state == ca_connected)
-		CL_Disconnect ();
+	if (quake::cls.state == ca_connected)
+		quake::cls.disconnect();
 
 // flush any pending messages - like the score!!!
 	start = Sys_FloatTime();
@@ -469,18 +469,19 @@ not reinitialize anything.
 */
 void Host_ClearMemory (void)
 {
-	Con_DPrintf ("Clearing memory\n");
+	quake::dcon << "Clearing memory" << std::endl;
 	D_FlushCaches ();
 	Mod_ClearAll ();
 	if (host_hunklevel)
 		Hunk_FreeToLowMark (host_hunklevel);
 
-	cls.signon = 0;
+	
 	for (size_t i = 0; i < sv.num_edicts; i++) {
 		if (sv.edicts[i].vars) delete(sv.edicts[i].vars);
 	}
 	memset (&sv, 0, sizeof(sv));
-	memset (&cl, 0, sizeof(cl));
+	quake::cl.clear();
+	quake::cls.signon = 0;
 }
 
 
@@ -501,7 +502,7 @@ qboolean Host_FilterTime (idTime time)
 	realtime += time;
 
 	const idTime new_time = (realtime - oldrealtime);
-	if (!cls.timedemo && new_time < max_framerate)
+	if (!quake::cls.timedemo && new_time < max_framerate)
 		return false;		// framerate is too high
 
 	host_frametime = new_time;
@@ -686,7 +687,7 @@ void _Host_Frame (idTime time)
 	host_time += host_frametime;
 
 // fetch results from server
-	if (cls.state == ca_connected)
+	if (quake::cls.state == ca_connected)
 	{
 		CL_ReadFromServer ();
 	}
@@ -701,7 +702,7 @@ void _Host_Frame (idTime time)
 		time2 = Sys_FloatTime ();
 		
 // update audio
-	if (cls.signon == SIGNONS)
+	if (quake::cls.signon == SIGNONS)
 	{
 		S_Update (r_origin, vpn, vright, vup);
 		CL_DecayLights ();
@@ -766,7 +767,7 @@ void Host_Frame (idTime time)
 
 #define	VCR_SIGNATURE	0x56435231
 // "VCR1"
-
+ZVector<char> buffer2;
 void Host_InitVCR (quakeparms_t *parms)
 {
 	int		i, len, n;
@@ -870,7 +871,7 @@ void Host_Init (quakeparms_t *parms)
 	
 	R_InitTextures ();		// needed even for dedicated servers
  
-	if (cls.state != ca_dedicated)
+	if (quake::cls.state != ca_dedicated)
 	{
 		host_basepal = (byte *)COM_LoadHunkFile ("gfx/palette.lmp");
 		if (!host_basepal)
@@ -947,7 +948,7 @@ void Host_Shutdown(void)
 	S_Shutdown();
 	IN_Shutdown ();
 
-	if (cls.state != ca_dedicated)
+	if (quake::cls.state != ca_dedicated)
 	{
 		VID_Shutdown();
 	}

@@ -11,7 +11,7 @@
 typedef struct memblock_s
 {
 	size_t		size;           // including the header and possibly tiny fragments
-	int     tag;            // a tag of 0 is a free block
+	const void*     tag;            // a tag of 0 is a free block
 	int     id;        		// should be ZONEID
 	struct memblock_s       *next, *prev;
 	int		pad;			// pad to 64 bit boundary
@@ -333,8 +333,8 @@ typedef struct
 	cvar_t m_yaw;
 	cvar_t m_forward;
 	cvar_t m_side;
-	client_static_t cls;
-	client_state_t cl;
+	client_static_t quake::cls;
+	client_state_t quake::cl;
 	efrag_t cl_efrags[MAX_EFRAGS];
 	entity_t cl_entities[MAX_EDICTS];
 	entity_t cl_static_entities[MAX_STATIC_ENTITIES];

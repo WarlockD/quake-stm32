@@ -358,8 +358,8 @@ void Cmd_Alias_f (cmd_source_t source, size_t argc, const quake::string_view arg
 */
 
 
-
-
+void Z_Print_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void Z_Stats_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
 
 
 /*
@@ -378,6 +378,8 @@ void Cmd_Init (void)
 	Cmd_AddCommand ("alias",Cmd_Alias_f);
 	Cmd_AddCommand ("cmd", Cmd_ForwardToServer);
 	Cmd_AddCommand ("wait", Cmd_Wait_f);
+	Cmd_AddCommand("zstats", Z_Stats_f);
+	Cmd_AddCommand("zprint", Z_Print_f);
 }
 
 
@@ -481,25 +483,25 @@ Sends the entire command line over to the server
 */
 void Cmd_ForwardToServer(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
-	if (cls.state != ca_connected)
+	if (quake::cls.state != ca_connected)
 	{
 		Con_Printf ("Can't \"%s\", not connected\n", args[0]);
 		return;
 	}
 	
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 		return;		// not really connected
 
-	cls.message.WriteByte( clc_stringcmd);
+	quake::cls.message.WriteByte( clc_stringcmd);
 	if (Q_strcasecmp(args[0], "cmd") != 0)
 	{
-		cls.message.Print( args[0]);
-		cls.message.Print(' ');
+		quake::cls.message.Print( args[0]);
+		quake::cls.message.Print(' ');
 	}
 	if(argc > 1)
 	for(size_t i=1; i < argc;i++)
-		cls.message.Print(args[i]);
-	cls.message.Print('\n');
+		quake::cls.message.Print(args[i]);
+	quake::cls.message.Print('\n');
 }
 #define DEBUG_ARGS
 

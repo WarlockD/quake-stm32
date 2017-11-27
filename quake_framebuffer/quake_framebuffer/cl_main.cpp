@@ -29,7 +29,8 @@ using namespace std::chrono;
 cvar_t	cl_name = {"_cl_name", "player", true};
 cvar_t	cl_color = {"_cl_color", "0", true};
 
-cvar_t	cl_shownet = {"cl_shownet","0"};	// can be 0, 1, or 2
+//cvar_t	cl_shownet = {"cl_shownet","0"};	// can be 0, 1, or 2
+cvar_t	cl_shownet = { "cl_shownet","0" };	// can be 0, 1, or 2
 cvar_t	cl_nolerp = {"cl_nolerp","0"};
 
 cvar_t	lookspring = {"lookspring","0", true};
@@ -41,9 +42,36 @@ cvar_t	m_yaw = {"m_yaw","0.022", true};
 cvar_t	m_forward = {"m_forward","1", true};
 cvar_t	m_side = {"m_side","0.8", true};
 
+namespace quake {
+	client_static_t	cls;
+	client_state_t	cl;
+}
 
-client_static_t	cls;
-client_state_t	cl;
+client_static_t::client_static_t() {
+	clear();
+}
+
+void client_static_t::clear() {
+	state = ca_disconnected;
+	mapstring.clear();
+	spawnparms.clear();
+	demonum = 0;
+	demos.clear();
+	demorecording = 0;
+	demoplayback=0;
+	timedemo=0;
+	forcetrack=0;			// -1 = use normal cd track
+	demofile.close();
+	td_lastframe=0;		// to meter out one message a frame
+	td_startframe=0;		// host_framecount at start
+	td_starttime=0;		// realtime at second frame of timedemo
+	signon=0;			// 0 to SIGNONS
+	netcon=nullptr;
+	message.Clear();		// writing buffer to send to server
+}
+client_state_t::client_state_t() { clear(); }
+
+
 // FIXME: put these on hunk?
 efrag_t			cl_efrags[MAX_EFRAGS];
 entity_t		cl_entities[MAX_EDICTS];
@@ -60,6 +88,26 @@ CL_ClearState
 
 =====================
 */
+void client_state_t::clear() { 
+	memset(&quake::cl, 0, sizeof(quake::cl)); 
+	// clear other arrays	
+	memset(cl_efrags, 0, sizeof(cl_efrags));
+	memset(cl_entities, 0, sizeof(cl_entities));
+	memset(cl_dlights, 0, sizeof(cl_dlights));
+	memset(cl_lightstyle, 0, sizeof(cl_lightstyle));
+	memset(cl_temp_entities, 0, sizeof(cl_temp_entities));
+	memset(cl_beams, 0, sizeof(cl_beams));
+
+	//
+	// allocate the efrags and chain together into a free list
+	//
+	free_efrags = cl_efrags;
+	for (int i = 0; i<MAX_EFRAGS - 1; i++)
+		free_efrags[i].entnext = &free_efrags[i + 1];
+	//free_efrags[i].entnext = nullptr;
+
+
+}
 void CL_ClearState (void)
 {
 	int			i;
@@ -67,26 +115,13 @@ void CL_ClearState (void)
 	if (!sv.active)
 		Host_ClearMemory ();
 
-// wipe the entire cl structure
-	memset (&cl, 0, sizeof(cl));
+	
+// wipe the entire quake::cl structure
+	//memset (&quake::cl, 0, sizeof(quake::cl));
+	quake::cl.clear(); // host_clear memeroy clears this already
+	quake::cls.message.Clear();
 
-	cls.message.Clear();
 
-// clear other arrays	
-	memset (cl_efrags, 0, sizeof(cl_efrags));
-	memset (cl_entities, 0, sizeof(cl_entities));
-	memset (cl_dlights, 0, sizeof(cl_dlights));
-	memset (cl_lightstyle, 0, sizeof(cl_lightstyle));
-	memset (cl_temp_entities, 0, sizeof(cl_temp_entities));
-	memset (cl_beams, 0, sizeof(cl_beams));
-
-//
-// allocate the efrags and chain together into a free list
-//
-	cl.free_efrags = cl_efrags;
-	for (i=0 ; i<MAX_EFRAGS-1 ; i++)
-		cl.free_efrags[i].entnext = &cl.free_efrags[i+1];
-	cl.free_efrags[i].entnext = NULL;
 }
 
 /*
@@ -97,9 +132,8 @@ Sends a disconnect message to the server
 This is also called on Host_Error, so it shouldn't cause any errors
 =====================
 */
-void 	CL_Stop();
-void CL_Disconnect (void)
-{
+
+void client_static_t::disconnect(){
 // stop sounds (especially looping!)
 	S_StopAllSounds (true);
 	
@@ -107,65 +141,54 @@ void CL_Disconnect (void)
 //	SCR_BringDownConsole ();
 
 // if running a local server, shut it down
-	if (cls.demoplayback)
-		CL_StopPlayback ();
-	else if (cls.state == ca_connected)
+	if (demoplayback)
+		stop_playback();
+	else if (state == ca_connected)
 	{
-		if (cls.demorecording)
-			CL_Stop();
+		if (demorecording)
+			stop();
+		quake::dcon << "Sending clc_disconnect" << std::endl;
+		message.Clear();
+		message.WriteByte(clc_disconnect);
+		NET_SendUnreliableMessage (netcon, &message);
+		message.Clear();;
+		NET_Close (quake::cls.netcon);
 
-		Con_DPrintf ("Sending clc_disconnect\n");
-		cls.message.Clear();
-		cls.message.WriteByte(clc_disconnect);
-		NET_SendUnreliableMessage (cls.netcon, &cls.message);
-		cls.message.Clear();;
-		NET_Close (cls.netcon);
-
-		cls.state = ca_disconnected;
+		state = ca_disconnected;
 		if (sv.active)
 			Host_ShutdownServer(false);
 	}
 
-	cls.demoplayback = cls.timedemo = false;
-	cls.signon = 0;
+	demoplayback = timedemo = false;
+	signon = 0;
 }
 
 void CL_Disconnect_f(cmd_source_t source, size_t argc, const quake::string_view args[])
 {
-	CL_Disconnect ();
+	quake::cls.disconnect();
 	if (sv.active)
 		Host_ShutdownServer (false);
 }
 
 
+void client_static_t::establish_connection(const quake::string_view& host) {
+	if (state == ca_dedicated) return;
+	if (demoplayback) return;
 
+	disconnect();
+	if (sv.active) Host_ShutdownServer(false);
 
-/*
-=====================
-CL_EstablishConnection
+	netcon = NET_Connect(host);
+	if (!quake::cls.netcon)
+		Host_Error("CL_Connect: connect failed\n");
+	quake::dcon << "CL_EstablishConnection: connected to  " << host << std::endl;
 
-Host should be either "local" or a net address to be passed on
-=====================
-*/
-void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[])
-{
-	if (cls.state == ca_dedicated)
-		return;
-
-	if (cls.demoplayback)
-		return;
-
-	CL_Disconnect_f (source,argc,argv);
-
-	cls.netcon = NET_Connect (host);
-	if (!cls.netcon)
-		Host_Error ("CL_Connect: connect failed\n");
-	quake::dcon << "CL_EstablishConnection: connected to  "<<  host << std::endl;
-	
-	cls.demonum = -1;			// not in the demo loop now
-	cls.state = ca_connected;
-	cls.signon = 0;				// need all the signon messages before playing
+	quake::cls.demonum = -1;			// not in the demo loop now
+	quake::cls.state = ca_connected;
+	quake::cls.signon = 0;				// need all the signon messages before playing
 }
+
+
 
 /*
 =====================
@@ -174,45 +197,45 @@ CL_SignonReply
 An svc_signonnum has been received, perform a client side setup
 =====================
 */
-void CL_SignonReply (void)
+void client_static_t::signon_reply(void)
 {
 	//char 	str[8192];
 
-	quake::con << "CL_SignonReply: " << cls.signon << std::endl;
+	quake::con << "CL_SignonReply: " << signon << std::endl;
 
-	switch (cls.signon)
+	switch (quake::cls.signon)
 	{
 	case 1:
-		cls.message.WriteByte(clc_stringcmd);
-		cls.message.WriteString("prespawn");
+		message.WriteByte(clc_stringcmd);
+		message.WriteString("prespawn");
 		break;
 		
 	case 2:		
 	{
 		quake::fixed_string_stream<256> ss;
 
-		cls.message.WriteByte(clc_stringcmd);
+		message.WriteByte(clc_stringcmd);
 		ss.rdbuf()->clear();
 		ss << "name \"" << cl_name.string << std::endl;
-		cls.message.WriteString(ss.str().c_str());
+		message.WriteString(ss.str().c_str());
 
-		cls.message.WriteByte(clc_stringcmd);
+		message.WriteByte(clc_stringcmd);
 
 		ss.rdbuf()->clear();
 		ss << "color " << ((int)cl_color.value >> 4) << ' ' << ((int)cl_color.value & 15) << std::endl;
-		cls.message.WriteString(ss.str().c_str());
+		message.WriteString(ss.str().c_str());
 
-		cls.message.WriteByte(clc_stringcmd);
+		quake::cls.message.WriteByte(clc_stringcmd);
 
 		ss.rdbuf()->clear();
-		ss << "spawn " << cls.spawnparms << std::endl;
-		cls.message.WriteString(ss.str().c_str());
+		ss << "spawn " << quake::cls.spawnparms << std::endl;
+		message.WriteString(ss.str().c_str());
 	}
 		break;
 		
 	case 3:	
-		cls.message.WriteByte(clc_stringcmd);
-		cls.message.WriteString("begin");
+		message.WriteByte(clc_stringcmd);
+		message.WriteString("begin");
 		Cache_Report ();		// print remaining memory
 		break;
 		
@@ -229,29 +252,27 @@ CL_NextDemo
 Called to play the next demo in the demo loop
 =====================
 */
-void CL_NextDemo (void)
+void client_static_t::next_demo(void)
 {
 
-	if (cls.demonum == -1)
+	if (demonum == -1)
 		return;		// don't play demos
 
 	SCR_BeginLoadingPlaque ();
 
-	if (!cls.demos[cls.demonum][0] || cls.demonum == MAX_DEMOS)
-	{
-		cls.demonum = 0;
-		if (!cls.demos[cls.demonum][0])
-		{
-			quake::con << "No demos listed with startdemos" << std::endl;
-			cls.demonum = -1;
-			return;
-		}
+	if (demos.empty()) {
+		quake::con << "No demos listed with startdemos" << std::endl;
+		demonum = -1;
+		return;
+
 	}
+	if(demonum>= demos.size()) demonum = 0;
+		
 	quake::fixed_string_stream<256> ss;
-	ss << "playdemo " << cls.demos[cls.demonum] << std::endl;
+	ss << "playdemo " << demos[demonum].get() << std::endl;
 
 	Cbuf_InsertText(ss.str());
-	cls.demonum++;
+	demonum++;
 }
 
 /*
@@ -264,7 +285,7 @@ void CL_PrintEntities_f (cmd_source_t source, size_t argc, const quake::string_v
 	entity_t	*ent;
 	int			i;
 	
-	for (i=0,ent=cl_entities ; i<cl.num_entities ; i++,ent++)
+	for (i=0,ent=cl_entities ; i<quake::cl.num_entities ; i++,ent++)
 	{
 		Con_Printf ("%3i:",i);
 		if (!ent->model)
@@ -352,7 +373,7 @@ dlight_t *CL_AllocDlight (int key)
 	dl = cl_dlights;
 	for (i=0 ; i<MAX_DLIGHTS ; i++, dl++)
 	{
-		if (dl->die < cl.time)
+		if (dl->die < quake::cl.time)
 		{
 			memset (dl, 0, sizeof(*dl));
 			dl->key = key;
@@ -379,12 +400,12 @@ void CL_DecayLights (void)
 	dlight_t	*dl;
 	idTime		time;
 	
-	time = cl.time - cl.oldtime;
+	time = quake::cl.time - quake::cl.oldtime;
 
 	dl = cl_dlights;
 	for (i=0 ; i<MAX_DLIGHTS ; i++, dl++)
 	{
-		if (dl->die < cl.time || !dl->radius)
+		if (dl->die < quake::cl.time || !dl->radius)
 			continue;
 		
 		dl->radius -= idCast<float>(time)*dl->decay;
@@ -406,27 +427,27 @@ float	CL_LerpPoint(void)
 {
 	float	f, frac;
 
-	f = idCast<float>(cl.mtime[0] - cl.mtime[1]);
+	f = idCast<float>(quake::cl.mtime[0] - quake::cl.mtime[1]);
 
-	if (!f || cl_nolerp.value || cls.timedemo || sv.active)
+	if (!f || cl_nolerp.value || quake::cls.timedemo || sv.active)
 	{
-		cl.time = cl.mtime[0];
+		quake::cl.time = quake::cl.mtime[0];
 		return 1;
 	}
 
 	if (f > 0.1)
 	{	// dropped packet, or start of demo
-		cl.mtime[1] = cl.mtime[0] - 100ms;
+		quake::cl.mtime[1] = quake::cl.mtime[0] - 100ms;
 		f = 0.1f;
 	}
-	frac = idCast<float>((cl.time - cl.mtime[1])) / f;
+	frac = idCast<float>((quake::cl.time - quake::cl.mtime[1])) / f;
 	//Con_Printf ("frac: %f\n",frac);
 	if (frac < 0)
 	{
 		if (frac < -0.01)
 		{
 			SetPal(1);
-			cl.time = cl.mtime[1];
+			quake::cl.time = quake::cl.mtime[1];
 			//				Con_Printf ("low frac\n");
 		}
 		frac = 0;
@@ -436,7 +457,7 @@ float	CL_LerpPoint(void)
 		if (frac > 1.01)
 		{
 			SetPal(2);
-			cl.time = cl.mtime[0];
+			quake::cl.time = quake::cl.mtime[0];
 			//				Con_Printf ("high frac\n");
 		}
 		frac = 1;
@@ -472,27 +493,27 @@ void CL_RelinkEntities (void)
 // interpolate player info
 //
 	for (i=0 ; i<3 ; i++)
-		cl.velocity[i] = cl.mvelocity[1][i] + 
-			frac * (cl.mvelocity[0][i] - cl.mvelocity[1][i]);
+		quake::cl.velocity[i] = quake::cl.mvelocity[1][i] + 
+			frac * (quake::cl.mvelocity[0][i] - quake::cl.mvelocity[1][i]);
 
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 	{
 	// interpolate the angles	
 		for (j=0 ; j<3 ; j++)
 		{
-			d = cl.mviewangles[0][j] - cl.mviewangles[1][j];
+			d = quake::cl.mviewangles[0][j] - quake::cl.mviewangles[1][j];
 			if (d > 180)
 				d -= 360;
 			else if (d < -180)
 				d += 360;
-			cl.viewangles[j] = cl.mviewangles[1][j] + frac*d;
+			quake::cl.viewangles[j] = quake::cl.mviewangles[1][j] + frac*d;
 		}
 	}
 	
-	bobjrotate = anglemod(100.0f*idCast<float>(cl.time));
+	bobjrotate = anglemod(100.0f*idCast<float>(quake::cl.time));
 	
 // start on the entity after the world
-	for (i=1,ent=cl_entities+1 ; i<cl.num_entities ; i++,ent++)
+	for (i=1,ent=cl_entities+1 ; i<quake::cl.num_entities ; i++,ent++)
 	{
 		if (!ent->model)
 		{	// empty slot
@@ -502,7 +523,7 @@ void CL_RelinkEntities (void)
 		}
 
 // if the object wasn't included in the last packet, remove it
-		if (ent->msgtime != cl.mtime[0])
+		if (ent->msgtime != quake::cl.mtime[0])
 		{
 			ent->model = NULL;
 			continue;
@@ -563,7 +584,7 @@ void CL_RelinkEntities (void)
 			VectorMA (dl->origin, 18, fv, dl->origin);
 			dl->radius = 200.0f + static_cast<float>((rand()&31));
 			dl->minlight = 32;
-			dl->die = cl.time + 100ms;
+			dl->die = quake::cl.time + 100ms;
 		}
 		if (ent->effects & EF_BRIGHTLIGHT)
 		{			
@@ -571,14 +592,14 @@ void CL_RelinkEntities (void)
 			VectorCopy (ent->origin,  dl->origin);
 			dl->origin[2] += 16;
 			dl->radius = 400.0f + static_cast<float>((rand() & 31));
-			dl->die = cl.time + 1ms;
+			dl->die = quake::cl.time + 1ms;
 		}
 		if (ent->effects & EF_DIMLIGHT)
 		{			
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
 			dl->radius = 200.0f + static_cast<float>((rand() & 31));
-			dl->die = cl.time + 1ms;
+			dl->die = quake::cl.time + 1ms;
 		}
 #ifdef QUAKE2
 		if (ent->effects & EF_DARKLIGHT)
@@ -586,7 +607,7 @@ void CL_RelinkEntities (void)
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
 			dl->radius = 200.0 + (rand()&31);
-			dl->die = cl.time + 0.001;
+			dl->die = quake::cl.time + 0.001;
 			dl->dark = true;
 		}
 		if (ent->effects & EF_LIGHT)
@@ -594,7 +615,7 @@ void CL_RelinkEntities (void)
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin,  dl->origin);
 			dl->radius = 200;
-			dl->die = cl.time + 0.001;
+			dl->die = quake::cl.time + 0.001;
 		}
 #endif
 
@@ -612,7 +633,7 @@ void CL_RelinkEntities (void)
 			dl = CL_AllocDlight (i);
 			VectorCopy (ent->origin, dl->origin);
 			dl->radius = 200;
-			dl->die = cl.time + 10ms;
+			dl->die = quake::cl.time + 10ms;
 		}
 		else if (ent->model->flags & EF_GRENADE)
 			R_RocketTrail (oldorg, ent->origin, 1);
@@ -621,7 +642,7 @@ void CL_RelinkEntities (void)
 
 		ent->forcelink = false;
 
-		if (i == cl.viewentity && !chase_active.value)
+		if (i == quake::cl.viewentity && !chase_active.value)
 			continue;
 
 #ifdef QUAKE2
@@ -649,8 +670,8 @@ int CL_ReadFromServer (void)
 {
 	int		ret;
 
-	cl.oldtime = cl.time;
-	cl.time += host_frametime;
+	quake::cl.oldtime = quake::cl.time;
+	quake::cl.time += host_frametime;
 	
 	do
 	{
@@ -660,12 +681,13 @@ int CL_ReadFromServer (void)
 		if (!ret)
 			break;
 		
-		cl.last_received_message = realtime;
+		quake::cl.last_received_message = realtime;
 		CL_ParseServerMessage ();
-	} while (ret && cls.state == ca_connected);
+	} while (ret && quake::cls.state == ca_connected);
 	
-	if (cl_shownet.value)
-		Con_Printf ("\n");
+//	if (cl_shownet.value)
+//		quake::con << std::endl;
+
 
 	CL_RelinkEntities ();
 	CL_UpdateTEnts ();
@@ -685,10 +707,10 @@ void CL_SendCmd (void)
 {
 	usercmd_t		cmd;
 
-	if (cls.state != ca_connected)
+	if (quake::cls.state != ca_connected)
 		return;
 
-	if (cls.signon == SIGNONS)
+	if (quake::cls.signon == SIGNONS)
 	{
 	// get basic movement from keyboard
 		CL_BaseMove (&cmd);
@@ -701,26 +723,26 @@ void CL_SendCmd (void)
 	
 	}
 
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 	{
-		cls.message.Clear();
+		quake::cls.message.Clear();
 		return;
 	}
 	
 // send the reliable message
-	if (!cls.message.size())
+	if (!quake::cls.message.size())
 		return;		// no message at all
 	
-	if (!NET_CanSendMessage (cls.netcon))
+	if (!NET_CanSendMessage (quake::cls.netcon))
 	{
 		Con_DPrintf ("CL_WriteToServer: can't send\n");
 		return;
 	}
 
-	if (NET_SendMessage (cls.netcon, &cls.message) == -1)
+	if (NET_SendMessage (quake::cls.netcon, &quake::cls.message) == -1)
 		Host_Error ("CL_WriteToServer: lost server connection");
 
-	cls.message.Clear();;
+	quake::cls.message.Clear();;
 }
 
 /*
@@ -730,7 +752,7 @@ CL_Init
 */
 void CL_Init (void)
 {	
-	cls.message.Alloc( 1024);
+	quake::cls.message.Alloc( 1024);
 
 	CL_InitInput ();
 	CL_InitTEnts ();

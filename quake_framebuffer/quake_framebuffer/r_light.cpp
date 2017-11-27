@@ -37,7 +37,7 @@ void R_AnimateLight (void)
 //
 // light animations
 // 'm' is normal light, 'a' is no light, 'z' is double bright
-	i = (int)(idCast<float>(cl.time)*10);
+	i = (int)(idCast<float>(quake::cl.time)*10);
 	for (j=0 ; j<MAX_LIGHTSTYLES ; j++)
 	{
 		if (!cl_lightstyle[j].length)
@@ -91,7 +91,7 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 	}
 		
 // mark the polygons
-	surf = cl.worldmodel->surfaces + node->firstsurface;
+	surf = quake::cl.worldmodel->surfaces + node->firstsurface;
 	for (i=0 ; i<node->numsurfaces ; i++, surf++)
 	{
 		if (surf->dlightframe != r_dlightframecount)
@@ -123,9 +123,9 @@ void R_PushDlights (void)
 
 	for (i=0 ; i<MAX_DLIGHTS ; i++, l++)
 	{
-		if (l->die < cl.time || !l->radius)
+		if (l->die < quake::cl.time || !l->radius)
 			continue;
-		R_MarkLights ( l, 1<<i, cl.worldmodel->nodes );
+		R_MarkLights ( l, 1<<i, quake::cl.worldmodel->nodes );
 	}
 }
 
@@ -182,7 +182,7 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 		
 // check for impact on this node
 
-	surf = cl.worldmodel->surfaces + node->firstsurface;
+	surf = quake::cl.worldmodel->surfaces + node->firstsurface;
 	for (i=0 ; i<node->numsurfaces ; i++, surf++)
 	{
 		if (surf->flags & SURF_DRAWTILED)
@@ -240,14 +240,14 @@ int R_LightPoint (vec3_t p)
 	vec3_t		end;
 	int			r;
 	
-	if (!cl.worldmodel->lightdata)
+	if (!quake::cl.worldmodel->lightdata)
 		return 255;
 	
 	end[0] = p[0];
 	end[1] = p[1];
 	end[2] = p[2] - 2048;
 	
-	r = RecursiveLightPoint (cl.worldmodel->nodes, p, end);
+	r = RecursiveLightPoint (quake::cl.worldmodel->nodes, p, end);
 	
 	if (r == -1)
 		r = 0;

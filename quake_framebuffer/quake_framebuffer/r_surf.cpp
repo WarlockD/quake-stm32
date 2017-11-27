@@ -162,7 +162,7 @@ void R_BuildLightMap (void)
 	size = smax*tmax;
 	lightmap = surf->samples;
 
-	if (r_fullbright.value || !cl.worldmodel->lightdata)
+	if (r_fullbright.value || !quake::cl.worldmodel->lightdata)
 	{
 		for (i=0 ; i<size ; i++)
 			blocklights[i] = 0;
@@ -223,7 +223,7 @@ texture_t *R_TextureAnimation (texture_t *base)
 	if (!base->anim_total)
 		return base;
 
-	reletive = (int)(idCast<float>(cl.time)*10.0f) % base->anim_total;
+	reletive = (int)(idCast<float>(quake::cl.time)*10.0f) % base->anim_total;
 
 	count = 0;	
 	while (base->anim_min > reletive || base->anim_max <= reletive)
@@ -597,7 +597,7 @@ void R_GenTurbTile (pixel_t *pbasetex, void *pdest)
 	int		i, j, s, t;
 	byte	*pd;
 	
-	turb = sintable + ((int)(idCast<float>(cl.time)*SPEED)&(CYCLE-1));
+	turb = sintable + ((int)(idCast<float>(quake::cl.time)*SPEED)&(CYCLE-1));
 	pd = (byte *)pdest;
 
 	for (i=0 ; i<TILE_SIZE ; i++)
@@ -623,7 +623,7 @@ void R_GenTurbTile16 (pixel_t *pbasetex, void *pdest)
 	int				i, j, s, t;
 	unsigned short	*pd;
 
-	turb = sintable + ((int)(idCast<float>(cl.time)*SPEED)&(CYCLE-1));
+	turb = sintable + ((int)(idCast<float>(quake::cl.time)*SPEED)&(CYCLE-1));
 	pd = (unsigned short *)pdest;
 
 	for (i=0 ; i<TILE_SIZE ; i++)

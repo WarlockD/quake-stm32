@@ -271,7 +271,7 @@ void R_SetSkyFrame (void)
 	s2 = iskyspeed2 / g;
 	temp = SKYSIZE * s1 * s2;
 
-	skytime = cl.time - std::chrono::seconds(static_cast<int>((idCast<float>(cl.time) / temp) * temp));
+	skytime = quake::cl.time - std::chrono::seconds(static_cast<int>((idCast<float>(quake::cl.time) / temp) * temp));
 	
 
 	r_skymade = 0;

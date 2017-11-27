@@ -31,7 +31,9 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
+#include <windows.h>
 #include <windowsx.h>
+#include <dbt.h>
 #include <shellapi.h>
 
 #define _GLFW_KEY_INVALID -2

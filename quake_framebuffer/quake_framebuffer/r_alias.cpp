@@ -582,7 +582,7 @@ void R_AliasSetupSkin (void)
 		numskins = paliasskingroup->numskins;
 		fullskininterval = pskinintervals[numskins-1];
 	
-		skintime = idCast<float>(cl.time) + currententity->syncbase;
+		skintime = idCast<float>(quake::cl.time) + currententity->syncbase;
 	
 	// when loading in Mod_LoadAliasSkinGroup, we guaranteed all interval
 	// values are positive, so we don't have to worry about division by 0
@@ -672,7 +672,7 @@ void R_AliasSetupFrame (void)
 	numframes = paliasgroup->numframes;
 	fullinterval = pintervals[numframes-1];
 
-	time = idCast<float>(cl.time) + currententity->syncbase;
+	time = idCast<float>(quake::cl.time) + currententity->syncbase;
 
 //
 // when loading in Mod_LoadAliasGroup, we guaranteed all interval values
@@ -736,7 +736,7 @@ void R_AliasDrawModel (alight_t *plighting)
 
 	acolormap = currententity->colormap;
 
-	if (currententity != &cl.viewent)
+	if (currententity != &quake::cl.viewent)
 		ziscale = (float)0x8000 * (float)0x10000;
 	else
 		ziscale = (float)0x8000 * (float)0x10000 * 3.0;

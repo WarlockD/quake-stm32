@@ -249,8 +249,8 @@ void R_NewMap (void)
 	
 // clear out efrags in case the level hasn't been reloaded
 // FIXME: is this one short?
-	for (i=0 ; i<cl.worldmodel->numleafs ; i++)
-		cl.worldmodel->leafs[i].efrags = NULL;
+	for (i=0 ; i<quake::cl.worldmodel->numleafs ; i++)
+		quake::cl.worldmodel->leafs[i].efrags = NULL;
 		 	
 	r_viewleaf = NULL;
 	R_ClearParticles ();
@@ -312,7 +312,7 @@ void R_SetVrect (vrect_t *pvrectin, vrect_t *pvrect, int lineadj)
 	int		h;
 
 	float size = scr_viewsize.value > 100.0f ? 100.0f : scr_viewsize.value;
-	if (cl.intermission)
+	if (quake::cl.intermission)
 	{
 		size = 100.0f;
 		lineadj = 0;
@@ -499,13 +499,13 @@ void R_MarkLeaves (void)
 	r_visframecount++;
 	r_oldviewleaf = r_viewleaf;
 
-	vis = Mod_LeafPVS (r_viewleaf, cl.worldmodel);
+	vis = Mod_LeafPVS (r_viewleaf, quake::cl.worldmodel);
 		
-	for (i=0 ; i<cl.worldmodel->numleafs ; i++)
+	for (i=0 ; i<quake::cl.worldmodel->numleafs ; i++)
 	{
 		if (vis[i>>3] & (1<<(i&7)))
 		{
-			node = (mnode_t *)&cl.worldmodel->leafs[i+1];
+			node = (mnode_t *)&quake::cl.worldmodel->leafs[i+1];
 			do
 			{
 				if (node->visframe == r_visframecount)
@@ -540,7 +540,7 @@ void R_DrawEntitiesOnList (void)
 	{
 		currententity = cl_visedicts[i];
 
-		if (currententity == &cl_entities[cl.viewentity])
+		if (currententity == &cl_entities[quake::cl.viewentity])
 			continue;	// don't draw the player
 
 		switch (currententity->model->type)
@@ -568,7 +568,7 @@ void R_DrawEntitiesOnList (void)
 
 				for (lnum=0 ; lnum<MAX_DLIGHTS ; lnum++)
 				{
-					if (cl_dlights[lnum].die >= cl.time)
+					if (cl_dlights[lnum].die >= quake::cl.time)
 					{
 						VectorSubtract (currententity->origin,
 										cl_dlights[lnum].origin,
@@ -615,13 +615,13 @@ void R_DrawViewModel (void)
 	if (!r_drawviewmodel.value || r_fov_greater_than_90)
 		return;
 
-	if (cl.items & IT_INVISIBILITY)
+	if (quake::cl.items & IT_INVISIBILITY)
 		return;
 
-	if (cl.stats[STAT_HEALTH] <= 0)
+	if (quake::cl.stats[STAT_HEALTH] <= 0)
 		return;
 
-	currententity = &cl.viewent;
+	currententity = &quake::cl.viewent;
 	if (!currententity->model)
 		return;
 
@@ -646,7 +646,7 @@ void R_DrawViewModel (void)
 			continue;
 		if (!dl->radius)
 			continue;
-		if (dl->die < cl.time)
+		if (dl->die < quake::cl.time)
 			continue;
 
 		VectorSubtract (currententity->origin, dl->origin, dist);
@@ -664,7 +664,7 @@ void R_DrawViewModel (void)
 	r_viewlighting.plightvec = lightvec;
 
 #ifdef QUAKE2
-	cl.light_level = r_viewlighting.ambientlight;
+	quake::cl.light_level = r_viewlighting.ambientlight;
 #endif
 
 	R_AliasDrawModel (&r_viewlighting);
@@ -794,7 +794,7 @@ void R_DrawBEntitiesOnList (void)
 				{
 					for (k=0 ; k<MAX_DLIGHTS ; k++)
 					{
-						if ((cl_dlights[k].die < cl.time) ||
+						if ((cl_dlights[k].die < quake::cl.time) ||
 							(!cl_dlights[k].radius))
 						{
 							continue;
@@ -822,7 +822,7 @@ void R_DrawBEntitiesOnList (void)
 						r_emaxs[j] = minmaxs[3+j];
 					}
 
-					R_SplitEntityOnNode2 (cl.worldmodel->nodes);
+					R_SplitEntityOnNode2 (quake::cl.worldmodel->nodes);
 
 					if (r_pefragtopnode)
 					{
@@ -972,7 +972,7 @@ SetVisibilityByPassages ();
 // done in screen.c
 	Sys_LowFPPrecision ();
 
-	if (!cl_entities[0].model || !cl.worldmodel)
+	if (!cl_entities[0].model || !quake::cl.worldmodel)
 		Sys_Error ("R_RenderView: NULL worldmodel");
 		
 	if (!r_dspeeds.value)

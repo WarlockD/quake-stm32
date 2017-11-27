@@ -77,7 +77,7 @@ void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_v
 {
 	if (key_dest == key_console)
 	{
-		if (cls.state == ca_connected)
+		if (quake::cls.state == ca_connected)
 		{
 			key_dest = key_game;
 			key_lines[edit_line][1] = 0;	// clear any typing
@@ -479,14 +479,14 @@ void Con_Printf (const char *fmt, ...)
 	if (!con_initialized)
 		return;
 		
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		return;		// no graphics mode
 
 // write it to the scrollable buffer
 	Con_Print (msg);
 	
 // update the screen if the console is displayed
-	if (cls.signon != SIGNONS && !scr_disabled_for_loading )
+	if (quake::cls.signon != SIGNONS && !scr_disabled_for_loading )
 	{
 	// protect against infinite loop if something in SCR_UpdateScreen calls
 	// Con_Printd

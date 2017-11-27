@@ -18,10 +18,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // Z_zone.c
+#include "icommon.h"
+#include <iomanip>
+#if 0
 #define _CRTDBG_MAP_ALLOC  
 #include <stdlib.h>  
 #include <crtdbg.h>
-#include "icommon.h"
+#endif
+
 static constexpr size_t alignment_bits = sizeof(ptrdiff_t) / 8;
 static inline size_t AllignSize(size_t size) { return  ((size + (alignment_bits-1))&~(alignment_bits - 1)); }
 
@@ -51,6 +55,130 @@ The zone calls are pretty much only used for small strings and structures,
 all big things are allocated on the hunk.
 ==============================================================================
 */
+// soo, borrowing the quake  2 system
+// seems they rely on malloc.  Its slower than how quake1 does it but right now I need
+// to check how much overhead stl is biting me
+
+
+#define	Z_MAGIC		0x1d1d
+
+
+struct zhead_t
+{
+	zhead_t	*prev, *next;
+	uint32_t magic;
+	const void* tag;	// for group free			
+	size_t	size;
+} ;
+
+zhead_t		z_chain = { &z_chain,&z_chain, Z_MAGIC , "unkonwn", 0 };
+size_t		z_count=0U, z_bytes=0U;
+
+/*
+========================
+Z_Free
+========================
+*/
+void Z_Free(void *ptr)
+{
+	zhead_t	*z;
+
+	z = ((zhead_t *)ptr) - 1;
+
+	if (z->magic != Z_MAGIC)
+		Sys_Error( "Z_Free: bad magic");
+
+	z->prev->next = z->next;
+	z->next->prev = z->prev;
+
+	z_count--;
+	z_bytes -= z->size;
+	free(z);
+}
+void Z_Stats_f(void)
+{
+	quake::con << z_bytes << "bytes in " << z_count << " blocks" << std::endl;
+}
+void Z_Stats_f(cmd_source_t source, size_t argc, const quake::string_view args[]) { Z_Stats_f(); }
+
+/*
+========================
+Z_Print
+========================
+*/
+void Z_Print_f()
+{
+	Z_Stats_f();
+	zhead_t	*z, *next;
+
+	for (z = z_chain.next; z != &z_chain; z = next)
+	{
+		const char* tag = z->tag ? (const char*)z->tag : "free";
+
+		quake::con << " block: " << std::hex << std::setw(8) << (size_t)z;
+		quake::con << " size: " << std::setw(8) << z->size;
+		quake::con << " tag: " << std::setw(8) << tag;
+		quake::con << std::endl;
+		next = z->next;
+	}
+
+}
+void Z_Print_f(cmd_source_t source, size_t argc, const quake::string_view args[]) { Z_Print_f(); }
+/*
+========================
+Z_FreeTags
+========================
+*/
+void Z_FreeTags(const void* tag)
+{
+	zhead_t	*z, *next;
+
+	for (z = z_chain.next; z != &z_chain; z = next)
+	{
+		next = z->next;
+		if (z->tag == tag)
+			Z_Free((void *)(z + 1));
+	}
+}
+
+/*
+========================
+Z_TagMalloc
+========================
+*/
+void *Z_TagMalloc(size_t size, const void* tag)
+{
+	zhead_t	*z;
+
+	size = size + sizeof(zhead_t);
+	z = (zhead_t*)malloc(size);
+	if (!z)
+		Sys_Error("Z_Malloc: failed on allocation of %i bytes", size);
+	std::memset(z, 0, size);
+	z_count++;
+	z_bytes += size;
+	z->magic = Z_MAGIC;
+	z->tag = tag;
+	z->size = size;
+
+	z->next = z_chain.next;
+	z->prev = &z_chain;
+	z_chain.next->prev = z;
+	z_chain.next = z;
+
+	return (void *)(z + 1);
+}
+
+/*
+========================
+Z_Malloc
+========================
+*/
+void *Z_Malloc(size_t size)
+{
+	return Z_TagMalloc(size, "unkonwn");
+}
+
 
 memzone_t	*mainzone;
 
@@ -70,7 +198,7 @@ void Z_ClearZone (memzone_t *zone, size_t size)
 
 	zone->blocklist.next = zone->blocklist.prev = block =
 		(memblock_t *)( (byte *)zone + sizeof(memzone_t) );
-	zone->blocklist.tag = 1;	// in use block
+	zone->blocklist.tag = "empty";	// in use block
 	zone->blocklist.id = 0;
 	zone->blocklist.size = 0;
 	zone->rover = block;
@@ -80,8 +208,7 @@ void Z_ClearZone (memzone_t *zone, size_t size)
 	block->id = ZONEID;
 	block->size = size - sizeof(memzone_t);
 }
-
-static std::unordered_map<void*, _CrtMemState> _checkpoints;
+#ifdef QUAKE1_ZONE
 
 /*
 ========================
@@ -91,7 +218,7 @@ Z_Free
 void Z_Free (void *ptr)
 {
 #if 0
-	memblock_t	*block, *other;
+
 	assert(_CrtCheckMemory());
 #endif
 	if (!ptr)
@@ -113,9 +240,9 @@ void Z_Free (void *ptr)
 	assert(_CrtCheckMemory());
 #endif
 	//_malloc_dbg()
-	umm_free(ptr);
+	//umm_free(ptr);
 	//free(ptr);
-#if 0
+	memblock_t	*block, *other;
 	block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
 	if (block->id != ZONEID)
 		Sys_Error ("Z_Free: freed a pointer without ZONEID");
@@ -144,7 +271,7 @@ void Z_Free (void *ptr)
 		if (other == mainzone->rover)
 			mainzone->rover = block;
 	}
-#endif
+
 }
 
 
@@ -160,25 +287,25 @@ void *Z_Malloc (size_t size)
 //
 // tag malloc is never really used
 //	assert(_CrtCheckMemory());
-	void	*buf =  umm_malloc(size);
+	//void	*buf =  umm_malloc(size);
 //	void	*buf = malloc(size);
 //	_CrtMemState stat;
 //	_CrtMemCheckpoint(&stat);
 //	_CrtMemDumpStatistics(&stat);
 //	_checkpoints.emplace(buf, stat);
 //	assert(_CrtCheckMemory());
-#if 0
+
 	Z_CheckHeap();	// DEBUG
 
-	void	*buf = Z_TagMalloc (size, 1);
+	void	*buf = Z_TagMalloc (size, "Z_Malloc");
 	if (!buf)
 		Sys_Error ("Z_Malloc: failed on allocation of %i bytes",size);
 	Q_memset (buf, 0, size);
-#endif
+
 	return buf;
 }
 
-void *Z_TagMalloc (size_t size, int tag)
+void *Z_TagMalloc (size_t size, const void* tag)
 {
 	int		extra;
 	memblock_t	*start, *rover, *new_ptr, *base;
@@ -252,8 +379,11 @@ void Z_Print (memzone_t *zone)
 	
 	for (block = zone->blocklist.next ; ; block = block->next)
 	{
-		Con_Printf ("block:%p    size:%7i    tag:%3i\n",
-			block, block->size, block->tag);
+		const char* tag = block->tag ? (const char*)block->tag : "free";
+
+		Con_Printf ("block:%p    size:%7i    tag:%s\n",
+			block, block->size, (const char*)tag);
+
 		
 		if (block->next == &zone->blocklist)
 			break;			// all blocks have been hit	
@@ -288,7 +418,7 @@ void Z_CheckHeap (void)
 			Sys_Error ("Z_CheckHeap: two consecutive free blocks\n");
 	}
 }
-
+#endif
 //============================================================================
 
 #define	HUNK_SENTINAL	0x1df001ed

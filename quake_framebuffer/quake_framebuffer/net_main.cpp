@@ -835,10 +835,10 @@ void NET_Init (void)
 	}
 	net_hostport = DEFAULTnet_hostport;
 
-	if (host_parms.COM_CheckParm("-listen") || cls.state == ca_dedicated)
+	if (host_parms.COM_CheckParm("-listen") || quake::cls.state == ca_dedicated)
 		listening = true;
 	net_numsockets = svs.maxclientslimit;
-	if (cls.state != ca_dedicated)
+	if (quake::cls.state != ca_dedicated)
 		net_numsockets++;
 
 	SetNetTime();

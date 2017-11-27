@@ -18,8 +18,31 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // mathlib.h
+#ifndef _QUAKE_MATHLIB_H_
+#define _QUAKE_MATHLIB_H_
 
 typedef float vec_t;
+#if 0
+struct vec3_t {
+	union {
+		float data[3];
+		struct {
+			float x;
+			float y;
+			float z;
+		};
+	};
+	vec3_t() : data{ 0.0f, 0.0f, 0.0f } {}
+	vec3_t(float x, float y, float z) : data{ x, y, z} {}
+	float& operator[](size_t i) { return data[i]; }
+	const float& operator[](size_t i) const { return data[i]; }
+	
+};
+#endif
+
+#define	ANGLE2SHORT(x)	((int)((x)*65536/360) & 65535)
+#define	SHORT2ANGLE(x)	((x)*(360.0f/65536.0f))
+
 typedef vec_t vec3_t[3];
 typedef vec_t vec5_t[5];
 
@@ -88,3 +111,6 @@ float	anglemod(float a);
 	)										\
 	:										\
 		BoxOnPlaneSide( (emins), (emaxs), (p)))
+
+
+#endif

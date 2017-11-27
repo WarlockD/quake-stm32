@@ -260,7 +260,7 @@ Sbar_DrawPic
 */
 void Sbar_DrawPic (int x, int y, qpic_t *pic)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		Draw_Pic (x /* + ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 	else
 		Draw_Pic (x + ((vid.width - 320)>>1), y + (vid.height-SBAR_HEIGHT), pic);
@@ -273,7 +273,7 @@ Sbar_DrawTransPic
 */
 void Sbar_DrawTransPic (int x, int y, qpic_t *pic)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		Draw_TransPic (x /*+ ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 	else
 		Draw_TransPic (x + ((vid.width - 320)>>1), y + (vid.height-SBAR_HEIGHT), pic);
@@ -288,7 +288,7 @@ Draws one solid graphics character
 */
 void Sbar_DrawCharacter (int x, int y, int num)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		Draw_Character ( x /*+ ((vid.width - 320)>>1) */ + 4 , y + vid.height-SBAR_HEIGHT, num);
 	else
 		Draw_Character ( x + ((vid.width - 320)>>1) + 4 , y + vid.height-SBAR_HEIGHT, num);
@@ -301,7 +301,7 @@ Sbar_DrawString
 */
 void Sbar_DrawString (int x, int y, char *str)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		Draw_String (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
 	else
 		Draw_String (x + ((vid.width - 320)>>1), y+ vid.height-SBAR_HEIGHT, str);
@@ -395,9 +395,9 @@ void Sbar_SortFrags (void)
 
 // sort by frags
 	scoreboardlines = 0;
-	for (i=0 ; i<cl.maxclients ; i++)
+	for (i=0 ; i<quake::cl.maxclients ; i++)
 	{
-		if (cl.scores[i].name[0])
+		if (quake::cl.scores[i].name[0])
 		{
 			fragsort[scoreboardlines] = i;
 			scoreboardlines++;
@@ -406,7 +406,7 @@ void Sbar_SortFrags (void)
 
 	for (i=0 ; i<scoreboardlines ; i++)
 		for (j=0 ; j<scoreboardlines-1-i ; j++)
-			if (cl.scores[fragsort[j]].frags < cl.scores[fragsort[j+1]].frags)
+			if (quake::cl.scores[fragsort[j]].frags < quake::cl.scores[fragsort[j+1]].frags)
 			{
 				k = fragsort[j];
 				fragsort[j] = fragsort[j+1];
@@ -438,7 +438,7 @@ void Sbar_UpdateScoreboard (void)
 	for (i=0 ; i<scoreboardlines; i++)
 	{
 		k = fragsort[i];
-		s = &cl.scores[k];
+		s = &quake::cl.scores[k];
 		Q_sprintf (&scoreboardtext[i][1], "%3i %s", s->frags, s->name);
 
 		top = s->colors & 0xf0;
@@ -461,14 +461,14 @@ void Sbar_SoloScoreboard (void)
 	int		minutes, seconds, tens, units;
 	int		l;
 
-	Q_sprintf (str,"Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+	Q_sprintf (str,"Monsters:%3i /%3i", quake::cl.stats[STAT_MONSTERS], quake::cl.stats[STAT_TOTALMONSTERS]);
 	Sbar_DrawString (8, 4, str);
 
-	Q_sprintf (str,"Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
+	Q_sprintf (str,"Secrets :%3i /%3i", quake::cl.stats[STAT_SECRETS], quake::cl.stats[STAT_TOTALSECRETS]);
 	Sbar_DrawString (8, 12, str);
 
 // time
-	auto time = cl.time.seconds();
+	auto time = quake::cl.time.seconds();
 	minutes = (int)time / 60;
 	seconds = (int)time - 60 * minutes;
 	tens = seconds / 10;
@@ -477,8 +477,8 @@ void Sbar_SoloScoreboard (void)
 	Sbar_DrawString (184, 4, str);
 
 // draw level name
-	l = Q_strlen (cl.levelname);
-	Sbar_DrawString (232 - l*4, 12, cl.levelname);
+	l = Q_strlen (quake::cl.levelname);
+	Sbar_DrawString (232 - l*4, 12, quake::cl.levelname);
 }
 
 /*
@@ -489,7 +489,7 @@ Sbar_DrawScoreboard
 void Sbar_DrawScoreboard (void)
 {
 	Sbar_SoloScoreboard ();
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		Sbar_DeathmatchOverlay ();
 #if 0
 	int		i, j, c;
@@ -498,7 +498,7 @@ void Sbar_DrawScoreboard (void)
 	int		top, bottom;
 	scoreboard_t	*s;
 
-	if (cl.gametype != GAME_DEATHMATCH)
+	if (quake::cl.gametype != GAME_DEATHMATCH)
 	{
 		Sbar_SoloScoreboard ();
 		return;
@@ -513,7 +513,7 @@ void Sbar_DrawScoreboard (void)
 		x = 20*(i&1);
 		y = i/2 * 8;
 
-		s = &cl.scores[fragsort[i]];
+		s = &quake::cl.scores[fragsort[i]];
 		if (!s->name[0])
 			continue;
 
@@ -551,11 +551,11 @@ void Sbar_DrawInventory (void)
 	char	num[6];
 	idTime	time;
 	int		flashon;
-	long	isec = idCast<int>(cl.time);  
+	long	isec = idCast<int>(quake::cl.time);  
 
 	if (rogue)
 	{
-		if ( cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
+		if ( quake::cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
 			Sbar_DrawPic (0, -24, rsb_invbar[0]);
 		else
 			Sbar_DrawPic (0, -24, rsb_invbar[1]);
@@ -568,13 +568,13 @@ void Sbar_DrawInventory (void)
 // weapons
 	for (i=0 ; i<7 ; i++)
 	{
-		if (cl.items & (IT_SHOTGUN<<i) )
+		if (quake::cl.items & (IT_SHOTGUN<<i) )
 		{
-			time = cl.item_gettime[i];
-			flashon = static_cast<int>(idCast<float>(cl.time - time)*10.0f);
+			time = quake::cl.item_gettime[i];
+			flashon = static_cast<int>(idCast<float>(quake::cl.time - time)*10.0f);
 			if (flashon >= 10)
 			{
-				if ( cl.stats[STAT_ACTIVEWEAPON] == (IT_SHOTGUN<<i)  )
+				if ( quake::cl.stats[STAT_ACTIVEWEAPON] == (IT_SHOTGUN<<i)  )
 					flashon = 1;
 				else
 					flashon = 0;
@@ -596,13 +596,13 @@ void Sbar_DrawInventory (void)
       int grenadeflashing=0;
       for (i=0 ; i<4 ; i++)
       {
-         if (cl.items & (1<<hipweapons[i]) )
+         if (quake::cl.items & (1<<hipweapons[i]) )
          {
-            time = cl.item_gettime[hipweapons[i]];
-            flashon = static_cast<int>(idCast<float>(cl.time - time)*10.0f);
+            time = quake::cl.item_gettime[hipweapons[i]];
+            flashon = static_cast<int>(idCast<float>(quake::cl.time - time)*10.0f);
             if (flashon >= 10)
             {
-               if ( cl.stats[STAT_ACTIVEWEAPON] == (1<<hipweapons[i])  )
+               if ( quake::cl.stats[STAT_ACTIVEWEAPON] == (1<<hipweapons[i])  )
                   flashon = 1;
                else
                   flashon = 0;
@@ -613,7 +613,7 @@ void Sbar_DrawInventory (void)
             // check grenade launcher
             if (i==2)
             {
-               if (cl.items & HIT_PROXIMITY_GUN)
+               if (quake::cl.items & HIT_PROXIMITY_GUN)
                {
                   if (flashon)
                   {
@@ -624,7 +624,7 @@ void Sbar_DrawInventory (void)
             }
             else if (i==3)
             {
-               if (cl.items & (IT_SHOTGUN<<4))
+               if (quake::cl.items & (IT_SHOTGUN<<4))
                {
                   if (flashon && !grenadeflashing)
                   {
@@ -649,11 +649,11 @@ void Sbar_DrawInventory (void)
 	if (rogue)
 	{
     // check for powered up weapon.
-		if ( cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
+		if ( quake::cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
 		{
 			for (i=0;i<5;i++)
 			{
-				if (cl.stats[STAT_ACTIVEWEAPON] == (RIT_LAVA_NAILGUN << i))
+				if (quake::cl.stats[STAT_ACTIVEWEAPON] == (RIT_LAVA_NAILGUN << i))
 				{
 					Sbar_DrawPic ((i+2)*24, -16, rsb_weapons[i]);
 				}
@@ -664,7 +664,7 @@ void Sbar_DrawInventory (void)
 // ammo counts
 	for (i=0 ; i<4 ; i++)
 	{
-		Q_sprintf (num, "%3i",cl.stats[STAT_SHELLS+i] );
+		Q_sprintf (num, "%3i",quake::cl.stats[STAT_SHELLS+i] );
 		if (num[0] != ' ')
 			Sbar_DrawCharacter ( (6*i+1)*8 - 2, -24, 18 + num[0] - '0');
 		if (num[1] != ' ')
@@ -676,10 +676,10 @@ void Sbar_DrawInventory (void)
 	flashon = 0;
    // items
    for (i=0 ; i<6 ; i++)
-      if (cl.items & (1<<(17+i)))
+      if (quake::cl.items & (1<<(17+i)))
       {
-         time = cl.item_gettime[17+i];
-         if (time != idTime::zero() && time > (cl.time - 2s) && flashon )
+         time = quake::cl.item_gettime[17+i];
+         if (time != idTime::zero() && time > (quake::cl.time - 2s) && flashon )
          {  // flash frame
             sb_updates = 0;
          }
@@ -691,7 +691,7 @@ void Sbar_DrawInventory (void)
                Sbar_DrawPic (192 + i*16, -16, sb_items[i]);
             }
          }
-         if (time != idTime::zero() && time > (cl.time - 2s))
+         if (time != idTime::zero() && time > (quake::cl.time - 2s))
             sb_updates = 0;
       }
    //MED 01/04/97 added hipnotic items
@@ -699,10 +699,10 @@ void Sbar_DrawInventory (void)
    if (hipnotic)
    {
       for (i=0 ; i<2 ; i++)
-         if (cl.items & (1<<(24+i)))
+         if (quake::cl.items & (1<<(24+i)))
          {
-            time = cl.item_gettime[24+i];
-            if (time != idTime::zero() && time > (cl.time - 2s) && flashon )
+            time = quake::cl.item_gettime[24+i];
+            if (time != idTime::zero() && time > (quake::cl.time - 2s) && flashon )
             {  // flash frame
                sb_updates = 0;
             }
@@ -710,7 +710,7 @@ void Sbar_DrawInventory (void)
             {
                Sbar_DrawPic (288 + i*16, -16, hsb_items[i]);
             }
-            if (time != idTime::zero() && time > (cl.time - 2s))
+            if (time != idTime::zero() && time > (quake::cl.time - 2s))
                sb_updates = 0;
          }
    }
@@ -720,11 +720,11 @@ void Sbar_DrawInventory (void)
 	// new rogue items
 		for (i=0 ; i<2 ; i++)
 		{
-			if (cl.items & (1<<(29+i)))
+			if (quake::cl.items & (1<<(29+i)))
 			{
-				time = cl.item_gettime[29+i];
+				time = quake::cl.item_gettime[29+i];
 
-				if (time != idTime::zero() &&	(time > cl.time - 2s) && flashon )
+				if (time != idTime::zero() &&	(time > quake::cl.time - 2s) && flashon )
 				{	// flash frame
 					sb_updates = 0;
 				}
@@ -733,7 +733,7 @@ void Sbar_DrawInventory (void)
 					Sbar_DrawPic (288 + i*16, -16, rsb_items[i]);
 				}
 
-				if (time != idTime::zero() &&	time > (cl.time - 2s))
+				if (time != idTime::zero() &&	time > (quake::cl.time - 2s))
 					sb_updates = 0;
 			}
 		}
@@ -743,16 +743,16 @@ void Sbar_DrawInventory (void)
 	// sigils
 		for (i=0 ; i<4 ; i++)
 		{
-			if (cl.items & (1<<(28+i)))
+			if (quake::cl.items & (1<<(28+i)))
 			{
-				time = cl.item_gettime[28+i];
-				if (time != idTime::zero() &&	time > (cl.time - 2s) && flashon )
+				time = quake::cl.item_gettime[28+i];
+				if (time != idTime::zero() &&	time > (quake::cl.time - 2s) && flashon )
 				{	// flash frame
 					sb_updates = 0;
 				}
 				else
 					Sbar_DrawPic (320-32 + i*8, -16, sb_sigil[i]);
-				if (time != idTime::zero() &&	time > (cl.time - 2s))
+				if (time != idTime::zero() &&	time > (quake::cl.time - 2s))
 					sb_updates = 0;
 			}
 		}
@@ -781,7 +781,7 @@ void Sbar_DrawFrags (void)
 	l = scoreboardlines <= 4 ? scoreboardlines : 4;
 
 	x = 23;
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 		xofs = 0;
 	else
 		xofs = (vid.width - 320)>>1;
@@ -790,7 +790,7 @@ void Sbar_DrawFrags (void)
 	for (i=0 ; i<l ; i++)
 	{
 		k = fragsort[i];
-		s = &cl.scores[k];
+		s = &quake::cl.scores[k];
 		if (!s->name[0])
 			continue;
 
@@ -811,7 +811,7 @@ void Sbar_DrawFrags (void)
 		Sbar_DrawCharacter ( (x+2)*8 , -24, num[1]);
 		Sbar_DrawCharacter ( (x+3)*8 , -24, num[2]);
 
-		if (k == cl.viewentity - 1)
+		if (k == quake::cl.viewentity - 1)
 		{
 			Sbar_DrawCharacter (x*8+2, -24, 16);
 			Sbar_DrawCharacter ( (x+4)*8-4, -24, 17);
@@ -835,7 +835,7 @@ void Sbar_DrawFace (void)
 // PGM 01/19/97 - team color drawing
 // PGM 03/02/97 - fixed so color swatch only appears in CTF modes
 	if (rogue &&
-        (cl.maxclients != 1) &&
+        (quake::cl.maxclients != 1) &&
         (teamplay.value>3) &&
         (teamplay.value<7))
 	{
@@ -844,14 +844,14 @@ void Sbar_DrawFace (void)
 		char			num[12];
 		scoreboard_t	*s;
 		
-		s = &cl.scores[cl.viewentity - 1];
+		s = &quake::cl.scores[quake::cl.viewentity - 1];
 		// draw background
 		top = s->colors & 0xf0;
 		bottom = (s->colors & 15)<<4;
 		top = Sbar_ColorForMap (top);
 		bottom = Sbar_ColorForMap (bottom);
 
-		if (cl.gametype == GAME_DEATHMATCH)
+		if (quake::cl.gametype == GAME_DEATHMATCH)
 			xofs = 113;
 		else
 			xofs = ((vid.width - 320)>>1) + 113;
@@ -884,34 +884,34 @@ void Sbar_DrawFace (void)
 	}
 // PGM 01/19/97 - team color drawing
 
-	if ( (cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY) )
+	if ( (quake::cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY) )
 	== (IT_INVISIBILITY | IT_INVULNERABILITY) )
 	{
 		Sbar_DrawPic (112, 0, sb_face_invis_invuln);
 		return;
 	}
-	if (cl.items & IT_QUAD)
+	if (quake::cl.items & IT_QUAD)
 	{
 		Sbar_DrawPic (112, 0, sb_face_quad );
 		return;
 	}
-	if (cl.items & IT_INVISIBILITY)
+	if (quake::cl.items & IT_INVISIBILITY)
 	{
 		Sbar_DrawPic (112, 0, sb_face_invis );
 		return;
 	}
-	if (cl.items & IT_INVULNERABILITY)
+	if (quake::cl.items & IT_INVULNERABILITY)
 	{
 		Sbar_DrawPic (112, 0, sb_face_invuln);
 		return;
 	}
 
-	if (cl.stats[STAT_HEALTH] >= 100)
+	if (quake::cl.stats[STAT_HEALTH] >= 100)
 		f = 4;
 	else
-		f = cl.stats[STAT_HEALTH] / 20;
+		f = quake::cl.stats[STAT_HEALTH] / 20;
 
-	if (cl.time <= cl.faceanimtime)
+	if (quake::cl.time <= quake::cl.faceanimtime)
 	{
 		anim = 1;
 		sb_updates = 0;		// make sure the anim gets drawn over
@@ -944,11 +944,11 @@ void Sbar_Draw (void)
 	if (sb_lines > 24)
 	{
 		Sbar_DrawInventory ();
-		if (cl.maxclients != 1)
+		if (quake::cl.maxclients != 1)
 			Sbar_DrawFrags ();
 	}
 
-	if (sb_showscores || cl.stats[STAT_HEALTH] <= 0)
+	if (sb_showscores || quake::cl.stats[STAT_HEALTH] <= 0)
 	{
 		Sbar_DrawPic (0, 0, sb_scorebar);
 		Sbar_DrawScoreboard ();
@@ -962,13 +962,13 @@ void Sbar_Draw (void)
       //MED 01/04/97 moved keys here so they would not be overwritten
       if (hipnotic)
       {
-         if (cl.items & IT_KEY1)
+         if (quake::cl.items & IT_KEY1)
             Sbar_DrawPic (209, 3, sb_items[0]);
-         if (cl.items & IT_KEY2)
+         if (quake::cl.items & IT_KEY2)
             Sbar_DrawPic (209, 12, sb_items[1]);
       }
    // armor
-		if (cl.items & IT_INVULNERABILITY)
+		if (quake::cl.items & IT_INVULNERABILITY)
 		{
 			Sbar_DrawNum (24, 0, 666, 3, 1);
 			Sbar_DrawPic (0, 0, draw_disc);
@@ -977,24 +977,24 @@ void Sbar_Draw (void)
 		{
 			if (rogue)
 			{
-				Sbar_DrawNum (24, 0, cl.stats[STAT_ARMOR], 3,
-								cl.stats[STAT_ARMOR] <= 25);
-				if (cl.items & RIT_ARMOR3)
+				Sbar_DrawNum (24, 0, quake::cl.stats[STAT_ARMOR], 3,
+								quake::cl.stats[STAT_ARMOR] <= 25);
+				if (quake::cl.items & RIT_ARMOR3)
 					Sbar_DrawPic (0, 0, sb_armor[2]);
-				else if (cl.items & RIT_ARMOR2)
+				else if (quake::cl.items & RIT_ARMOR2)
 					Sbar_DrawPic (0, 0, sb_armor[1]);
-				else if (cl.items & RIT_ARMOR1)
+				else if (quake::cl.items & RIT_ARMOR1)
 					Sbar_DrawPic (0, 0, sb_armor[0]);
 			}
 			else
 			{
-				Sbar_DrawNum (24, 0, cl.stats[STAT_ARMOR], 3
-				, cl.stats[STAT_ARMOR] <= 25);
-				if (cl.items & IT_ARMOR3)
+				Sbar_DrawNum (24, 0, quake::cl.stats[STAT_ARMOR], 3
+				, quake::cl.stats[STAT_ARMOR] <= 25);
+				if (quake::cl.items & IT_ARMOR3)
 					Sbar_DrawPic (0, 0, sb_armor[2]);
-				else if (cl.items & IT_ARMOR2)
+				else if (quake::cl.items & IT_ARMOR2)
 					Sbar_DrawPic (0, 0, sb_armor[1]);
-				else if (cl.items & IT_ARMOR1)
+				else if (quake::cl.items & IT_ARMOR1)
 					Sbar_DrawPic (0, 0, sb_armor[0]);
 			}
 		}
@@ -1003,45 +1003,45 @@ void Sbar_Draw (void)
 		Sbar_DrawFace ();
 
 	// health
-		Sbar_DrawNum (136, 0, cl.stats[STAT_HEALTH], 3
-		, cl.stats[STAT_HEALTH] <= 25);
+		Sbar_DrawNum (136, 0, quake::cl.stats[STAT_HEALTH], 3
+		, quake::cl.stats[STAT_HEALTH] <= 25);
 
 	// ammo icon
 		if (rogue)
 		{
-			if (cl.items & RIT_SHELLS)
+			if (quake::cl.items & RIT_SHELLS)
 				Sbar_DrawPic (224, 0, sb_ammo[0]);
-			else if (cl.items & RIT_NAILS)
+			else if (quake::cl.items & RIT_NAILS)
 				Sbar_DrawPic (224, 0, sb_ammo[1]);
-			else if (cl.items & RIT_ROCKETS)
+			else if (quake::cl.items & RIT_ROCKETS)
 				Sbar_DrawPic (224, 0, sb_ammo[2]);
-			else if (cl.items & RIT_CELLS)
+			else if (quake::cl.items & RIT_CELLS)
 				Sbar_DrawPic (224, 0, sb_ammo[3]);
-			else if (cl.items & RIT_LAVA_NAILS)
+			else if (quake::cl.items & RIT_LAVA_NAILS)
 				Sbar_DrawPic (224, 0, rsb_ammo[0]);
-			else if (cl.items & RIT_PLASMA_AMMO)
+			else if (quake::cl.items & RIT_PLASMA_AMMO)
 				Sbar_DrawPic (224, 0, rsb_ammo[1]);
-			else if (cl.items & RIT_MULTI_ROCKETS)
+			else if (quake::cl.items & RIT_MULTI_ROCKETS)
 				Sbar_DrawPic (224, 0, rsb_ammo[2]);
 		}
 		else
 		{
-			if (cl.items & IT_SHELLS)
+			if (quake::cl.items & IT_SHELLS)
 				Sbar_DrawPic (224, 0, sb_ammo[0]);
-			else if (cl.items & IT_NAILS)
+			else if (quake::cl.items & IT_NAILS)
 				Sbar_DrawPic (224, 0, sb_ammo[1]);
-			else if (cl.items & IT_ROCKETS)
+			else if (quake::cl.items & IT_ROCKETS)
 				Sbar_DrawPic (224, 0, sb_ammo[2]);
-			else if (cl.items & IT_CELLS)
+			else if (quake::cl.items & IT_CELLS)
 				Sbar_DrawPic (224, 0, sb_ammo[3]);
 		}
 
-		Sbar_DrawNum (248, 0, cl.stats[STAT_AMMO], 3,
-					  cl.stats[STAT_AMMO] <= 10);
+		Sbar_DrawNum (248, 0, quake::cl.stats[STAT_AMMO], 3,
+					  quake::cl.stats[STAT_AMMO] <= 10);
 	}
 
 	if (vid.width > 320) {
-		if (cl.gametype == GAME_DEATHMATCH)
+		if (quake::cl.gametype == GAME_DEATHMATCH)
 			Sbar_MiniDeathmatchOverlay ();
 	}
 }
@@ -1112,7 +1112,7 @@ void Sbar_DeathmatchOverlay (void)
 	for (i=0 ; i<l ; i++)
 	{
 		k = fragsort[i];
-		s = &cl.scores[k];
+		s = &quake::cl.scores[k];
 		if (!s->name[0])
 			continue;
 
@@ -1133,7 +1133,7 @@ void Sbar_DeathmatchOverlay (void)
 		Draw_Character ( x+16 , y, num[1]);
 		Draw_Character ( x+24 , y, num[2]);
 
-		if (k == cl.viewentity - 1)
+		if (k == quake::cl.viewentity - 1)
 			Draw_Character ( x - 8, y, 12);
 
 #if 0
@@ -1142,7 +1142,7 @@ void Sbar_DeathmatchOverlay (void)
 	int				n, minutes, tens, units;
 
 	// draw time
-		total = cl.completed_time - s->entertime;
+		total = quake::cl.completed_time - s->entertime;
 		minutes = (int)total/60;
 		n = total - minutes*60;
 		tens = n/10;
@@ -1194,7 +1194,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 
 	//find us
 	for (i = 0; i < scoreboardlines; i++)
-		if (fragsort[i] == cl.viewentity - 1)
+		if (fragsort[i] == quake::cl.viewentity - 1)
 			break;
 
     if (i == scoreboardlines) // we're not there
@@ -1211,7 +1211,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 	for (/* */; i < scoreboardlines && y < (int)vid.height - 8 ; i++)
 	{
 		k = fragsort[i];
-		s = &cl.scores[k];
+		s = &quake::cl.scores[k];
 		if (!s->name[0])
 			continue;
 
@@ -1232,7 +1232,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 		Draw_Character ( x+16 , y, num[1]);
 		Draw_Character ( x+24 , y, num[2]);
 
-		if (k == cl.viewentity - 1) {
+		if (k == quake::cl.viewentity - 1) {
 			Draw_Character ( x, y, 16);
 			Draw_Character ( x + 32, y, 17);
 		}
@@ -1243,7 +1243,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 	int				n, minutes, tens, units;
 
 	// draw time
-		total = cl.completed_time - s->entertime;
+		total = quake::cl.completed_time - s->entertime;
 		minutes = (int)total/60;
 		n = total - minutes*60;
 		tens = n/10;
@@ -1277,7 +1277,7 @@ void Sbar_IntermissionOverlay (void)
 	scr_copyeverything = 1;
 	scr_fullupdate = 0;
 
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (quake::cl.gametype == GAME_DEATHMATCH)
 	{
 		Sbar_DeathmatchOverlay ();
 		return;
@@ -1290,20 +1290,20 @@ void Sbar_IntermissionOverlay (void)
 	Draw_TransPic (0, 56, pic);
 
 // time
-	dig = cl.completed_time/60;
+	dig = quake::cl.completed_time/60;
 	Sbar_IntermissionNumber (160, 64, dig, 3, 0);
-	num = cl.completed_time - dig*60;
+	num = quake::cl.completed_time - dig*60;
 	Draw_TransPic (234,64,sb_colon);
 	Draw_TransPic (246,64,sb_nums[0][num/10]);
 	Draw_TransPic (266,64,sb_nums[0][num%10]);
 
-	Sbar_IntermissionNumber (160, 104, cl.stats[STAT_SECRETS], 3, 0);
+	Sbar_IntermissionNumber (160, 104, quake::cl.stats[STAT_SECRETS], 3, 0);
 	Draw_TransPic (232,104,sb_slash);
-	Sbar_IntermissionNumber (240, 104, cl.stats[STAT_TOTALSECRETS], 3, 0);
+	Sbar_IntermissionNumber (240, 104, quake::cl.stats[STAT_TOTALSECRETS], 3, 0);
 
-	Sbar_IntermissionNumber (160, 144, cl.stats[STAT_MONSTERS], 3, 0);
+	Sbar_IntermissionNumber (160, 144, quake::cl.stats[STAT_MONSTERS], 3, 0);
 	Draw_TransPic (232,144,sb_slash);
-	Sbar_IntermissionNumber (240, 144, cl.stats[STAT_TOTALMONSTERS], 3, 0);
+	Sbar_IntermissionNumber (240, 144, quake::cl.stats[STAT_TOTALMONSTERS], 3, 0);
 
 }
 

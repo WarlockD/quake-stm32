@@ -499,12 +499,13 @@
 
 #ifndef UMM_MALLOC_CFG__DONT_BUILD
 
-
+#if 0
 static int stupid_lock = 0;
 int test_and_set() { int lock = stupid_lock; stupid_lock = 1; return lock; }
 
 #undef UMM_CRITICAL_ENTRY
 #undef UMM_CRITICAL_EXIT
+
 
 void UMM_CRITICAL_ENTRY() {
 	while (test_and_set());
@@ -513,7 +514,7 @@ void UMM_CRITICAL_ENTRY() {
 void UMM_CRITICAL_EXIT() {
 	while(stupid_lock) stupid_lock = 0;
 }
-
+#endif
 #ifndef UMM_FIRST_FIT
 #  ifndef UMM_BEST_FIT
 #    define UMM_BEST_FIT

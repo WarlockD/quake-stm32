@@ -693,6 +693,76 @@ float FloatNoSwap (float f)
 Handles byte ordering and avoids alignment errors
 ==============================================================================
 */
+// reading functions
+
+
+
+float	sizebuf_t::ReadFloat() {
+	union {
+		float	f;
+		int	l;
+	} dat;
+
+	if (Read(dat.l)) {
+		dat.l = LittleLong(dat.l);
+		return dat.f;
+	}
+	return -1;
+}
+
+void	sizebuf_t::ReadString(quake::string& str) {
+	str.reserve(256);
+	str.clear();
+	while (_cursize < _read_count) {
+		int c = _data[_read_count++];
+		if (c == 0 || c == -1) break;
+		if (str.size() + 1 >= str.capacity()) {
+			str.reserve(str.capacity() + 256);
+		}
+		str.push_back(c);
+	}
+}
+void	sizebuf_t::ReadStringLine(quake::string& str) {
+	str.reserve(256);
+	str.clear();
+	while (_cursize < _read_count) {
+		int c = _data[_read_count++];
+		if (c == 0 || c == -1 || c == '\n') break;
+		if (str.size() + 1 >= str.capacity()) {
+			str.reserve(str.capacity() + 256);
+		}
+		str.push_back(c);
+	}
+
+}
+
+
+
+
+//void	MSG_ReadDeltaUsercmd( struct usercmd_s *from, struct usercmd_s *cmd);
+
+void	sizebuf_t::ReadDir(vec3_t& vector) {
+	assert(0);
+#ifdef QUAKE2
+	int		b;
+
+	b = ReadByte();
+	if (b >= NUMVERTEXNORMALS)
+		quake::com << "MSF_ReadDir: out of range" << std::endl;
+		//Com_Error(ERR_DROP, "MSF_ReadDir: out of range");
+	VectorCopy(bytedirs[b], vector);
+#endif
+}
+
+size_t	sizebuf_t::ReadData(void *buffer, int len) {
+	uint8_t* data = reinterpret_cast<uint8_t*>(buffer);
+	while (len--) {
+		int c = ReadByte();
+		if (c == -1) break;
+		*data++ = c;
+	}
+	return (size_t)(data - reinterpret_cast<uint8_t*>(buffer));
+}
 
 //
 // writing functions
@@ -937,7 +1007,7 @@ void sizebuf_t::Print(char c) {
 }
 
 
-void sizebuf_t::Clear() { _cursize = 0; }
+void sizebuf_t::Clear() { _cursize = 0; _read_count=0U; }
 void sizebuf_t::Free() { assert(_hunk_low_used); Hunk_FreeToLowMark(_hunk_low_used);  _hunk_low_used = 0; _cursize = 0; _capacity = 0;   }
 void sizebuf_t::Alloc(size_t startsize) {
 	assert(!_hunk_low_used);
@@ -946,6 +1016,7 @@ void sizebuf_t::Alloc(size_t startsize) {
 	_data = (byte*)Hunk_AllocName(startsize, "sizebuf");
 	_capacity = startsize;
 	_cursize = 0;
+	_read_count = 0U;
 }
 
 void sizebuf_t::Write(const void* data, size_t length) {
@@ -1198,11 +1269,11 @@ void COM_CheckRegistered (void)
 {
 	unsigned short  check[128];
 	size_t                     i;
-
-	auto h = COM_FindFile("gfx/pop.lmp");
+	std::fstream h;
+	size_t length = COM_FindFile("gfx/pop.lmp", h);
 	static_registered = 0;
 
-	if (!h.is_open())
+	if (!length)
 	{
 #if WINDED
 	Sys_Error ("This dedicated server requires a full registered copy of Quake");
@@ -2219,11 +2290,10 @@ Sets com_filesize and one of handle or file
 */
 
 
-quake::iofstream COM_FindFile(const quake::string_view& filename)
+size_t COM_FindFile(const quake::string_view& filename, std::fstream& stream)
 {
 	quake::fixed_string_stream<MAX_OSPATH>   cachepath;
 	quake::fixed_string_stream<MAX_OSPATH>   netpath;
-	quake::iofstream stream;
 #if 0
 	if (file && handle)
 		Sys_Error("COM_FindFile: both handle and file set");
@@ -2237,9 +2307,9 @@ quake::iofstream COM_FindFile(const quake::string_view& filename)
 	if (it != com_packfilesearch.end()) { // its a pack file
 		auto& pfile = it->second.get();		
 	//	quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
-		stream.set_offset(pfile.offset, pfile.length);
-		stream.open(pfile.pack->filename);
-		assert(stream.is_open());
+		stream.open(pfile.pack->filename, std::ifstream::binary | std::ifstream::in);
+		stream.seekg(pfile.offset);
+		return pfile.length;
 	}
 	else { // not a pack file
 		// hack for now
@@ -2247,8 +2317,12 @@ quake::iofstream COM_FindFile(const quake::string_view& filename)
 			netpath.clear();
 			netpath << path << '/' << filename;
 			auto test = netpath.str();
-			stream.open(test.c_str());
-			if (stream.is_open()) break;
+			stream.open(test.c_str(), std::ifstream::binary | std::ifstream::in | std::ifstream::ate);
+			if (stream.is_open()) {
+				size_t len = stream.tellg();
+				stream.seekg(0);
+				return len;
+			}
 #if 0
 			findtime = Sys_FileTime(netpath.data());
 			if (findtime == -1) continue;
@@ -2259,11 +2333,10 @@ quake::iofstream COM_FindFile(const quake::string_view& filename)
 #endif
 		}
 	}
-	if (!stream.is_open()) 
-		 quake::con << "FindFile: can't find " << filename << std::endl;
+	quake::con << "FindFile: can't find " << filename << std::endl;
 
 
-	return stream;
+	return 0;
 }
 
 
@@ -2302,11 +2375,11 @@ int             loadsize;
 static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 {
 	byte    *buf = nullptr;  // quiet compiler warning
-	size_t len;
 // look for it in the filesystem or pack files
-	auto is = COM_FindFile(path);
-	if (!is.is_open()) return nullptr;
-	len = is.file_length();
+	std::fstream is;
+	size_t len = COM_FindFile(path, is);
+	if (!len) return nullptr;
+
 // extract the filename base name for hunk tag
 	auto base = COM_FileBase (path);
 	

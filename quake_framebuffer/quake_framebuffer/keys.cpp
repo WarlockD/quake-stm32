@@ -168,7 +168,7 @@ void Key_Console (int key)
 		history_line = edit_line;
 		key_lines[edit_line][0] = ']';
 		key_linepos = 1;
-		if (cls.state == ca_disconnected)
+		if (quake::cls.state == ca_disconnected)
 			SCR_UpdateScreen ();	// force an update, because the command
 									// may take some time
 		return;
@@ -657,7 +657,7 @@ void Key_Event (int key, qboolean down)
 //
 // during demo playback, most keys bring up the main menu
 //
-	if (cls.demoplayback && down && consolekeys[key] && key_dest == key_game)
+	if (quake::cls.demoplayback && down && consolekeys[key] && key_dest == key_game)
 	{
 		M_ToggleMenu ();
 		return;

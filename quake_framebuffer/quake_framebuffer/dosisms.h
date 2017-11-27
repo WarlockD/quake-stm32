@@ -65,7 +65,7 @@ typedef union {
 		unsigned char res[4];
 		unsigned char bl, bh, ebx_b2, ebx_b3;
 		unsigned char dl, dh, edx_b2, edx_b3;
-		unsigned char cl, ch, ecx_b2, ecx_b3;
+		unsigned char quake::cl, ch, ecx_b2, ecx_b3;
 		unsigned char al, ah, eax_b2, eax_b3;
 	} h;
 } regs_t;

@@ -31,7 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // global refresh variables
 //-------------------------------------------------------
 
-// FIXME: make into one big structure, like cl or sv
+// FIXME: make into one big structure, like quake::cl or sv
 // FIXME: do separately for refresh engine and driver
 
 float	d_sdivzstepu, d_tdivzstepu, d_zistepu;

@@ -162,7 +162,7 @@ void R_TimeGraph (void)
 //a = (int)((r_refdef.vieworg[2] + 1024)/1)%(int)r_graphheight.value;
 //a = fabs(velocity[0])/20;
 //a = ((int)fabs(origin[0])/8)%20;
-//a = (cl.idealpitch + 30)/5;
+//a = (quake::cl.idealpitch + 30)/5;
 	r_timings[timex] = a;
 	a = timex;
 
@@ -370,7 +370,7 @@ void R_SetupFrame (void)
 	float			w, h;
 
 // don't allow cheats in multiplayer
-	if (cl.maxclients > 1)
+	if (quake::cl.maxclients > 1)
 	{
 		Cvar_Set ("r_draworder", "0");
 		Cvar_Set ("r_fullbright", "0");
@@ -432,7 +432,7 @@ r_refdef.viewangles[2]=    0;
 
 // current viewleaf
 	r_oldviewleaf = r_viewleaf;
-	r_viewleaf = Mod_PointInLeaf (r_origin, cl.worldmodel);
+	r_viewleaf = Mod_PointInLeaf (r_origin, quake::cl.worldmodel);
 
 	r_dowarpold = r_dowarp;
 	r_dowarp = r_waterwarp.value && (r_viewleaf->contents <= CONTENTS_WATER);

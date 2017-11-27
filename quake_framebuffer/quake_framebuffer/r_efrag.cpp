@@ -76,8 +76,8 @@ void R_RemoveEfrags (entity_t *ent)
 		ef = ef->entnext;
 		
 	// put it on the free list
-		old->entnext = cl.free_efrags;
-		cl.free_efrags = old;
+		old->entnext = quake::cl.free_efrags;
+		quake::cl.free_efrags = old;
 	}
 	
 	ent->efrag = NULL; 
@@ -110,13 +110,13 @@ void R_SplitEntityOnNode (mnode_t *node)
 		leaf = (mleaf_t *)node;
 
 // grab an efrag off the free list
-		ef = cl.free_efrags;
+		ef = quake::cl.free_efrags;
 		if (!ef)
 		{
 			Con_Printf ("Too many efrags!\n");
 			return;		// no free fragments...
 		}
-		cl.free_efrags = cl.free_efrags->entnext;
+		quake::cl.free_efrags = quake::cl.free_efrags->entnext;
 
 		ef->entity = r_addent;
 		
@@ -223,7 +223,7 @@ void R_AddEfrags (entity_t *ent)
 		r_emaxs[i] = ent->origin[i] + entmodel->maxs[i];
 	}
 
-	R_SplitEntityOnNode (cl.worldmodel->nodes);
+	R_SplitEntityOnNode (quake::cl.worldmodel->nodes);
 
 	ent->topnode = r_pefragtopnode;
 }

@@ -325,7 +325,7 @@ GLFWbool _glfwRefreshContextAttribs(const _GLFWctxconfig* ctxconfig)
     const char* prefixes[] =
     {
         "OpenGL ES-CM ",
-        "OpenGL ES-CL ",
+        "OpenGL ES-quake::cl ",
         "OpenGL ES ",
         NULL
     };

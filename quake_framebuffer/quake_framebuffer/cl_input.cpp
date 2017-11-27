@@ -17,7 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-// cl.input.c  -- builds an intended movement command to send to the server
+// quake::cl.input.c  -- builds an intended movement command to send to the server
 
 // Quake is a trademark of Id Software, Inc., (c) 1996 Id Software, Inc. All
 // rights reserved.
@@ -237,35 +237,35 @@ void CL_AdjustAngles (void)
 
 	if (!(in_strafe.state & 1))
 	{
-		cl.viewangles[YAW] -= speed*cl_yawspeed.value*CL_KeyState (&in_right);
-		cl.viewangles[YAW] += speed*cl_yawspeed.value*CL_KeyState (&in_left);
-		cl.viewangles[YAW] = anglemod(cl.viewangles[YAW]);
+		quake::cl.viewangles[YAW] -= speed*cl_yawspeed.value*CL_KeyState (&in_right);
+		quake::cl.viewangles[YAW] += speed*cl_yawspeed.value*CL_KeyState (&in_left);
+		quake::cl.viewangles[YAW] = anglemod(quake::cl.viewangles[YAW]);
 	}
 	if (in_klook.state & 1)
 	{
 		V_StopPitchDrift ();
-		cl.viewangles[PITCH] -= speed*cl_pitchspeed.value * CL_KeyState (&in_forward);
-		cl.viewangles[PITCH] += speed*cl_pitchspeed.value * CL_KeyState (&in_back);
+		quake::cl.viewangles[PITCH] -= speed*cl_pitchspeed.value * CL_KeyState (&in_forward);
+		quake::cl.viewangles[PITCH] += speed*cl_pitchspeed.value * CL_KeyState (&in_back);
 	}
 	
 	up = CL_KeyState (&in_lookup);
 	down = CL_KeyState(&in_lookdown);
 	
-	cl.viewangles[PITCH] -= speed*cl_pitchspeed.value * up;
-	cl.viewangles[PITCH] += speed*cl_pitchspeed.value * down;
+	quake::cl.viewangles[PITCH] -= speed*cl_pitchspeed.value * up;
+	quake::cl.viewangles[PITCH] += speed*cl_pitchspeed.value * down;
 
 	if (up || down)
 		V_StopPitchDrift ();
 		
-	if (cl.viewangles[PITCH] > 80)
-		cl.viewangles[PITCH] = 80;
-	if (cl.viewangles[PITCH] < -70)
-		cl.viewangles[PITCH] = -70;
+	if (quake::cl.viewangles[PITCH] > 80)
+		quake::cl.viewangles[PITCH] = 80;
+	if (quake::cl.viewangles[PITCH] < -70)
+		quake::cl.viewangles[PITCH] = -70;
 
-	if (cl.viewangles[ROLL] > 50)
-		cl.viewangles[ROLL] = 50;
-	if (cl.viewangles[ROLL] < -50)
-		cl.viewangles[ROLL] = -50;
+	if (quake::cl.viewangles[ROLL] > 50)
+		quake::cl.viewangles[ROLL] = 50;
+	if (quake::cl.viewangles[ROLL] < -50)
+		quake::cl.viewangles[ROLL] = -50;
 		
 }
 
@@ -278,7 +278,7 @@ Send the intended movement message to the server
 */
 void CL_BaseMove (usercmd_t *cmd)
 {	
-	if (cls.signon != SIGNONS)
+	if (quake::cls.signon != SIGNONS)
 		return;
 			
 	CL_AdjustAngles ();
@@ -314,7 +314,7 @@ void CL_BaseMove (usercmd_t *cmd)
 	}
 
 #ifdef QUAKE2
-	cmd->lightlevel = cl.light_level;
+	cmd->lightlevel = quake::cl.light_level;
 #endif
 }
 
@@ -333,17 +333,17 @@ void CL_SendMove (usercmd_t *cmd)
 	byte	data[128];
 	sizebuf_t	buf(data, sizeof(data));
 
-	cl.cmd = *cmd;
+	quake::cl.cmd = *cmd;
 
 //
 // send the movement message
 //
     buf.WriteByte(clc_move);
 
-	buf.WriteFloat(idCast<float>(cl.mtime[0]));	// so server can get ping times
+	buf.WriteFloat(idCast<float>(quake::cl.mtime[0]));	// so server can get ping times
 
 	for (i=0 ; i<3 ; i++)
-		buf.WriteAngle(cl.viewangles[i]);
+		buf.WriteAngle(quake::cl.viewangles[i]);
 	
     buf.WriteShort(cmd->forwardmove);
     buf.WriteShort(cmd->sidemove);
@@ -377,20 +377,20 @@ void CL_SendMove (usercmd_t *cmd)
 //
 // deliver the message
 //
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 		return;
 
 //
 // allways dump the first two message, because it may contain leftover inputs
 // from the last level
 //
-	if (++cl.movemessages <= 2)
+	if (++quake::cl.movemessages <= 2)
 		return;
 	
-	if (NET_SendUnreliableMessage (cls.netcon, &buf) == -1)
+	if (NET_SendUnreliableMessage (quake::cls.netcon, &buf) == -1)
 	{
 		Con_Printf ("CL_SendMove: lost server connection\n");
-		CL_Disconnect ();
+		quake::cls.disconnect();
 	}
 }
 

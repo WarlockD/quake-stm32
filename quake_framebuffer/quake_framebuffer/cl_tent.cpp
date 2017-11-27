@@ -88,7 +88,7 @@ void CL_ParseBeam (model_t *m)
 		{
 			b->entity = ent;
 			b->model = m;
-			b->endtime = cl.time + 200ms;
+			b->endtime = quake::cl.time + 200ms;
 			VectorCopy (start, b->start);
 			VectorCopy (end, b->end);
 			return;
@@ -97,11 +97,11 @@ void CL_ParseBeam (model_t *m)
 // find a free beam
 	for (i=0, b=cl_beams ; i< MAX_BEAMS ; i++, b++)
 	{
-		if (!b->model || b->endtime < cl.time)
+		if (!b->model || b->endtime < quake::cl.time)
 		{
 			b->entity = ent;
 			b->model = m;
-			b->endtime = cl.time + 200ms;
+			b->endtime = quake::cl.time + 200ms;
 			VectorCopy (start, b->start);
 			VectorCopy (end, b->end);
 			return;
@@ -202,7 +202,7 @@ void CL_ParseTEnt (void)
 		dl = CL_AllocDlight (0);
 		VectorCopy (pos, dl->origin);
 		dl->radius = 350;
-		dl->die = cl.time + 500ms;
+		dl->die = quake::cl.time + 500ms;
 		dl->decay = 300;
 		S_StartSound (-1, 0, cl_sfx_r_exp3, pos, 1, 1);
 		break;
@@ -258,7 +258,7 @@ void CL_ParseTEnt (void)
 		dl = CL_AllocDlight (0);
 		VectorCopy (pos, dl->origin);
 		dl->radius = 350;
-		dl->die = cl.time + 500ms;
+		dl->die = quake::cl.time + 500ms;
 		dl->decay = 300;
 		S_StartSound (-1, 0, cl_sfx_r_exp3, pos, 1, 1);
 		break;
@@ -285,7 +285,7 @@ void CL_ParseTEnt (void)
 		dl = CL_AllocDlight (-1);
 		VectorCopy (endpos, dl->origin);
 		dl->radius = 350;
-		dl->die = cl.time + 0.5;
+		dl->die = quake::cl.time + 0.5;
 		dl->decay = 300;
 		break;
 #endif
@@ -340,13 +340,13 @@ void CL_UpdateTEnts (void)
 // update lightning
 	for (i=0, b=cl_beams ; i< MAX_BEAMS ; i++, b++)
 	{
-		if (!b->model || b->endtime < cl.time)
+		if (!b->model || b->endtime < quake::cl.time)
 			continue;
 
 	// if coming from the player, update the start position
-		if (b->entity == cl.viewentity)
+		if (b->entity == quake::cl.viewentity)
 		{
-			VectorCopy (cl_entities[cl.viewentity].origin, b->start);
+			VectorCopy (cl_entities[quake::cl.viewentity].origin, b->start);
 		}
 
 	// calculate pitch and yaw

@@ -31,7 +31,7 @@ DEMO CODE
 When a demo is playing back, all NET_SendMessages are skipped, and
 NET_GetMessages are read from the demo file.
 
-Whenever cl.time gets past the last received message, another message is
+Whenever quake::cl.time gets past the last received message, another message is
 read from the demo file.
 ==============================================================================
 */
@@ -43,16 +43,16 @@ CL_StopPlayback
 Called when a demo file runs out, or the user starts a game
 ==============
 */
-void CL_StopPlayback (void)
+void client_static_t::stop_playback(void)
 {
-	if (!cls.demoplayback)
+	if (!demoplayback)
 		return;
 
-	cls.demofile.close();
-	cls.demoplayback = false;
-	cls.state = ca_disconnected;
+	demofile.close();
+	demoplayback = false;
+	state = ca_disconnected;
 
-	if (cls.timedemo)
+	if (timedemo)
 		CL_FinishTimeDemo ();
 }
 
@@ -67,12 +67,12 @@ void CL_WriteDemoMessage (void)
 {
 	int		len;
 	int		i;
-	id_little_binary_writer bw(cls.demofile);
+	id_little_binary_writer bw(quake::cls.demofile);
 	bw << net_message.size();
 	for (i = 0; i < 3; i++)
-		bw << cl.viewangles[i];
+		bw << quake::cl.viewangles[i];
 	bw.write(net_message.data(), net_message.size());
-	cls.demofile.flush();
+	quake::cls.demofile.flush();
 }
 
 /*
@@ -86,39 +86,39 @@ int CL_GetMessage (void)
 {
 	int		r, i;
 	
-	if	(cls.demoplayback)
+	if	(quake::cls.demoplayback)
 	{
 	// decide if it is time to grab the next message		
-		if (cls.signon == SIGNONS)	// allways grab until fully connected
+		if (quake::cls.signon == SIGNONS)	// allways grab until fully connected
 		{
-			if (cls.timedemo)
+			if (quake::cls.timedemo)
 			{
-				if (host_framecount == cls.td_lastframe)
+				if (host_framecount == quake::cls.td_lastframe)
 					return 0;		// allready read this frame's message
-				cls.td_lastframe = host_framecount;
+				quake::cls.td_lastframe = host_framecount;
 			// if this is the second frame, grab the real td_starttime
 			// so the bogus time on the first frame doesn't count
-				if (host_framecount == cls.td_startframe + 1)
-					cls.td_starttime = realtime;
+				if (host_framecount == quake::cls.td_startframe + 1)
+					quake::cls.td_starttime = realtime;
 			}
-			else if ( /* cl.time > 0 && */ cl.time <= cl.mtime[0])
+			else if ( /* quake::cl.time > 0 && */ quake::cl.time <= quake::cl.mtime[0])
 			{
 					return 0;		// don't need another message yet
 			}
 		}
-		id_little_binary_reader br(cls.demofile);
+		id_little_binary_reader br(quake::cls.demofile);
 		br >> i;
 		net_message.resize(i);
-		VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
+		VectorCopy (quake::cl.mviewangles[0], quake::cl.mviewangles[1]);
 		for (i = 0; i < 3; i++)
-			br >> cl.mviewangles[0][i];
+			br >> quake::cl.mviewangles[0][i];
 
 		if (net_message.size() > MAX_MSGLEN)
 			Sys_Error ("Demo message > MAX_MSGLEN");
 		br.read(net_message.data(), net_message.size());
-		if (!cls.demofile)
+		if (!quake::cls.demofile.is_open())
 		{
-			CL_StopPlayback ();
+			quake::cls.stop_playback();
 			return 0;
 		}
 	
@@ -127,7 +127,7 @@ int CL_GetMessage (void)
 
 	while (1)
 	{
-		r = NET_GetMessage (cls.netcon);
+		r = NET_GetMessage (quake::cls.netcon);
 		
 		if (r != 1 && r != 2)
 			return r;
@@ -139,7 +139,7 @@ int CL_GetMessage (void)
 			break;
 	}
 
-	if (cls.demorecording)
+	if (quake::cls.demorecording)
 		CL_WriteDemoMessage ();
 	
 	return r;
@@ -153,8 +153,8 @@ CL_Stop_f
 stop recording a demo
 ====================
 */
-void CL_Stop() {
-	if (!cls.demorecording)
+void client_static_t::stop() {
+	if (!demorecording)
 	{
 		Con_Printf("Not recording a demo.\n");
 		return;
@@ -166,15 +166,16 @@ void CL_Stop() {
 	CL_WriteDemoMessage();
 
 	// finish up
-	cls.demofile.close();
-	cls.demorecording = false;
-	Con_Printf("Completed demo\n");
+	demofile.close();
+	demorecording = false;
+	quake::con << "Completed demo" << std::endl;
 }
 void CL_Stop_f (cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	if (source != src_command)
 		return;
-	CL_Stop();
+	quake::cls.stop();
+
 }
 
 /*
@@ -206,7 +207,7 @@ void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view arg
 		return;
 	}
 
-	if (c == 2 && cls.state == ca_connected)
+	if (c == 2 && quake::cls.state == ca_connected)
 	{
 		Con_Printf("Can not record - already connected to server\nClient demo recording must be started before connecting\n");
 		return;
@@ -216,7 +217,7 @@ void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view arg
 	if (c == 4)
 	{
 		track = Q_atoi(args[3]);
-		Con_Printf ("Forcing CD track to %i\n", cls.forcetrack);
+		Con_Printf ("Forcing CD track to %i\n", quake::cls.forcetrack);
 	}
 	else
 		track = -1;	
@@ -243,16 +244,16 @@ void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view arg
 	COM_DefaultExtension (name, ".dem");
 
 	Con_Printf ("recording to %s.\n", name.c_str());
-	cls.demofile.open(name.c_str(), std::ios_base::out);
-	if (!cls.demofile)
+	quake::cls.demofile.open(name.c_str(), std::ios_base::out);
+	if (!quake::cls.demofile)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
 		return;
 	}
-	cls.demofile << cls.forcetrack << '\n';
-	cls.demofile.flush();
+	quake::cls.demofile << quake::cls.forcetrack << '\n';
+	quake::cls.demofile.flush();
 	
-	cls.demorecording = true;
+	quake::cls.demorecording = true;
 }
 
 
@@ -281,7 +282,7 @@ void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view ar
 //
 // disconnect from server
 //
-	CL_Disconnect ();
+	quake::cls.disconnect();
 	
 //
 // open the demo file
@@ -292,31 +293,31 @@ void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view ar
 	COM_DefaultExtension (name, ".dem");
 	
 
-	cls.demofile = COM_FindFile(name.c_str());
-	if (!cls.demofile.is_open())
+	size_t len = COM_FindFile(name.c_str(), quake::cls.demofile);
+	if (!quake::cls.demofile.is_open())
 	{
 		quake::con << "ERROR: couldn't open demo " << name << std::endl;
-		cls.demonum = -1;		// stop demo loop
+		quake::cls.demonum = -1;		// stop demo loop
 		return;
 	}
 	else {
 		quake::con << "Playing demo from " << name << std::endl;
 	}
 
-	cls.demoplayback = true;
-	cls.state = ca_connected;
-	cls.forcetrack = 0;
+	quake::cls.demoplayback = true;
+	quake::cls.state = ca_connected;
+	quake::cls.forcetrack = 0;
 
-	while ((c = cls.demofile.get()) != '\n')
+	while ((c = quake::cls.demofile.get()) != '\n')
 		if (c == '-')
 			neg = true;
 		else
-			cls.forcetrack = cls.forcetrack * 10 + (c - '0');
+			quake::cls.forcetrack = quake::cls.forcetrack * 10 + (c - '0');
 
 	if (neg)
-		cls.forcetrack = -cls.forcetrack;
+		quake::cls.forcetrack = -quake::cls.forcetrack;
 // ZOID, fscanf is evil
-//	fscanf (cls.demofile, "%i\n", &cls.forcetrack);
+//	fscanf (quake::cls.demofile, "%i\n", &quake::cls.forcetrack);
 }
 
 /*
@@ -330,11 +331,11 @@ void CL_FinishTimeDemo (void)
 	int		frames;
 	idTime	time;
 	
-	cls.timedemo = false;
+	quake::cls.timedemo = false;
 	
 // the first frame didn't count
-	frames = (host_framecount - cls.td_startframe) - 1;
-	time = realtime - cls.td_starttime;
+	frames = (host_framecount - quake::cls.td_startframe) - 1;
+	time = realtime - quake::cls.td_starttime;
 	if (time != idTime::zero())
 		time = 1s;
 	Con_Printf ("%i frames %5.1f seconds %5.1f fps\n", frames, idCast<float>(time), frames/ idCast<float>(time));
@@ -360,11 +361,11 @@ void CL_TimeDemo_f(cmd_source_t source, size_t argc, const quake::string_view ar
 
 	CL_PlayDemo_f (source,argc, args);
 	
-// cls.td_starttime will be grabbed at the second frame of the demo, so
+// quake::cls.td_starttime will be grabbed at the second frame of the demo, so
 // all the loading time doesn't get counted
 	
-	cls.timedemo = true;
-	cls.td_startframe = host_framecount;
-	cls.td_lastframe = -1;		// get a new message this frame
+	quake::cls.timedemo = true;
+	quake::cls.td_startframe = host_framecount;
+	quake::cls.td_lastframe = -1;		// get a new message this frame
 }
 

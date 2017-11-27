@@ -89,7 +89,7 @@ float V_CalcRoll (vec3_t angles, vec3_t velocity)
 	side = fabs(side);
 	
 	value = cl_rollangle.value;
-//	if (cl.inwater)
+//	if (quake::cl.inwater)
 //		value *= 6;
 
 	if (side < cl_rollspeed.value)
@@ -113,7 +113,7 @@ float V_CalcBob (void)
 	float	bob;
 	float	cycle;
 	
-	cycle = idCast<float>(cl.time) - (int)(idCast<float>(cl.time)/cl_bobcycle.value)*cl_bobcycle.value;
+	cycle = idCast<float>(quake::cl.time) - (int)(idCast<float>(quake::cl.time)/cl_bobcycle.value)*cl_bobcycle.value;
 	cycle /= cl_bobcycle.value;
 	if (cycle < cl_bobup.value)
 		cycle = static_cast<float>(M_PI) * cycle / cl_bobup.value;
@@ -123,8 +123,8 @@ float V_CalcBob (void)
 // bob is proportional to velocity in the xy plane
 // (don't count Z, or jumping messes it up)
 
-	bob = Q_sqrt(cl.velocity[0]*cl.velocity[0] + cl.velocity[1]*cl.velocity[1]) * cl_bob.value;
-//Con_Printf ("speed: %5.1f\n", Length(cl.velocity));
+	bob = Q_sqrt(quake::cl.velocity[0]*quake::cl.velocity[0] + quake::cl.velocity[1]*quake::cl.velocity[1]) * cl_bob.value;
+//Con_Printf ("speed: %5.1f\n", Length(quake::cl.velocity));
 	bob = bob*0.3f + bob*0.7f*Q_sin(cycle);
 	if (bob > 4)
 		bob = 4;
@@ -145,31 +145,31 @@ cvar_t	v_centerspeed = {"v_centerspeed","500"};
 void V_StartPitchDrift()
 {
 #if 1
-	if (cl.laststop == cl.time)
+	if (quake::cl.laststop == quake::cl.time)
 	{
 		return;		// something else is keeping it from drifting
 	}
 #endif
-	if (cl.nodrift || !cl.pitchvel)
+	if (quake::cl.nodrift || !quake::cl.pitchvel)
 	{
-		cl.pitchvel = v_centerspeed.value;
-		cl.nodrift = false;
-		cl.driftmove = 0;
+		quake::cl.pitchvel = v_centerspeed.value;
+		quake::cl.nodrift = false;
+		quake::cl.driftmove = 0;
 	}
 }
 
 void V_StopPitchDrift (void)
 {
-	cl.laststop = cl.time;
-	cl.nodrift = true;
-	cl.pitchvel = 0;
+	quake::cl.laststop = quake::cl.time;
+	quake::cl.nodrift = true;
+	quake::cl.pitchvel = 0;
 }
 
 /*
 ===============
 V_DriftPitch
 
-Moves the client pitch angle towards cl.idealpitch sent by the server.
+Moves the client pitch angle towards quake::cl.idealpitch sent by the server.
 
 If the user is adjusting pitch manually, either with lookup/lookdown,
 mlook and mouse, or klook and keyboard, pitch drifting is constantly stopped.
@@ -183,38 +183,38 @@ void V_DriftPitch (void)
 	float		delta, move;
 	const float fhosttime = idCast<float>(host_frametime);
 
-	if (noclip_anglehack || !cl.onground || cls.demoplayback )
+	if (noclip_anglehack || !quake::cl.onground || quake::cls.demoplayback )
 	{
-		cl.driftmove = 0;
-		cl.pitchvel = 0;
+		quake::cl.driftmove = 0;
+		quake::cl.pitchvel = 0;
 		return;
 	}
 
 // don't count small mouse motion
-	if (cl.nodrift)
+	if (quake::cl.nodrift)
 	{
-		if ( fabs(cl.cmd.forwardmove) < cl_forwardspeed.value)
-			cl.driftmove = 0;
+		if ( fabs(quake::cl.cmd.forwardmove) < cl_forwardspeed.value)
+			quake::cl.driftmove = 0;
 		else
-			cl.driftmove += fhosttime;
+			quake::cl.driftmove += fhosttime;
 	
-		if ( cl.driftmove > v_centermove.value)
+		if ( quake::cl.driftmove > v_centermove.value)
 		{
 			V_StartPitchDrift ();
 		}
 		return;
 	}
 	
-	delta = cl.idealpitch - cl.viewangles[PITCH];
+	delta = quake::cl.idealpitch - quake::cl.viewangles[PITCH];
 
 	if (!delta)
 	{
-		cl.pitchvel = 0;
+		quake::cl.pitchvel = 0;
 		return;
 	}
 
-	move = fhosttime * cl.pitchvel;
-	cl.pitchvel += fhosttime * v_centerspeed.value;
+	move = fhosttime * quake::cl.pitchvel;
+	quake::cl.pitchvel += fhosttime * v_centerspeed.value;
 	
 //Con_Printf ("move: %f (%f)\n", move, host_frametime);
 
@@ -222,19 +222,19 @@ void V_DriftPitch (void)
 	{
 		if (move > delta)
 		{
-			cl.pitchvel = 0;
+			quake::cl.pitchvel = 0;
 			move = delta;
 		}
-		cl.viewangles[PITCH] += move;
+		quake::cl.viewangles[PITCH] += move;
 	}
 	else if (delta < 0)
 	{
 		if (move > -delta)
 		{
-			cl.pitchvel = 0;
+			quake::cl.pitchvel = 0;
 			move = -delta;
 		}
-		cl.viewangles[PITCH] -= move;
+		quake::cl.viewangles[PITCH] -= move;
 	}
 }
 
@@ -332,37 +332,37 @@ void V_ParseDamage (void)
 	if (count < 10)
 		count = 10;
 
-	cl.faceanimtime = cl.time + 100ms;		// but sbar face into pain frame
+	quake::cl.faceanimtime = quake::cl.time + 100ms;		// but sbar face into pain frame
 
-	cl.cshifts[CSHIFT_DAMAGE].percent += static_cast<int>(3.0f*count);
-	if (cl.cshifts[CSHIFT_DAMAGE].percent < 0)
-		cl.cshifts[CSHIFT_DAMAGE].percent = 0;
-	if (cl.cshifts[CSHIFT_DAMAGE].percent > 150)
-		cl.cshifts[CSHIFT_DAMAGE].percent = 150;
+	quake::cl.cshifts[CSHIFT_DAMAGE].percent += static_cast<int>(3.0f*count);
+	if (quake::cl.cshifts[CSHIFT_DAMAGE].percent < 0)
+		quake::cl.cshifts[CSHIFT_DAMAGE].percent = 0;
+	if (quake::cl.cshifts[CSHIFT_DAMAGE].percent > 150)
+		quake::cl.cshifts[CSHIFT_DAMAGE].percent = 150;
 
 	if (armor > blood)		
 	{
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 200;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 100;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 100;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 200;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 100;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 100;
 	}
 	else if (armor)
 	{
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 220;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 50;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 50;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 220;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 50;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 50;
 	}
 	else
 	{
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 255;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 0;
-		cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 0;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = 255;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = 0;
+		quake::cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = 0;
 	}
 
 //
 // calculate view angle kicks
 //
-	ent = &cl_entities[cl.viewentity];
+	ent = &cl_entities[quake::cl.viewentity];
 	
 	VectorSubtract (from, ent->origin, from);
 	VectorNormalize (from);
@@ -402,10 +402,10 @@ When you run over an item, the server sends this command
 */
 void V_BonusFlash_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	cl.cshifts[CSHIFT_BONUS].destcolor[0] = 215;
-	cl.cshifts[CSHIFT_BONUS].destcolor[1] = 186;
-	cl.cshifts[CSHIFT_BONUS].destcolor[2] = 69;
-	cl.cshifts[CSHIFT_BONUS].percent = 50;
+	quake::cl.cshifts[CSHIFT_BONUS].destcolor[0] = 215;
+	quake::cl.cshifts[CSHIFT_BONUS].destcolor[1] = 186;
+	quake::cl.cshifts[CSHIFT_BONUS].destcolor[2] = 69;
+	quake::cl.cshifts[CSHIFT_BONUS].percent = 50;
 }
 
 /*
@@ -421,16 +421,16 @@ void V_SetContentsColor (int contents)
 	{
 	case CONTENTS_EMPTY:
 	case CONTENTS_SOLID:
-		cl.cshifts[CSHIFT_CONTENTS] = cshift_empty;
+		quake::cl.cshifts[CSHIFT_CONTENTS] = cshift_empty;
 		break;
 	case CONTENTS_LAVA:
-		cl.cshifts[CSHIFT_CONTENTS] = cshift_lava;
+		quake::cl.cshifts[CSHIFT_CONTENTS] = cshift_lava;
 		break;
 	case CONTENTS_SLIME:
-		cl.cshifts[CSHIFT_CONTENTS] = cshift_slime;
+		quake::cl.cshifts[CSHIFT_CONTENTS] = cshift_slime;
 		break;
 	default:
-		cl.cshifts[CSHIFT_CONTENTS] = cshift_water;
+		quake::cl.cshifts[CSHIFT_CONTENTS] = cshift_water;
 	}
 }
 
@@ -441,36 +441,36 @@ V_CalcPowerupCshift
 */
 void V_CalcPowerupCshift (void)
 {
-	if (cl.items & IT_QUAD)
+	if (quake::cl.items & IT_QUAD)
 	{
-		cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 0;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 0;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 255;
-		cl.cshifts[CSHIFT_POWERUP].percent = 30;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 255;
+		quake::cl.cshifts[CSHIFT_POWERUP].percent = 30;
 	}
-	else if (cl.items & IT_SUIT)
+	else if (quake::cl.items & IT_SUIT)
 	{
-		cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 0;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 255;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 0;
-		cl.cshifts[CSHIFT_POWERUP].percent = 20;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 255;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].percent = 20;
 	}
-	else if (cl.items & IT_INVISIBILITY)
+	else if (quake::cl.items & IT_INVISIBILITY)
 	{
-		cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 100;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 100;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 100;
-		cl.cshifts[CSHIFT_POWERUP].percent = 100;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 100;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 100;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 100;
+		quake::cl.cshifts[CSHIFT_POWERUP].percent = 100;
 	}
-	else if (cl.items & IT_INVULNERABILITY)
+	else if (quake::cl.items & IT_INVULNERABILITY)
 	{
-		cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 255;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 255;
-		cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 0;
-		cl.cshifts[CSHIFT_POWERUP].percent = 30;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 255;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[1] = 255;
+		quake::cl.cshifts[CSHIFT_POWERUP].destcolor[2] = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].percent = 30;
 	}
 	else
-		cl.cshifts[CSHIFT_POWERUP].percent = 0;
+		quake::cl.cshifts[CSHIFT_POWERUP].percent = 0;
 }
 
 /*
@@ -494,17 +494,17 @@ void V_CalcBlend (void)
 		if (!gl_cshiftpercent.value)
 			continue;
 
-		a2 = ((cl.cshifts[j].percent * gl_cshiftpercent.value) / 100.0) / 255.0;
+		a2 = ((quake::cl.cshifts[j].percent * gl_cshiftpercent.value) / 100.0) / 255.0;
 
-//		a2 = cl.cshifts[j].percent/255.0;
+//		a2 = quake::cl.cshifts[j].percent/255.0;
 		if (!a2)
 			continue;
 		a = a + a2*(1-a);
 //Con_Printf ("j:%i a:%f\n", j, a);
 		a2 = a2/a;
-		r = r*(1-a2) + cl.cshifts[j].destcolor[0]*a2;
-		g = g*(1-a2) + cl.cshifts[j].destcolor[1]*a2;
-		b = b*(1-a2) + cl.cshifts[j].destcolor[2]*a2;
+		r = r*(1-a2) + quake::cl.cshifts[j].destcolor[0]*a2;
+		g = g*(1-a2) + quake::cl.cshifts[j].destcolor[1]*a2;
+		b = b*(1-a2) + quake::cl.cshifts[j].destcolor[2]*a2;
 	}
 
 	v_blend[0] = r/255.0;
@@ -540,28 +540,28 @@ void V_UpdatePalette (void)
 	
 	for (i=0 ; i<NUM_CSHIFTS ; i++)
 	{
-		if (cl.cshifts[i].percent != cl.prev_cshifts[i].percent)
+		if (quake::cl.cshifts[i].percent != quake::cl.prev_cshifts[i].percent)
 		{
 			new = true;
-			cl.prev_cshifts[i].percent = cl.cshifts[i].percent;
+			quake::cl.prev_cshifts[i].percent = quake::cl.cshifts[i].percent;
 		}
 		for (j=0 ; j<3 ; j++)
-			if (cl.cshifts[i].destcolor[j] != cl.prev_cshifts[i].destcolor[j])
+			if (quake::cl.cshifts[i].destcolor[j] != quake::cl.prev_cshifts[i].destcolor[j])
 			{
 				new = true;
-				cl.prev_cshifts[i].destcolor[j] = cl.cshifts[i].destcolor[j];
+				quake::cl.prev_cshifts[i].destcolor[j] = quake::cl.cshifts[i].destcolor[j];
 			}
 	}
 	
 // drop the damage value
-	cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*150;
-	if (cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
-		cl.cshifts[CSHIFT_DAMAGE].percent = 0;
+	quake::cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*150;
+	if (quake::cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
+		quake::cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 
 // drop the bonus value
-	cl.cshifts[CSHIFT_BONUS].percent -= host_frametime*100;
-	if (cl.cshifts[CSHIFT_BONUS].percent <= 0)
-		cl.cshifts[CSHIFT_BONUS].percent = 0;
+	quake::cl.cshifts[CSHIFT_BONUS].percent -= host_frametime*100;
+	if (quake::cl.cshifts[CSHIFT_BONUS].percent <= 0)
+		quake::cl.cshifts[CSHIFT_BONUS].percent = 0;
 
 	force = V_CheckGamma ();
 	if (!new && !force)
@@ -627,28 +627,28 @@ void V_UpdatePalette (void)
 	
 	for (i=0 ; i<NUM_CSHIFTS ; i++)
 	{
-		if (cl.cshifts[i].percent != cl.prev_cshifts[i].percent)
+		if (quake::cl.cshifts[i].percent != quake::cl.prev_cshifts[i].percent)
 		{
 			changed = true;
-			cl.prev_cshifts[i].percent = cl.cshifts[i].percent;
+			quake::cl.prev_cshifts[i].percent = quake::cl.cshifts[i].percent;
 		}
 		for (j=0 ; j<3 ; j++)
-			if (cl.cshifts[i].destcolor[j] != cl.prev_cshifts[i].destcolor[j])
+			if (quake::cl.cshifts[i].destcolor[j] != quake::cl.prev_cshifts[i].destcolor[j])
 			{
 				changed = true;
-				cl.prev_cshifts[i].destcolor[j] = cl.cshifts[i].destcolor[j];
+				quake::cl.prev_cshifts[i].destcolor[j] = quake::cl.cshifts[i].destcolor[j];
 			}
 	}
 	
 // drop the damage value
-	cl.cshifts[CSHIFT_DAMAGE].percent -= static_cast<int>(fhosttime *150.0f);
-	if (cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
-		cl.cshifts[CSHIFT_DAMAGE].percent = 0;
+	quake::cl.cshifts[CSHIFT_DAMAGE].percent -= static_cast<int>(fhosttime *150.0f);
+	if (quake::cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
+		quake::cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 
 // drop the bonus value
-	cl.cshifts[CSHIFT_BONUS].percent -= static_cast<int>(fhosttime *100.0f);
-	if (cl.cshifts[CSHIFT_BONUS].percent <= 0)
-		cl.cshifts[CSHIFT_BONUS].percent = 0;
+	quake::cl.cshifts[CSHIFT_BONUS].percent -= static_cast<int>(fhosttime *100.0f);
+	if (quake::cl.cshifts[CSHIFT_BONUS].percent <= 0)
+		quake::cl.cshifts[CSHIFT_BONUS].percent = 0;
 
 	force = V_CheckGamma ();
 	if (!changed && !force)
@@ -666,9 +666,9 @@ void V_UpdatePalette (void)
 	
 		for (j=0 ; j<NUM_CSHIFTS ; j++)	
 		{
-			r += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[0]-r))>>8;
-			g += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[1]-g))>>8;
-			b += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[2]-b))>>8;
+			r += (quake::cl.cshifts[j].percent*(quake::cl.cshifts[j].destcolor[0]-r))>>8;
+			g += (quake::cl.cshifts[j].percent*(quake::cl.cshifts[j].destcolor[1]-g))>>8;
+			b += (quake::cl.cshifts[j].percent*(quake::cl.cshifts[j].destcolor[2]-b))>>8;
 		}
 		
 		newpal[0] = gammatable[r];
@@ -749,12 +749,12 @@ void CalcGunAngle (void)
 	oldyaw = yaw;
 	oldpitch = pitch;
 
-	cl.viewent.angles[YAW] = r_refdef.viewangles[YAW] + yaw;
-	cl.viewent.angles[PITCH] = - (r_refdef.viewangles[PITCH] + pitch);
+	quake::cl.viewent.angles[YAW] = r_refdef.viewangles[YAW] + yaw;
+	quake::cl.viewent.angles[PITCH] = - (r_refdef.viewangles[PITCH] + pitch);
 
-	cl.viewent.angles[ROLL] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_iroll_cycle.value) * v_iroll_level.value;
-	cl.viewent.angles[PITCH] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_ipitch_cycle.value) * v_ipitch_level.value;
-	cl.viewent.angles[YAW] -= v_idlescale.value * Q_sin(idCast<float>(cl.time)*v_iyaw_cycle.value) * v_iyaw_level.value;
+	quake::cl.viewent.angles[ROLL] -= v_idlescale.value * Q_sin(idCast<float>(quake::cl.time)*v_iroll_cycle.value) * v_iroll_level.value;
+	quake::cl.viewent.angles[PITCH] -= v_idlescale.value * Q_sin(idCast<float>(quake::cl.time)*v_ipitch_cycle.value) * v_ipitch_level.value;
+	quake::cl.viewent.angles[YAW] -= v_idlescale.value * Q_sin(idCast<float>(quake::cl.time)*v_iyaw_cycle.value) * v_iyaw_level.value;
 }
 
 /*
@@ -766,7 +766,7 @@ void V_BoundOffsets (void)
 {
 	entity_t	*ent;
 	
-	ent = &cl_entities[cl.viewentity];
+	ent = &cl_entities[quake::cl.viewentity];
 
 // absolutely bound refresh reletive to entity clipping hull
 // so the view can never be inside a solid wall
@@ -794,7 +794,7 @@ Idle swaying
 */
 void V_AddIdle (void)
 {
-	const float time = idCast<float>(cl.time);
+	const float time = idCast<float>(quake::cl.time);
 	r_refdef.viewangles[ROLL] += v_idlescale.value * Q_sin(time*v_iroll_cycle.value) * v_iroll_level.value;
 	r_refdef.viewangles[PITCH] += v_idlescale.value * Q_sin(time*v_ipitch_cycle.value) * v_ipitch_level.value;
 	r_refdef.viewangles[YAW] += v_idlescale.value * Q_sin(time*v_iyaw_cycle.value) * v_iyaw_level.value;
@@ -812,7 +812,7 @@ void V_CalcViewRoll (void)
 {
 	float		side;
 		
-	side = V_CalcRoll (cl_entities[cl.viewentity].angles, cl.velocity);
+	side = V_CalcRoll (cl_entities[quake::cl.viewentity].angles, quake::cl.velocity);
 	r_refdef.viewangles[ROLL] += side;
 
 	if (v_dmg_time > 0.0f)
@@ -823,7 +823,7 @@ void V_CalcViewRoll (void)
 		v_dmg_time -= fhosttime;
 	}
 
-	if (cl.stats[STAT_HEALTH] <= 0.0f)
+	if (quake::cl.stats[STAT_HEALTH] <= 0.0f)
 	{
 		r_refdef.viewangles[ROLL] = 80.0f;	// dead view angle
 		return;
@@ -844,9 +844,9 @@ void V_CalcIntermissionRefdef (void)
 	float		old;
 
 // ent is the player model (visible when out of body)
-	ent = &cl_entities[cl.viewentity];
+	ent = &cl_entities[quake::cl.viewentity];
 // view is the weapon model (only visible from inside body)
-	view = &cl.viewent;
+	view = &quake::cl.viewent;
 
 	VectorCopy (ent->origin, r_refdef.vieworg);
 	VectorCopy (ent->angles, r_refdef.viewangles);
@@ -877,16 +877,16 @@ void V_CalcRefdef (void)
 	V_DriftPitch ();
 
 // ent is the player model (visible when out of body)
-	ent = &cl_entities[cl.viewentity];
+	ent = &cl_entities[quake::cl.viewentity];
 // view is the weapon model (only visible from inside body)
-	view = &cl.viewent;
+	view = &quake::cl.viewent;
 	
 
 // transform the view offset by the model's matrix to get the offset from
 // model origin for the view
-	ent->angles[YAW] = cl.viewangles[YAW];	// the model should face
+	ent->angles[YAW] = quake::cl.viewangles[YAW];	// the model should face
 										// the view dir
-	ent->angles[PITCH] = -cl.viewangles[PITCH];	// the model should face
+	ent->angles[PITCH] = -quake::cl.viewangles[PITCH];	// the model should face
 										// the view dir
 										
 	
@@ -894,7 +894,7 @@ void V_CalcRefdef (void)
 	
 // refresh position
 	VectorCopy (ent->origin, r_refdef.vieworg);
-	r_refdef.vieworg[2] += cl.viewheight + bob;
+	r_refdef.vieworg[2] += quake::cl.viewheight + bob;
 
 // never let it sit exactly on a node line, because a water plane can
 // dissapear when viewed with the eye exactly on it.
@@ -903,7 +903,7 @@ void V_CalcRefdef (void)
 	r_refdef.vieworg[1] += 1.0/32;
 	r_refdef.vieworg[2] += 1.0/32;
 
-	VectorCopy (cl.viewangles, r_refdef.viewangles);
+	VectorCopy (quake::cl.viewangles, r_refdef.viewangles);
 	V_CalcViewRoll ();
 	V_AddIdle ();
 
@@ -924,12 +924,12 @@ void V_CalcRefdef (void)
 	V_BoundOffsets ();
 		
 // set up gun position
-	VectorCopy (cl.viewangles, view->angles);
+	VectorCopy (quake::cl.viewangles, view->angles);
 	
 	CalcGunAngle ();
 
 	VectorCopy (ent->origin, view->origin);
-	view->origin[2] += cl.viewheight;
+	view->origin[2] += quake::cl.viewheight;
 
 	for (i=0 ; i<3 ; i++)
 	{
@@ -943,7 +943,7 @@ void V_CalcRefdef (void)
 // roughly equal with different FOV
 
 #if 0
-	if (cl.model_precache[cl.stats[STAT_WEAPON]] && strcmp (cl.model_precache[cl.stats[STAT_WEAPON]]->name,  "progs/v_shot2.mdl"))
+	if (quake::cl.model_precache[quake::cl.stats[STAT_WEAPON]] && strcmp (quake::cl.model_precache[quake::cl.stats[STAT_WEAPON]]->name,  "progs/v_shot2.mdl"))
 #endif
 	if (scr_viewsize.value == 110)
 		view->origin[2] += 1;
@@ -954,19 +954,19 @@ void V_CalcRefdef (void)
 	else if (scr_viewsize.value == 80)
 		view->origin[2] += 0.5;
 
-	view->model = cl.model_precache[cl.stats[STAT_WEAPON]];
-	view->frame = cl.stats[STAT_WEAPONFRAME];
+	view->model = quake::cl.model_precache[quake::cl.stats[STAT_WEAPON]];
+	view->frame = quake::cl.stats[STAT_WEAPONFRAME];
 	view->colormap = vid.colormap;
 
 // set up the refresh position
-	VectorAdd (r_refdef.viewangles, cl.punchangle, r_refdef.viewangles);
+	VectorAdd (r_refdef.viewangles, quake::cl.punchangle, r_refdef.viewangles);
 
 // smooth out stair step ups
-if (cl.onground && ent->origin[2] - oldz > 0)
+if (quake::cl.onground && ent->origin[2] - oldz > 0)
 {
 	idTime steptime;
 	
-	steptime = cl.time - cl.oldtime;
+	steptime = quake::cl.time - quake::cl.oldtime;
 	if (steptime < idTime::zero())
 //FIXME		I_Error ("steptime < 0");
 		steptime = idTime::zero();
@@ -1002,20 +1002,20 @@ void V_RenderView (void)
 		return;
 
 // don't allow cheats in multiplayer
-	if (cl.maxclients > 1)
+	if (quake::cl.maxclients > 1)
 	{
 		Cvar_Set ("scr_ofsx", "0");
 		Cvar_Set ("scr_ofsy", "0");
 		Cvar_Set ("scr_ofsz", "0");
 	}
 
-	if (cl.intermission)
+	if (quake::cl.intermission)
 	{	// intermission / finale rendering
 		V_CalcIntermissionRefdef ();	
 	}
 	else
 	{
-		if (!cl.paused /* && (sv.maxclients > 1 || key_dest == key_game) */ )
+		if (!quake::cl.paused /* && (sv.maxclients > 1 || key_dest == key_game) */ )
 			V_CalcRefdef ();
 	}
 

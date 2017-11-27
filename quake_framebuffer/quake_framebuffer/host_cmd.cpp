@@ -36,12 +36,12 @@ extern void M_Menu_Quit_f(cmd_source_t source, size_t argc, const quake::string_
 
 void Host_Quit_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	if (key_dest != key_console && cls.state != ca_dedicated)
+	if (key_dest != key_console && quake::cls.state != ca_dedicated)
 	{
 		M_Menu_Quit_f (source,argc,argv);
 		return;
 	}
-	CL_Disconnect ();
+	quake::cls.disconnect ();
 	Host_ShutdownServer(false);		
 
 	Sys_Quit ();
@@ -259,19 +259,20 @@ void Host_Map_f(cmd_source_t source, size_t argc, const quake::string_view argv[
 	if (source != src_command)
 		return;
 
-	cls.demonum = -1;		// stop demo loop in case this fails
+	quake::cls.demonum = -1;		// stop demo loop in case this fails
 
-	CL_Disconnect ();
+	quake::cls.disconnect();
 	Host_ShutdownServer(false);		
 
 	key_dest = key_game;			// remove console or menu
 	SCR_BeginLoadingPlaque ();
 
-	cls.mapstring[0] = 0;
-	for (int i=0 ; i<argc ; i++)
-		name << argv[i] << ' ';
-	name << std::endl; 
-	static_cast<quake::string_view>(name.str()).copy(cls.mapstring, sizeof(cls.mapstring));
+	quake::cls.mapstring.clear();
+	for (int i = 0; i < argc; i++) {
+		if (i != 0)  quake::cls.mapstring.push_back(' ');
+		quake::cls.mapstring.append(argv[i]);
+	}
+	quake::cls.mapstring.push_back('\n');
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	name.clear();
@@ -284,14 +285,13 @@ void Host_Map_f(cmd_source_t source, size_t argc, const quake::string_view argv[
 	if (!sv.active)
 		return;
 	
-	if (cls.state != ca_dedicated)
+	if (quake::cls.state != ca_dedicated)
 	{
-		name.clear();
-
-		for (size_t i = 2; i < argc; i++)
-			name << argv[i] << ' ';
-
-		static_cast<quake::string_view>(name.str()).copy(cls.spawnparms, sizeof(cls.spawnparms));
+		quake::cls.spawnparms.clear();
+		for (int i = 2; i < argc; i++) {
+			if (i != 0)  quake::cls.spawnparms.push_back(' ');
+			quake::cls.spawnparms.append(argv[i]);
+		}
 		execute_args("connect local", src_command);
 	}	
 }
@@ -315,7 +315,7 @@ void Host_Changelevel_f(cmd_source_t source, size_t argc, const quake::string_vi
 		Con_Printf ("changelevel <levelname> : continue game on a new level\n");
 		return;
 	}
-	if (!sv.active || cls.demoplayback)
+	if (!sv.active || quake::cls.demoplayback)
 	{
 		Con_Printf ("Only the server may changelevel\n");
 		return;
@@ -338,7 +338,7 @@ void Host_Changelevel_f(cmd_source_t source, size_t argc, const quake::string_vi
 		Con_Printf ("changelevel <levelname> : continue game on a new level\n");
 		return;
 	}
-	if (!sv.active || cls.demoplayback)
+	if (!sv.active || quake::cls.demoplayback)
 	{
 		Con_Printf ("Only the server may changelevel\n");
 		return;
@@ -363,7 +363,7 @@ void Host_Restart_f(cmd_source_t source, size_t argc, const quake::string_view a
 	char	startspot[MAX_QPATH];
 #endif
 
-	if (cls.demoplayback || !sv.active)
+	if (quake::cls.demoplayback || !sv.active)
 		return;
 
 	if (source != src_command)
@@ -389,7 +389,7 @@ This is sent just before a server changes levels
 void Host_Reconnect_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
 	SCR_BeginLoadingPlaque ();
-	cls.signon = 0;		// need new connection messages
+	quake::cls.signon = 0;		// need new connection messages
 }
 
 /*
@@ -401,13 +401,14 @@ User command to connect to server
 */
 void Host_Connect_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	cls.demonum = -1;		// stop demo loop in case this fails
-	if (cls.demoplayback)
+	quake::cls.demonum = -1;		// stop demo loop in case this fails
+	if (quake::cls.demoplayback)
 	{
-		CL_StopPlayback ();
-		CL_Disconnect ();
+		quake::cls.stop_playback();
+		quake::cls.disconnect();
 	}
-	CL_EstablishConnection (argv[1],source,argc,argv);
+	quake::cls.establish_connection(argv[1]);
+
 	Host_Reconnect_f (source,argc,argv);
 }
 
@@ -432,7 +433,7 @@ Writes a SAVEGAME_COMMENT_LENGTH character comment describing the current
 using save_game_comment_string = quake::fixed_string<SAVEGAME_COMMENT_LENGTH + 1>;
 static void Host_SavegameComment(std::ostream& os){
 	quake::fixed_string_stream<SAVEGAME_COMMENT_LENGTH + 1> ss;
-	ss << cl.levelname << " kills:" << std::setw(3) << cl.stats[STAT_MONSTERS] << '/' << std::setw(3) << cl.stats[STAT_TOTALMONSTERS];
+	ss << quake::cl.levelname << " kills:" << std::setw(3) << quake::cl.stats[STAT_MONSTERS] << '/' << std::setw(3) << quake::cl.stats[STAT_TOTALMONSTERS];
 	size_t len = ss.str().size();
 	if (len< SAVEGAME_COMMENT_LENGTH)
 		ss << std::setfill('_') << std::setw(SAVEGAME_COMMENT_LENGTH - len) << '_';
@@ -459,7 +460,7 @@ void Host_Savegame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		return;
 	}
 
-	if (cl.intermission)
+	if (quake::cl.intermission)
 	{
 		quake::con << "Can't save in intermission." << std::endl;
 		return;
@@ -563,7 +564,7 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		return;
 	}
 
-	cls.demonum = -1;		// stop demo loop in case this fails
+	quake::cls.demonum = -1;		// stop demo loop in case this fails
 
 	name += COM_GameDir();
 	name += '/';
@@ -686,9 +687,9 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
 		svs.clients->spawn_parms[i] = spawn_parms[i];
 
-	if (cls.state != ca_dedicated)
+	if (quake::cls.state != ca_dedicated)
 	{
-		CL_EstablishConnection ("local", source, argc, argv);
+		quake::cls.establish_connection("local");
 		Host_Reconnect_f (source,argc,argv);
 	}
 }
@@ -860,7 +861,7 @@ void Host_Changelevel2_f (void)
 		Con_Printf ("changelevel2 <levelname> : continue game on a new level in the unit\n");
 		return;
 	}
-	if (!sv.active || cls.demoplayback)
+	if (!sv.active || quake::cls.demoplayback)
 	{
 		Con_Printf ("Only the server may changelevel\n");
 		return;
@@ -913,7 +914,7 @@ void Host_Name_f(cmd_source_t source, size_t argc, const quake::string_view argv
 		if (cl_name.string == newName.str())
 			return;
 		Cvar_Set ("_cl_name", newName.str());
-		if (cls.state == ca_connected)
+		if (quake::cls.state == ca_connected)
 			Cmd_ForwardToServer (source, argc, argv);
 		return;
 	}
@@ -944,7 +945,7 @@ void Host_Version_f(cmd_source_t source, size_t argc, const quake::string_view a
 #ifdef IDGODS
 void Host_Please_f (void)
 {
-	client_t *cl;
+	client_t *quake::cl;
 	int			j;
 	
 	if (cmd_source != src_command)
@@ -957,36 +958,36 @@ void Host_Please_f (void)
 			return;
 		if (!svs.clients[j].active)
 			return;
-		cl = &svs.clients[j];
-		if (cl->privileged)
+		quake::cl = &svs.clients[j];
+		if (quake::cl->privileged)
 		{
-			cl->privileged = false;
-			cl->edict->v.flags = (int)cl->edict->v.flags & ~(FL_GODMODE|FL_NOTARGET);
-			cl->edict->v.movetype = MOVETYPE_WALK;
+			quake::cl->privileged = false;
+			quake::cl->edict->v.flags = (int)quake::cl->edict->v.flags & ~(FL_GODMODE|FL_NOTARGET);
+			quake::cl->edict->v.movetype = MOVETYPE_WALK;
 			noclip_anglehack = false;
 		}
 		else
-			cl->privileged = true;
+			quake::cl->privileged = true;
 	}
 
 	if (Cmd_Argc () != 2)
 		return;
 
-	for (j=0, cl = svs.clients ; j<svs.maxclients ; j++, cl++)
+	for (j=0, quake::cl = svs.clients ; j<svs.maxclients ; j++, quake::cl++)
 	{
-		if (!cl->active)
+		if (!quake::cl->active)
 			continue;
-		if (Q_strcasecmp(cl->name, Cmd_Argv(1)) == 0)
+		if (Q_strcasecmp(quake::cl->name, Cmd_Argv(1)) == 0)
 		{
-			if (cl->privileged)
+			if (quake::cl->privileged)
 			{
-				cl->privileged = false;
-				cl->edict->v.flags = (int)cl->edict->v.flags & ~(FL_GODMODE|FL_NOTARGET);
-				cl->edict->v.movetype = MOVETYPE_WALK;
+				quake::cl->privileged = false;
+				quake::cl->edict->v.flags = (int)quake::cl->edict->v.flags & ~(FL_GODMODE|FL_NOTARGET);
+				quake::cl->edict->v.movetype = MOVETYPE_WALK;
 				noclip_anglehack = false;
 			}
 			else
-				cl->privileged = true;
+				quake::cl->privileged = true;
 			break;
 		}
 	}
@@ -1004,7 +1005,7 @@ void Host_Say(cmd_source_t source, size_t argc, const quake::string_view argv[],
 
 	if (source == src_command)
 	{
-		if (cls.state == ca_dedicated)
+		if (quake::cls.state == ca_dedicated)
 		{
 			fromServer = true;
 			teamonly = false;
@@ -1141,7 +1142,7 @@ void Host_Color_f(cmd_source_t source, size_t argc, const quake::string_view arg
 	if (source == src_command)
 	{
 		Cvar_SetValue ("_cl_color", playercolor);
-		if (cls.state == ca_connected)
+		if (quake::cls.state == ca_connected)
 			Cmd_ForwardToServer (source, argc, argv);
 		return;
 	}
@@ -1436,7 +1437,7 @@ void Host_Kick_f (cmd_source_t source, size_t argc, const quake::string_view arg
 	if (i < svs.maxclients)
 	{
 		if (source == src_command)
-			if (cls.state == ca_dedicated)
+			if (quake::cls.state == ca_dedicated)
 				who = "Console";
 			else
 				who = cl_name.string;
@@ -1670,7 +1671,7 @@ void Host_Viewmodel_f(cmd_source_t source, size_t argc, const quake::string_view
 	}
 	
 	e->v.frame = 0;
-	cl.model_precache[(int)e->v.modelindex] = m;
+	quake::cl.model_precache[(int)e->v.modelindex] = m;
 }
 
 /*
@@ -1687,7 +1688,7 @@ void Host_Viewframe_f(cmd_source_t source, size_t argc, const quake::string_view
 	e = FindViewthing ();
 	if (!e)
 		return;
-	m = cl.model_precache[(int)e->v.modelindex];
+	m = quake::cl.model_precache[(int)e->v.modelindex];
 
 	f = Q_atoi(argv[1]);
 	if (f >= m->numframes)
@@ -1723,7 +1724,7 @@ void Host_Viewnext_f(cmd_source_t source, size_t argc, const quake::string_view 
 	e = FindViewthing ();
 	if (!e)
 		return;
-	m = cl.model_precache[(int)e->v.modelindex];
+	m = quake::cl.model_precache[(int)e->v.modelindex];
 
 	e->v.frame = e->v.frame + 1;
 	if (e->v.frame >= m->numframes)
@@ -1746,7 +1747,7 @@ void Host_Viewprev_f(cmd_source_t source, size_t argc, const quake::string_view 
 	if (!e)
 		return;
 
-	m = cl.model_precache[(int)e->v.modelindex];
+	m = quake::cl.model_precache[(int)e->v.modelindex];
 
 	e->v.frame = e->v.frame - 1;
 	if (e->v.frame < 0)
@@ -1773,7 +1774,7 @@ void Host_Startdemos_f(cmd_source_t source, size_t argc, const quake::string_vie
 {
 	int		i, c;
 
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 	{
 		if (!sv.active)
 			Cbuf_AddText ("map start\n");
@@ -1788,17 +1789,22 @@ void Host_Startdemos_f(cmd_source_t source, size_t argc, const quake::string_vie
 	}
 	quake::con << c << " demo(s) in loop" << std::endl;
 
-	for (size_t i = 1; i < c + 1; i++)
-		argv[i].copy(cls.demos[i - 1], sizeof(cls.demos[i - 1]));
+	for (size_t i = 1; i < c + 1; i++) {
+		char* ptr = (char*)Z_Malloc(argv[i].size());
+		argv[i].copy(ptr, argv[i].size());
+		ptr[argv[i].size()] = 0;
+		quake::cls.demos.emplace_back(ptr);
+	}
+		
 
 
-	if (!sv.active && cls.demonum != -1 && !cls.demoplayback)
+	if (!sv.active && quake::cls.demonum != -1 && !quake::cls.demoplayback)
 	{
-		cls.demonum = 0;
-		CL_NextDemo ();
+		quake::cls.demonum = 0;
+		quake::cls.next_demo();
 	}
 	else
-		cls.demonum = -1;
+		quake::cls.demonum = -1;
 }
 
 
@@ -1811,12 +1817,12 @@ Return to looping demos
 */
 void Host_Demos_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		return;
-	if (cls.demonum == -1)
-		cls.demonum = 1;
+	if (quake::cls.demonum == -1)
+		quake::cls.demonum = 1;
 	CL_Disconnect_f(source, argc, argv);
-	CL_NextDemo ();
+	quake::cls.next_demo();
 }
 
 /*
@@ -1828,12 +1834,14 @@ Return to looping demos
 */
 void Host_Stopdemo_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
 {
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		return;
-	if (!cls.demoplayback)
+	if (!quake::cls.demoplayback)
 		return;
-	CL_StopPlayback ();
-	CL_Disconnect ();
+
+	quake::cls.stop_playback();
+	quake::cls.disconnect();
+
 }
 
 //=============================================================================

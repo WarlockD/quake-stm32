@@ -235,7 +235,7 @@ namespace quake {
 		debug_value_t<T> _value;
 	public:
 		constexpr debug_t() : _value() {}
-		constexpr debug_t(const T& value) : _value(value) {}
+		constexpr debug_t(const T& value) : _value() { _value.set(value); }
 		debug_t& operator=(const T& value) { _value.set(value); return *this; }
 		constexpr operator T&() { return _value.get(); }
 		constexpr operator const T&() const { return _value.get(); }
@@ -246,7 +246,7 @@ namespace quake {
 		debug_value_t<T> _value;
 	public:
 		constexpr debug_t() : _value() {}
-		constexpr debug_t(const T& value) : _value(value) {}
+		constexpr debug_t(const T& value) : _value() { _value.set(value); }
 		debug_t& operator=(const T& value) { _value.set(value); return *this; }
 		T operator->() { return _value.get(); }
 		const T operator->() const { return _value.get(); }
@@ -1007,6 +1007,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 	//	inline string&		append(const_wpointer s1, const_wpointer s2) { insert(size(), s1, s2); return *this; }
 		//inline string&		append(const_wpointer s) { const_wpointer se(s); for (; se&&*se; ++se) {} return append(s, se); }
 		inline string&		append(const string& s) { return append(s.begin(), s.end()); }
+		inline string&		append(const string_view& s) { return append(s.data(), s.data()+s.size()); }
 		inline string&		append(const string& s, pos_type o, size_type n) { return append(s.iat(o), s.iat(o + n)); }
 		inline void			push_back(value_type c) { resize(size() + 1); end()[-1] = c; }
 	//	inline void			push_back(wvalue_type c) { append(1, c); }
@@ -1678,9 +1679,10 @@ namespace std {
 // any dynamicly defined stuff needs to be created after this
 
 #include "zone.h"
-
+#include "mathlib.h"
 
 //============================================================================
+
 
 class sizebuf_t { //: public quake::memblock {
 	qboolean	_allowoverflow;	// if false, do a Sys_Error
@@ -1688,6 +1690,7 @@ class sizebuf_t { //: public quake::memblock {
 	int			_hunk_low_used;
 	size_t		_cursize;
 	size_t		_capacity;
+	size_t		_read_count;
 	byte*		_data;
 public:
 	using refrence = byte&;
@@ -1695,8 +1698,8 @@ public:
 	using iterator = byte*;
 	using const_iterator = const byte*;
 	using size_type = size_t;
-	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr), _capacity(0U), _cursize(0U) {}
-	sizebuf_t(byte* data, size_t size, bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data(data), _capacity(size), _cursize(0U) {}
+	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr), _capacity(0U), _cursize(0U) , _read_count(0U) {}
+	sizebuf_t(byte* data, size_t size, bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data(data), _capacity(size), _cursize(0U), _read_count(0U) {}
 	void* GetSpace(size_t length);
 	sizebuf_t(sizebuf_t&& move) = default;
 	sizebuf_t(const sizebuf_t& copy) = default;
@@ -1743,6 +1746,50 @@ public:
 	void WriteString(const quake::string_view& data);
 	void WriteCoord(float f);
 	void WriteAngle(float f);
+	//void WriteAngle16(float f);
+	//void WriteDeltaUsercmd( struct usercmd_s *from, struct usercmd_s *cmd);
+	//void WriteDeltaEntity(struct entity_state_s *from, struct entity_state_s *to,  qboolean force, qboolean newentity);
+	//void WriteDir(vec3_t vector);
+
+	void	BeginReading() { _read_count = 0; }
+
+
+	template<typename T>
+	typename std::enable_if_t<std::is_integral_v<T>,bool> Read(T& value) {
+		if (_read_count + sizeof(T) > _cursize) return false;
+		// this looks ineffechent but its unrolled on compile
+		value = T{};
+		for (size_t i = 0; i < (sizeof(T) * 8); i = 8)
+			value += _data[_read_count++] << i;
+		return true;
+	}
+
+	template<typename T>
+	typename std::enable_if_t<std::is_integral_v<T>, T> Read() {
+		T value;
+		return Read(value) ? value : -1;
+	}
+	int		ReadChar() { return Read<int8_t>(); }
+	int		ReadByte() { return Read<uint8_t>(); }
+	int		ReadShort() { return Read<int16_t>(); }
+	int		ReadLong() { return Read<int32_t>(); }
+	float	ReadFloat();
+	void	ReadString(quake::string& str);
+	void	ReadStringLine(quake::string& str);
+
+	inline float	ReadCoord() { return ReadShort() * (1.0f / 8.0f); }
+	void ReadPos(vec3_t& pos) { 
+		pos[0] = ReadCoord(); pos[1] = ReadCoord();  pos[2] = ReadCoord();
+	}
+
+	float	ReadAngle() { return ReadChar() * (360.0f / 256.0f); }
+	float	ReadAngle16() { SHORT2ANGLE(ReadShort()); }
+	//void	MSG_ReadDeltaUsercmd( struct usercmd_s *from, struct usercmd_s *cmd);
+
+	void	ReadDir(vec3_t& vector);
+
+	size_t	ReadData(void *buffer, int len);
+
 
 } ;
 #if 0
@@ -2096,7 +2143,7 @@ byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsi
 byte *COM_LoadTempFile (const quake::string_view& path);
 byte *COM_LoadHunkFile (const quake::string_view& path);
 void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu);
-quake::iofstream COM_FindFile(const quake::string_view& filename);
+ size_t COM_FindFile(const quake::string_view& filename, std::fstream& file);
 
 
 

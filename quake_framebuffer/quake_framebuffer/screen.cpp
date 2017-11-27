@@ -91,7 +91,7 @@ void SCR_CenterPrint (char *str)
 {
 	Q_strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
 	scr_centertime_off = idCast<idTime>(scr_centertime.value);
-	scr_centertime_start = cl.time;
+	scr_centertime_start = quake::cl.time;
 
 // count the number of lines for centering
 	scr_center_lines = 1;
@@ -131,8 +131,8 @@ void SCR_DrawCenterString (void)
 	int		remaining;
 
 // the finale prints the characters one at a time
-	if (cl.intermission)
-		remaining = static_cast<int>(scr_printspeed.value * idCast<float>(cl.time - scr_centertime_start));
+	if (quake::cl.intermission)
+		remaining = static_cast<int>(scr_printspeed.value * idCast<float>(quake::cl.time - scr_centertime_start));
 	else
 		remaining = 9999;
 
@@ -177,7 +177,7 @@ void SCR_CheckDrawCenterString (void)
 
 	scr_centertime_off -= host_frametime;
 	
-	if (scr_centertime_off <= idTime::zero() && !cl.intermission)
+	if (scr_centertime_off <= idTime::zero() && !quake::cl.intermission)
 		return;
 	if (key_dest != key_game)
 		return;
@@ -246,7 +246,7 @@ static void SCR_CalcRefdef (void)
 	r_refdef.fov_y = CalcFov (r_refdef.fov_x, r_refdef.vrect.width, r_refdef.vrect.height);
 
 // intermission is always full screen	
-	if (cl.intermission)
+	if (quake::cl.intermission)
 		size = 120;
 	else
 		size = scr_viewsize.value;
@@ -387,9 +387,9 @@ SCR_DrawNet
 */
 void SCR_DrawNet (void)
 {
-	if ((realtime - cl.last_received_message) < 300ms)
+	if ((realtime - quake::cl.last_received_message) < 300ms)
 		return;
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 		return;
 
 	Draw_Pic (scr_vrect.x+64, scr_vrect.y, scr_net);
@@ -407,7 +407,7 @@ void SCR_DrawPause (void)
 	if (!scr_showpause.value)		// turn off for screenshots
 		return;
 
-	if (!cl.paused)
+	if (!quake::cl.paused)
 		return;
 
 	pic = Draw_CachePic ("gfx/pause.lmp");
@@ -453,7 +453,7 @@ void SCR_SetUpToDrawConsole (void)
 		return;		// never a console with loading plaque
 		
 // decide on the height of the console
-	con_forcedup = !cl.worldmodel || cls.signon != SIGNONS;
+	con_forcedup = !quake::cl.worldmodel || quake::cls.signon != SIGNONS;
 
 	if (con_forcedup)
 	{
@@ -657,9 +657,9 @@ void SCR_BeginLoadingPlaque (void)
 {
 	S_StopAllSounds (true);
 
-	if (cls.state != ca_connected)
+	if (quake::cls.state != ca_connected)
 		return;
-	if (cls.signon != SIGNONS)
+	if (quake::cls.signon != SIGNONS)
 		return;
 	
 // redraw with no console and the loading plaque
@@ -738,7 +738,7 @@ keypress.
 */
 int SCR_ModalMessage (char *text)
 {
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		return true;
 
 	scr_notifystring = text;
@@ -782,7 +782,7 @@ void SCR_BringDownConsole (void)
 	for (i=0 ; i<20 && scr_conlines != scr_con_current ; i++)
 		SCR_UpdateScreen ();
 
-	cl.cshifts[0].percent = 0;		// no area contents palette on next frame
+	quake::cl.cshifts[0].percent = 0;		// no area contents palette on next frame
 	VID_SetPalette (host_basepal);
 }
 
@@ -821,7 +821,7 @@ void SCR_UpdateScreen (void)
 			return;
 	}
 
-	if (cls.state == ca_dedicated)
+	if (quake::cls.state == ca_dedicated)
 		return;				// stdout only
 
 	if (!scr_initialized || !con_initialized)
@@ -901,16 +901,16 @@ void SCR_UpdateScreen (void)
 		SCR_DrawLoading ();
 		Sbar_Draw ();
 	}
-	else if (cl.intermission == 1 && key_dest == key_game)
+	else if (quake::cl.intermission == 1 && key_dest == key_game)
 	{
 		Sbar_IntermissionOverlay ();
 	}
-	else if (cl.intermission == 2 && key_dest == key_game)
+	else if (quake::cl.intermission == 2 && key_dest == key_game)
 	{
 		Sbar_FinaleOverlay ();
 		SCR_CheckDrawCenterString ();
 	}
-	else if (cl.intermission == 3 && key_dest == key_game)
+	else if (quake::cl.intermission == 3 && key_dest == key_game)
 	{
 		SCR_CheckDrawCenterString ();
 	}

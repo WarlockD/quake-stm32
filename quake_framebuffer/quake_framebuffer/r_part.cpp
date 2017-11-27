@@ -87,7 +87,7 @@ void R_DarkFieldParticles (entity_t *ent)
 				p->next = active_particles;
 				active_particles = p;
 		
-				p->die = cl.time + 0.2 + (rand()&7) * 0.02;
+				p->die = quake::cl.time + 0.2 + (rand()&7) * 0.02;
 				p->color = 150 + rand()%6;
 				p->type = pt_slowgrav;
 				
@@ -140,7 +140,7 @@ void R_EntityParticles(entity_t *ent)
 			avelocities[0][i] = (rand() & 255) * 0.01f;
 	}
 
-	const float ftime = idCast<float>(cl.time);
+	const float ftime = idCast<float>(quake::cl.time);
 	for (i = 0; i < NUMVERTEXNORMALS; i++)
 	{
 		angle = ftime * avelocities[i][0];
@@ -164,7 +164,7 @@ void R_EntityParticles(entity_t *ent)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 10ms;
+		p->die = quake::cl.time + 10ms;
 		p->color = 0x6f;
 		p->type = pt_explode;
 
@@ -202,9 +202,10 @@ void R_ReadPointFile_f(cmd_source_t source, size_t argc, const quake::string_vie
 	char	name[MAX_OSPATH];
 
 	Q_sprintf (name,"maps/%s.pts", sv.name);
+	std::fstream f;
 
-	auto f = COM_FindFile(name);
-	if (!f)
+	size_t length = COM_FindFile(name, f);
+	if (!length)
 	{
 		Con_Printf ("couldn't open %s\n", name);
 		return;
@@ -291,7 +292,7 @@ void R_ParticleExplosion (vec3_t org)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 5s;
+		p->die = quake::cl.time + 5s;
 		p->color = ramp1[0];
 		p->ramp = rand()&3;
 		if (i & 1)
@@ -336,7 +337,7 @@ void R_ParticleExplosion2 (vec3_t org, int colorStart, int colorLength)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 300ms;
+		p->die = quake::cl.time + 300ms;
 		p->color = colorStart + (colorMod % colorLength);
 		colorMod++;
 
@@ -369,7 +370,7 @@ void R_BlobExplosion (vec3_t org)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 1s + (50ms * (rand() & 8));
+		p->die = quake::cl.time + 1s + (50ms * (rand() & 8));
 
 		if (i & 1)
 		{
@@ -416,7 +417,7 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 
 		if (count == 1024)
 		{	// rocket explosion
-			p->die = cl.time + 5s;
+			p->die = quake::cl.time + 5s;
 			p->color = ramp1[0];
 			p->ramp = rand()&3;
 			if (i & 1)
@@ -440,7 +441,7 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 		}
 		else
 		{
-			p->die = cl.time + (100ms*(rand()%5));
+			p->die = quake::cl.time + (100ms*(rand()%5));
 			p->color = (color&~7) + (rand()&7);
 			p->type = pt_slowgrav;
 			for (j=0 ; j<3 ; j++)
@@ -477,7 +478,7 @@ void R_LavaSplash (vec3_t org)
 				p->next = active_particles;
 				active_particles = p;
 		
-				p->die = cl.time + 2s + (20ms * (rand() & 31));
+				p->die = quake::cl.time + 2s + (20ms * (rand() & 31));
 				p->color = 224 + (rand()&7);
 				p->type = pt_slowgrav;
 				
@@ -519,7 +520,7 @@ void R_TeleportSplash (vec3_t org)
 				p->next = active_particles;
 				active_particles = p;
 		
-				p->die = cl.time + 200ms + (20ms * (rand() & 7));
+				p->die = quake::cl.time + 200ms + (20ms * (rand() & 7));
 				p->color = 7 + (rand()&7);
 				p->type = pt_slowgrav;
 				
@@ -568,7 +569,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 		active_particles = p;
 		
 		VectorCopy (vec3_origin, p->vel);
-		p->die = cl.time + 2s;
+		p->die = quake::cl.time + 2s;
 
 		switch (type)
 		{
@@ -597,7 +598,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 
 			case 3:
 			case 5:	// tracer
-				p->die = cl.time + 500ms;
+				p->die = quake::cl.time + 500ms;
 				p->type = pt_static;
 				if (type == 3)
 					p->color = 52 + ((tracercount&4)<<1);
@@ -630,7 +631,7 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 			case 6:	// voor trail
 				p->color = 9*16 + 8 + (rand()&3);
 				p->type = pt_static;
-				p->die = cl.time + 300ms;
+				p->die = quake::cl.time + 300ms;
 				for (j=0 ; j<3 ; j++)
 					p->org[j] = start[j] + ((rand()&15)-8);
 				break;
@@ -677,7 +678,7 @@ void R_DrawParticles (void)
 	VectorScale (vup, yscaleshrink, r_pup);
 	VectorCopy (vpn, r_ppn);
 #endif
-	frametime = cl.time - cl.oldtime;
+	frametime = quake::cl.time - quake::cl.oldtime;
 	time3 = frametime * 15;
 	time2 = frametime * 10; // 15;
 	time1 = frametime * 5;
@@ -687,7 +688,7 @@ void R_DrawParticles (void)
 	for ( ;; ) 
 	{
 		kill = active_particles;
-		if (kill && kill->die < cl.time)
+		if (kill && kill->die < quake::cl.time)
 		{
 			active_particles = kill->next;
 			kill->next = free_particles;
@@ -702,7 +703,7 @@ void R_DrawParticles (void)
 		for ( ;; )
 		{
 			kill = p->next;
-			if (kill && kill->die < cl.time)
+			if (kill && kill->die < quake::cl.time)
 			{
 				p->next = kill->next;
 				kill->next = free_particles;

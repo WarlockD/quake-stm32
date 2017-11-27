@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 using namespace std::chrono;
 
-char *svc_strings[] =
+static const char *svc_strings[] =
 {
 	"svc_bad",
 	"svc_nop",
@@ -81,14 +81,14 @@ This error checks and tracks the total number of entities
 */
 entity_t	*CL_EntityNum (int num)
 {
-	if (num >= cl.num_entities)
+	if (num >= quake::cl.num_entities)
 	{
 		if (num >= MAX_EDICTS)
 			Host_Error ("CL_EntityNum: %i is an invalid number",num);
-		while (cl.num_entities<=num)
+		while (quake::cl.num_entities<=num)
 		{
-			cl_entities[cl.num_entities].colormap = vid.colormap;
-			cl.num_entities++;
+			cl_entities[quake::cl.num_entities].colormap = vid.colormap;
+			quake::cl.num_entities++;
 		}
 	}
 		
@@ -135,7 +135,7 @@ void CL_ParseStartSoundPacket(void)
 	for (i=0 ; i<3 ; i++)
 		pos[i] = MSG_ReadCoord ();
  
-    S_StartSound (ent, channel, cl.sound_precache[sound_num], pos, volume/255.0, attenuation);
+    S_StartSound (ent, channel, quake::cl.sound_precache[sound_num], pos, volume/255.0, attenuation);
 }       
 
 /*
@@ -156,7 +156,7 @@ void CL_KeepaliveMessage (void)
 	
 	if (sv.active)
 		return;		// no need if server is local
-	if (cls.demoplayback)
+	if (quake::cls.demoplayback)
 		return;
 
 	old = net_message;
@@ -194,9 +194,9 @@ void CL_KeepaliveMessage (void)
 // write out a nop
 	Con_Printf ("--> client to server keepalive\n");
 
-	cls.message.WriteByte(clc_nop);
-	NET_SendMessage (cls.netcon, &cls.message);
-	cls.message.Clear();
+	quake::cls.message.WriteByte(clc_nop);
+	NET_SendMessage (quake::cls.netcon, &quake::cls.message);
+	quake::cls.message.Clear();
 }
 
 /*
@@ -227,20 +227,20 @@ void CL_ParseServerInfo (void)
 	}
 
 // parse maxclients
-	cl.maxclients = MSG_ReadByte ();
-	if (cl.maxclients < 1 || cl.maxclients > MAX_SCOREBOARD)
+	quake::cl.maxclients = MSG_ReadByte ();
+	if (quake::cl.maxclients < 1 || quake::cl.maxclients > MAX_SCOREBOARD)
 	{
-		Con_Printf("Bad maxclients (%u) from server\n", cl.maxclients);
+		Con_Printf("Bad maxclients (%u) from server\n", quake::cl.maxclients);
 		return;
 	}
-	cl.scores = (scoreboard_t*)Hunk_AllocName (cl.maxclients*sizeof(*cl.scores), "scores");
+	quake::cl.scores = (scoreboard_t*)Hunk_AllocName (quake::cl.maxclients*sizeof(*quake::cl.scores), "scores");
 
 // parse gametype
-	cl.gametype = MSG_ReadByte ();
+	quake::cl.gametype = MSG_ReadByte ();
 
 // parse signon message
 	str = MSG_ReadString ();
-	strncpy (cl.levelname, str, sizeof(cl.levelname)-1);
+	strncpy (quake::cl.levelname, str, sizeof(quake::cl.levelname)-1);
 
 // seperate the printfs so the server message can have a color
 	Con_Printf("\n\n\35\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\37\n\n");
@@ -253,7 +253,7 @@ void CL_ParseServerInfo (void)
 //
 
 // precache models
-	memset (cl.model_precache, 0, sizeof(cl.model_precache));
+	memset (quake::cl.model_precache, 0, sizeof(quake::cl.model_precache));
 	for (nummodels=1 ; ; nummodels++)
 	{
 		str = MSG_ReadString ();
@@ -269,7 +269,7 @@ void CL_ParseServerInfo (void)
 	}
 
 // precache sounds
-	memset (cl.sound_precache, 0, sizeof(cl.sound_precache));
+	memset (quake::cl.sound_precache, 0, sizeof(quake::cl.sound_precache));
 	for (numsounds=1 ; ; numsounds++)
 	{
 		str = MSG_ReadString ();
@@ -290,8 +290,8 @@ void CL_ParseServerInfo (void)
 
 	for (i=1 ; i<nummodels ; i++)
 	{
-		cl.model_precache[i] = Mod_ForName (model_precache[i], false);
-		if (cl.model_precache[i] == NULL)
+		quake::cl.model_precache[i] = Mod_ForName (model_precache[i], false);
+		if (quake::cl.model_precache[i] == NULL)
 		{
 			Con_Printf("Model %s not found\n", model_precache[i]);
 			return;
@@ -302,14 +302,14 @@ void CL_ParseServerInfo (void)
 	S_BeginPrecaching ();
 	for (i=1 ; i<numsounds ; i++)
 	{
-		cl.sound_precache[i] = S_PrecacheSound (sound_precache[i]);
+		quake::cl.sound_precache[i] = S_PrecacheSound (sound_precache[i]);
 		CL_KeepaliveMessage ();
 	}
 	S_EndPrecaching ();
 
 
 // local state
-	cl_entities[0].model = cl.worldmodel = cl.model_precache[1];
+	cl_entities[0].model = quake::cl.worldmodel = quake::cl.model_precache[1];
 	
 	R_NewMap ();
 
@@ -340,10 +340,10 @@ void CL_ParseUpdate (int bits)
 	int			num;
 	int			skin;
 
-	if (cls.signon == SIGNONS - 1)
+	if (quake::cls.signon == SIGNONS - 1)
 	{	// first update is the final signon stage
-		cls.signon = SIGNONS;
-		CL_SignonReply ();
+		quake::cls.signon = SIGNONS;
+		quake::cls.signon_reply();
 	}
 
 	if (bits & U_MOREBITS)
@@ -363,12 +363,12 @@ for (i=0 ; i<16 ; i++)
 if (bits&(1<<i))
 	bitcounts[i]++;
 
-	if (ent->msgtime != cl.mtime[1])
+	if (ent->msgtime != quake::cl.mtime[1])
 		forcelink = true;	// no previous frame to lerp from
 	else
 		forcelink = false;
 
-	ent->msgtime = cl.mtime[0];
+	ent->msgtime = quake::cl.mtime[0];
 	
 	if (bits & U_MODEL)
 	{
@@ -379,7 +379,7 @@ if (bits&(1<<i))
 	else
 		modnum = ent->baseline.modelindex;
 		
-	model = cl.model_precache[modnum];
+	model = quake::cl.model_precache[modnum];
 	if (model != ent->model)
 	{
 		ent->model = model;
@@ -395,7 +395,7 @@ if (bits&(1<<i))
 		else
 			forcelink = true;	// hack to make null model players work
 #ifdef GLQUAKE
-		if (num > 0 && num <= cl.maxclients)
+		if (num > 0 && num <= quake::cl.maxclients)
 			R_TranslatePlayerSkin (num - 1);
 #endif
 	}
@@ -413,9 +413,9 @@ if (bits&(1<<i))
 		ent->colormap = vid.colormap;
 	else
 	{
-		if (i > cl.maxclients)
-			Sys_Error ("i >= cl.maxclients");
-		ent->colormap = cl.scores[i-1].translations;
+		if (i > quake::cl.maxclients)
+			Sys_Error ("i >= quake::cl.maxclients");
+		ent->colormap = quake::cl.scores[i-1].translations;
 	}
 
 #ifdef GLQUAKE
@@ -425,7 +425,7 @@ if (bits&(1<<i))
 		skin = ent->baseline.skin;
 	if (skin != ent->skinnum) {
 		ent->skinnum = skin;
-		if (num > 0 && num <= cl.maxclients)
+		if (num > 0 && num <= quake::cl.maxclients)
 			R_TranslatePlayerSkin (num - 1);
 	}
 
@@ -519,55 +519,55 @@ void CL_ParseClientdata (int bits)
 	int		i, j;
 	
 	if (bits & SU_VIEWHEIGHT)
-		cl.viewheight = MSG_ReadChar ();
+		quake::cl.viewheight = MSG_ReadChar ();
 	else
-		cl.viewheight = DEFAULT_VIEWHEIGHT;
+		quake::cl.viewheight = DEFAULT_VIEWHEIGHT;
 
 	if (bits & SU_IDEALPITCH)
-		cl.idealpitch = MSG_ReadChar ();
+		quake::cl.idealpitch = MSG_ReadChar ();
 	else
-		cl.idealpitch = 0;
+		quake::cl.idealpitch = 0;
 	
-	VectorCopy (cl.mvelocity[0], cl.mvelocity[1]);
+	VectorCopy (quake::cl.mvelocity[0], quake::cl.mvelocity[1]);
 	for (i=0 ; i<3 ; i++)
 	{
 		if (bits & (SU_PUNCH1<<i) )
-			cl.punchangle[i] = MSG_ReadChar();
+			quake::cl.punchangle[i] = MSG_ReadChar();
 		else
-			cl.punchangle[i] = 0;
+			quake::cl.punchangle[i] = 0;
 		if (bits & (SU_VELOCITY1<<i) )
-			cl.mvelocity[0][i] = MSG_ReadChar()*16;
+			quake::cl.mvelocity[0][i] = MSG_ReadChar()*16;
 		else
-			cl.mvelocity[0][i] = 0;
+			quake::cl.mvelocity[0][i] = 0;
 	}
 
 // [always sent]	if (bits & SU_ITEMS)
 		i = MSG_ReadLong ();
 
-	if (cl.items != i)
+	if (quake::cl.items != i)
 	{	// set flash times
 		Sbar_Changed ();
 		for (j=0 ; j<32 ; j++)
-			if ( (i & (1<<j)) && !(cl.items & (1<<j)))
-				cl.item_gettime[j] = cl.time;
-		cl.items = i;
+			if ( (i & (1<<j)) && !(quake::cl.items & (1<<j)))
+				quake::cl.item_gettime[j] = quake::cl.time;
+		quake::cl.items = i;
 	}
 		
-	cl.onground = (bits & SU_ONGROUND) != 0;
-	cl.inwater = (bits & SU_INWATER) != 0;
+	quake::cl.onground = (bits & SU_ONGROUND) != 0;
+	quake::cl.inwater = (bits & SU_INWATER) != 0;
 
 	if (bits & SU_WEAPONFRAME)
-		cl.stats[STAT_WEAPONFRAME] = MSG_ReadByte ();
+		quake::cl.stats[STAT_WEAPONFRAME] = MSG_ReadByte ();
 	else
-		cl.stats[STAT_WEAPONFRAME] = 0;
+		quake::cl.stats[STAT_WEAPONFRAME] = 0;
 
 	if (bits & SU_ARMOR)
 		i = MSG_ReadByte ();
 	else
 		i = 0;
-	if (cl.stats[STAT_ARMOR] != i)
+	if (quake::cl.stats[STAT_ARMOR] != i)
 	{
-		cl.stats[STAT_ARMOR] = i;
+		quake::cl.stats[STAT_ARMOR] = i;
 		Sbar_Changed ();
 	}
 
@@ -575,32 +575,32 @@ void CL_ParseClientdata (int bits)
 		i = MSG_ReadByte ();
 	else
 		i = 0;
-	if (cl.stats[STAT_WEAPON] != i)
+	if (quake::cl.stats[STAT_WEAPON] != i)
 	{
-		cl.stats[STAT_WEAPON] = i;
+		quake::cl.stats[STAT_WEAPON] = i;
 		Sbar_Changed ();
 	}
 	
 	i = MSG_ReadShort ();
-	if (cl.stats[STAT_HEALTH] != i)
+	if (quake::cl.stats[STAT_HEALTH] != i)
 	{
-		cl.stats[STAT_HEALTH] = i;
+		quake::cl.stats[STAT_HEALTH] = i;
 		Sbar_Changed ();
 	}
 
 	i = MSG_ReadByte ();
-	if (cl.stats[STAT_AMMO] != i)
+	if (quake::cl.stats[STAT_AMMO] != i)
 	{
-		cl.stats[STAT_AMMO] = i;
+		quake::cl.stats[STAT_AMMO] = i;
 		Sbar_Changed ();
 	}
 
 	for (i=0 ; i<4 ; i++)
 	{
 		j = MSG_ReadByte ();
-		if (cl.stats[STAT_SHELLS+i] != j)
+		if (quake::cl.stats[STAT_SHELLS+i] != j)
 		{
-			cl.stats[STAT_SHELLS+i] = j;
+			quake::cl.stats[STAT_SHELLS+i] = j;
 			Sbar_Changed ();
 		}
 	}
@@ -609,17 +609,17 @@ void CL_ParseClientdata (int bits)
 
 	if (standard_quake)
 	{
-		if (cl.stats[STAT_ACTIVEWEAPON] != i)
+		if (quake::cl.stats[STAT_ACTIVEWEAPON] != i)
 		{
-			cl.stats[STAT_ACTIVEWEAPON] = i;
+			quake::cl.stats[STAT_ACTIVEWEAPON] = i;
 			Sbar_Changed ();
 		}
 	}
 	else
 	{
-		if (cl.stats[STAT_ACTIVEWEAPON] != (1<<i))
+		if (quake::cl.stats[STAT_ACTIVEWEAPON] != (1<<i))
 		{
-			cl.stats[STAT_ACTIVEWEAPON] = (1<<i);
+			quake::cl.stats[STAT_ACTIVEWEAPON] = (1<<i);
 			Sbar_Changed ();
 		}
 	}
@@ -636,13 +636,13 @@ void CL_NewTranslation (int slot)
 	int		top, bottom;
 	byte	*dest, *source;
 	
-	if (slot > cl.maxclients)
-		Sys_Error ("CL_NewTranslation: slot > cl.maxclients");
-	dest = cl.scores[slot].translations;
+	if (slot > quake::cl.maxclients)
+		Sys_Error ("CL_NewTranslation: slot > quake::cl.maxclients");
+	dest = quake::cl.scores[slot].translations;
 	source = vid.colormap;
-	Q_memcpy (dest, vid.colormap, sizeof(cl.scores[slot].translations));
-	top = cl.scores[slot].colors & 0xf0;
-	bottom = (cl.scores[slot].colors &15)<<4;
+	Q_memcpy (dest, vid.colormap, sizeof(quake::cl.scores[slot].translations));
+	top = quake::cl.scores[slot].colors & 0xf0;
+	bottom = (quake::cl.scores[slot].colors &15)<<4;
 #ifdef GLQUAKE
 	R_TranslatePlayerSkin (slot);
 #endif
@@ -673,15 +673,15 @@ void CL_ParseStatic (void)
 	entity_t *ent;
 	int		i;
 		
-	i = cl.num_statics;
+	i = quake::cl.num_statics;
 	if (i >= MAX_STATIC_ENTITIES)
 		Host_Error ("Too many static entities");
 	ent = &cl_static_entities[i];
-	cl.num_statics++;
+	quake::cl.num_statics++;
 	CL_ParseBaseline (ent);
 
 // copy it to the current state
-	ent->model = cl.model_precache[ent->baseline.modelindex];
+	ent->model = quake::cl.model_precache[ent->baseline.modelindex];
 	ent->frame = ent->baseline.frame;
 	ent->colormap = vid.colormap;
 	ent->skinnum = ent->baseline.skin;
@@ -709,260 +709,261 @@ void CL_ParseStaticSound (void)
 	vol = MSG_ReadByte ();
 	atten = MSG_ReadByte ();
 	
-	S_StaticSound (cl.sound_precache[sound_num], org, vol, atten);
+	S_StaticSound (quake::cl.sound_precache[sound_num], org, vol, atten);
 }
 
-
-#define SHOWNET(x) if(cl_shownet.value==2)Con_Printf ("%3i:%s\n", msg_readcount-1, x);
+static void SHOWNET(const char* msg,  int readcount) {
+	if (cl_shownet.value == 2) { 
+		quake::con << std::setw(3) << (readcount - 1) << ':' << msg << std::endl;
+	}
+}
 
 /*
 =====================
 CL_ParseServerMessage
 =====================
 */
-void CL_ParseServerMessage (void)
+void CL_ParseServerMessage(void)
 {
 	int			cmd;
 	int			i;
-	
-//
-// if recording demos, copy the message out
-//
+
+	//
+	// if recording demos, copy the message out
+	//
 	if (cl_shownet.value == 1)
-		Con_Printf ("%i ",net_message.size());
+		Con_Printf("%i ", net_message.size());
 	else if (cl_shownet.value == 2)
-		Con_Printf ("------------------\n");
-	
-	cl.onground = false;	// unless the server says otherwise	
+		Con_Printf("------------------\n");
+
+	quake::cl.onground = false;	// unless the server says otherwise	
 //
 // parse the message
 //
-	MSG_BeginReading ();
-	
+	MSG_BeginReading();
+
 	while (1)
 	{
 		if (msg_badread)
-			Host_Error ("CL_ParseServerMessage: Bad server message");
+			Host_Error("CL_ParseServerMessage: Bad server message");
 
-		cmd = MSG_ReadByte ();
+		cmd = MSG_ReadByte();
 
 		if (cmd == -1)
 		{
-			SHOWNET("END OF MESSAGE");
+			SHOWNET("END OF MESSAGE", msg_readcount);
 			return;		// end of message
 		}
 
-	// if the high bit of the command byte is set, it is a fast update
+		// if the high bit of the command byte is set, it is a fast update
 		if (cmd & 128)
 		{
-			SHOWNET("fast update");
-			CL_ParseUpdate (cmd&127);
+			SHOWNET("fast update", msg_readcount);
+			CL_ParseUpdate(cmd & 127);
 			continue;
 		}
 
-		SHOWNET(svc_strings[cmd]);
-	
-	// other commands
+		SHOWNET(svc_strings[cmd], msg_readcount);
+
+		// other commands
 		switch (cmd)
 		{
 		default:
-			Host_Error ("CL_ParseServerMessage: Illegible server message\n");
+			Host_Error("CL_ParseServerMessage: Illegible server message\n");
 			break;
-			
+
 		case svc_nop:
-//			Con_Printf ("svc_nop\n");
+			//			Con_Printf ("svc_nop\n");
 			break;
-			
+
 		case svc_time:
-			cl.mtime[1] = cl.mtime[0];
-			cl.mtime[0] = idCast<idTime>(MSG_ReadFloat ());			
+			quake::cl.mtime[1] = quake::cl.mtime[0];
+			quake::cl.mtime[0] = idCast<idTime>(MSG_ReadFloat());
 			break;
-			
+
 		case svc_clientdata:
-			i = MSG_ReadShort ();
-			CL_ParseClientdata (i);
+			i = MSG_ReadShort();
+			CL_ParseClientdata(i);
 			break;
-		
+
 		case svc_version:
-			i = MSG_ReadLong ();
+			i = MSG_ReadLong();
 			if (i != PROTOCOL_VERSION)
-				Host_Error ("CL_ParseServerMessage: Server is protocol %i instead of %i\n", i, PROTOCOL_VERSION);
+				Host_Error("CL_ParseServerMessage: Server is protocol %i instead of %i\n", i, PROTOCOL_VERSION);
 			break;
-			
+
 		case svc_disconnect:
-			Host_EndGame ("Server disconnected\n");
+			Host_EndGame("Server disconnected\n");
 
 		case svc_print:
-			Con_Printf ("%s", MSG_ReadString ());
+			Con_Printf("%s", MSG_ReadString());
 			break;
-			
+
 		case svc_centerprint:
-			SCR_CenterPrint (MSG_ReadString ());
+			SCR_CenterPrint(MSG_ReadString());
 			break;
-			
+
 		case svc_stufftext:
-			Cbuf_AddText (MSG_ReadString ());
+			Cbuf_AddText(MSG_ReadString());
 			break;
-			
+
 		case svc_damage:
-			V_ParseDamage ();
+			V_ParseDamage();
 			break;
-			
+
 		case svc_serverinfo:
-			CL_ParseServerInfo ();
+			CL_ParseServerInfo();
 			vid.recalc_refdef = true;	// leave intermission full screen
 			break;
-			
+
 		case svc_setangle:
-			for (i=0 ; i<3 ; i++)
-				cl.viewangles[i] = MSG_ReadAngle ();
+			for (i = 0; i < 3; i++)
+				quake::cl.viewangles[i] = MSG_ReadAngle();
 			break;
-			
+
 		case svc_setview:
-			cl.viewentity = MSG_ReadShort ();
+			quake::cl.viewentity = MSG_ReadShort();
 			break;
-					
+
 		case svc_lightstyle:
-			i = MSG_ReadByte ();
+			i = MSG_ReadByte();
 			if (i >= MAX_LIGHTSTYLES)
-				Sys_Error ("svc_lightstyle > MAX_LIGHTSTYLES");
-			Q_strcpy (cl_lightstyle[i].map,  MSG_ReadString());
+				Sys_Error("svc_lightstyle > MAX_LIGHTSTYLES");
+			Q_strcpy(cl_lightstyle[i].map, MSG_ReadString());
 			cl_lightstyle[i].length = Q_strlen(cl_lightstyle[i].map);
 			break;
-			
+
 		case svc_sound:
 			CL_ParseStartSoundPacket();
 			break;
-			
+
 		case svc_stopsound:
 			i = MSG_ReadShort();
-			S_StopSound(i>>3, i&7);
+			S_StopSound(i >> 3, i & 7);
 			break;
-		
+
 		case svc_updatename:
-			Sbar_Changed ();
-			i = MSG_ReadByte ();
-			if (i >= cl.maxclients)
-				Host_Error ("CL_ParseServerMessage: svc_updatename > MAX_SCOREBOARD");
-			strcpy (cl.scores[i].name, MSG_ReadString ());
+			Sbar_Changed();
+			i = MSG_ReadByte();
+			if (i >= quake::cl.maxclients)
+				Host_Error("CL_ParseServerMessage: svc_updatename > MAX_SCOREBOARD");
+			strcpy(quake::cl.scores[i].name, MSG_ReadString());
 			break;
-			
+
 		case svc_updatefrags:
-			Sbar_Changed ();
-			i = MSG_ReadByte ();
-			if (i >= cl.maxclients)
-				Host_Error ("CL_ParseServerMessage: svc_updatefrags > MAX_SCOREBOARD");
-			cl.scores[i].frags = MSG_ReadShort ();
-			break;			
+			Sbar_Changed();
+			i = MSG_ReadByte();
+			if (i >= quake::cl.maxclients)
+				Host_Error("CL_ParseServerMessage: svc_updatefrags > MAX_SCOREBOARD");
+			quake::cl.scores[i].frags = MSG_ReadShort();
+			break;
 
 		case svc_updatecolors:
-			Sbar_Changed ();
-			i = MSG_ReadByte ();
-			if (i >= cl.maxclients)
-				Host_Error ("CL_ParseServerMessage: svc_updatecolors > MAX_SCOREBOARD");
-			cl.scores[i].colors = MSG_ReadByte ();
-			CL_NewTranslation (i);
+			Sbar_Changed();
+			i = MSG_ReadByte();
+			if (i >= quake::cl.maxclients)
+				Host_Error("CL_ParseServerMessage: svc_updatecolors > MAX_SCOREBOARD");
+			quake::cl.scores[i].colors = MSG_ReadByte();
+			CL_NewTranslation(i);
 			break;
-			
+
 		case svc_particle:
-			R_ParseParticleEffect ();
+			R_ParseParticleEffect();
 			break;
 
 		case svc_spawnbaseline:
-			i = MSG_ReadShort ();
-			// must use CL_EntityNum() to force cl.num_entities up
-			CL_ParseBaseline (CL_EntityNum(i));
+			i = MSG_ReadShort();
+			// must use CL_EntityNum() to force quake::cl.num_entities up
+			CL_ParseBaseline(CL_EntityNum(i));
 			break;
 		case svc_spawnstatic:
-			CL_ParseStatic ();
-			break;			
+			CL_ParseStatic();
+			break;
 		case svc_temp_entity:
-			CL_ParseTEnt ();
+			CL_ParseTEnt();
 			break;
 
 		case svc_setpause:
-			{
-				cl.paused = MSG_ReadByte ();
+		{
+			quake::cl.paused = MSG_ReadByte();
 
-				if (cl.paused)
-				{
-					CDAudio_Pause ();
+			if (quake::cl.paused)
+			{
+				CDAudio_Pause();
 #ifdef _WIN32
-					VID_HandlePause (true);
+				VID_HandlePause(true);
 #endif
-				}
-				else
-				{
-					CDAudio_Resume ();
-#ifdef _WIN32
-					VID_HandlePause (false);
-#endif
-				}
 			}
-			break;
-			
+			else
+			{
+				CDAudio_Resume();
+#ifdef _WIN32
+				VID_HandlePause(false);
+#endif
+			}
+		}
+		break;
+
 		case svc_signonnum:
-			i = MSG_ReadByte ();
-			if (i <= cls.signon)
-				Host_Error ("Received signon %i when at %i", i, cls.signon);
-			cls.signon = i;
-			CL_SignonReply ();
+			i = MSG_ReadByte();
+			if (i <= quake::cls.signon)
+				Host_Error("Received signon %i when at %i", i, quake::cls.signon);
+			quake::cls.signon = i;
+			quake::cls.signon_reply();
 			break;
 
 		case svc_killedmonster:
-			cl.stats[STAT_MONSTERS]++;
+			quake::cl.stats[STAT_MONSTERS]++;
 			break;
 
 		case svc_foundsecret:
-			cl.stats[STAT_SECRETS]++;
+			quake::cl.stats[STAT_SECRETS]++;
 			break;
 
 		case svc_updatestat:
-			i = MSG_ReadByte ();
+			i = MSG_ReadByte();
 			if (i < 0 || i >= MAX_CL_STATS)
-				Sys_Error ("svc_updatestat: %i is invalid", i);
-			cl.stats[i] = MSG_ReadLong ();;
+				Sys_Error("svc_updatestat: %i is invalid", i);
+			quake::cl.stats[i] = MSG_ReadLong();;
 			break;
-			
+
 		case svc_spawnstaticsound:
-			CL_ParseStaticSound ();
+			CL_ParseStaticSound();
 			break;
 
 		case svc_cdtrack:
-			cl.cdtrack = MSG_ReadByte ();
-			cl.looptrack = MSG_ReadByte ();
-			if ( (cls.demoplayback || cls.demorecording) && (cls.forcetrack != -1) )
-				CDAudio_Play ((byte)cls.forcetrack, true);
+			quake::cl.cdtrack = MSG_ReadByte();
+			quake::cl.looptrack = MSG_ReadByte();
+			if ((quake::cls.demoplayback || quake::cls.demorecording) && (quake::cls.forcetrack != -1))
+				CDAudio_Play((byte)quake::cls.forcetrack, true);
 			else
-				CDAudio_Play ((byte)cl.cdtrack, true);
+				CDAudio_Play((byte)quake::cl.cdtrack, true);
 			break;
 
 		case svc_intermission:
-			cl.intermission = 1;
-			cl.completed_time = idCast<int>(cl.time);
+			quake::cl.intermission = 1;
+			quake::cl.completed_time = idCast<int>(quake::cl.time);
 			vid.recalc_refdef = true;	// go to full screen
 			break;
 
 		case svc_finale:
-			cl.intermission = 2;
-			cl.completed_time = idCast<int>(cl.time);
+			quake::cl.intermission = 2;
+			quake::cl.completed_time = idCast<int>(quake::cl.time);
 			vid.recalc_refdef = true;	// go to full screen
-			SCR_CenterPrint (MSG_ReadString ());			
+			SCR_CenterPrint(MSG_ReadString());
 			break;
 
 		case svc_cutscene:
-			cl.intermission = 3;
-			cl.completed_time = idCast<int>(cl.time);
+			quake::cl.intermission = 3;
+			quake::cl.completed_time = idCast<int>(quake::cl.time);
 			vid.recalc_refdef = true;	// go to full screen
-			SCR_CenterPrint (MSG_ReadString ());			
+			SCR_CenterPrint(MSG_ReadString());
 			break;
 
 		case svc_sellscreen: {
 			execute_args("help", src_command);
 			break;
 		}
-			break;
 		}
 	}
 }
-

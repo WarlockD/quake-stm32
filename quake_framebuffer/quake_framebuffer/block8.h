@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 LEnter16_8:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -28,13 +28,13 @@ LEnter16_8:
 LBPatch0:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch1:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -43,13 +43,13 @@ LBPatch1:
 LBPatch2:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch3:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -58,13 +58,13 @@ LBPatch3:
 LBPatch4:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch5:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -73,14 +73,14 @@ LBPatch5:
 LBPatch6:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch7:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 LEnter8_8:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -89,13 +89,13 @@ LEnter8_8:
 LBPatch8:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch9:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -104,14 +104,14 @@ LBPatch9:
 LBPatch10:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch11:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 LEnter4_8:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -120,14 +120,14 @@ LEnter4_8:
 LBPatch12:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch13:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 
 LEnter2_8:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -136,8 +136,8 @@ LEnter2_8:
 LBPatch14:
 	addl	%ebp,%edx
 	movb	%al,(%edi)
-	movb	0x12345678(%ecx),%cl
+	movb	0x12345678(%ecx),%quake::cl
 LBPatch15:
-	movb	%cl,1(%edi)
+	movb	%quake::cl,1(%edi)
 	addl	$0x2,%edi
 

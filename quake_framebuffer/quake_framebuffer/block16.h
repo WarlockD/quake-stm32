@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 LEnter16_16:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -34,7 +34,7 @@ LBPatch1:
 	addl	$0x4,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -49,7 +49,7 @@ LBPatch3:
 	addl	$0x4,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -64,7 +64,7 @@ LBPatch5:
 	addl	$0x4,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -80,7 +80,7 @@ LBPatch7:
 
 LEnter8_16:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -95,7 +95,7 @@ LBPatch9:
 	addl	$0x4,%edi
 
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -111,7 +111,7 @@ LBPatch11:
 
 LEnter4_16:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch
@@ -127,7 +127,7 @@ LBPatch13:
 
 LEnter2_16:
 	movb	(%esi),%al
-	movb	(%esi,%ebx,),%cl
+	movb	(%esi,%ebx,),%quake::cl
 	movb	%dh,%ah
 	addl	%ebp,%edx
 	movb	%dh,%ch

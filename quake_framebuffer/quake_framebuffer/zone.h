@@ -94,7 +94,7 @@ void Memory_Init(void *buf, size_t size);
 
 void Z_Free(void *ptr);
 void *Z_Malloc(size_t size);			// returns 0 filled memory
-void *Z_TagMalloc(size_t size, int tag);
+void *Z_TagMalloc(size_t size, const void* tag);
 
 
 void Z_CheckHeap(void);
@@ -139,6 +139,78 @@ void *umm_realloc(void *ptr, size_t size);
 void umm_free(void *ptr);
 size_t umm_maxsize();
 
+
+
+namespace type_tags {
+	// https://stackoverflow.com/questions/23715212/template-specialization-containers
+	// working on a method to prity print containers and their types
+	struct unkonwn_stl { static constexpr const char* debug_name = "unkonwn stl"; };
+	struct unordered_map : unkonwn_stl { static constexpr const char* debug_name = "unordered_map"; };
+	struct string : unkonwn_stl { static constexpr const char* debug_name = "string"; };
+	struct vector : unkonwn_stl { static constexpr const char* debug_name = "vector"; };
+	struct list : unkonwn_stl { static constexpr const char* debug_name = "list"; };
+	struct stream : unkonwn_stl { static constexpr const char* debug_name = "stream"; };
+	struct pair : unkonwn_stl { static constexpr const char* debug_name = "pair"; };
+	template <typename C, typename E=void> struct container_traits {
+		using category = unkonwn_stl;
+	};
+
+	template <typename T, typename A>
+	struct container_traits<std::vector<T, A>, std::true_type> {
+		using category = vector;
+	};
+
+	template <typename T, typename A>
+	struct container_traits<std::list<T, A>, std::true_type> {
+		using category = list;
+	};
+
+	template <typename K, typename V, typename H, typename E, typename A>
+	struct container_traits<std::unordered_map<K, V, H, E, A>, std::true_type> {
+		using category = unordered_map;
+	};
+
+	template <typename L,typename R>
+	struct container_traits<std::pair<L, R>, std::true_type> {
+		using category = pair;
+	};
+
+
+	template <typename L, typename R>
+	constexpr const char* _get_type_string_t(std::pair<L,R>) { return "pair"; }
+	constexpr const char* _get_type_string(unkonwn_stl) { return "unkonwn stl"; }
+	constexpr const char* _get_type_string(unordered_map) { return "unordered_map"; }
+	constexpr const char* _get_type_string(string) { return "string"; }
+	constexpr const char* _get_type_string(vector) { return "vector"; }
+	constexpr const char* _get_type_string(stream) { return "stream"; }
+	constexpr const char* _get_type_string(list) { return "list"; }
+	constexpr const char* _get_type_string(pair) { return "pair"; }
+
+	template<typename T>
+	constexpr const char* get_type_string(const T*) { return _get_type_string(typename container_traits<T>::category{}); }
+	constexpr const char* get_type_string(float) { return "float"; }
+	constexpr const char* get_type_string(int32_t) { return "int32_t"; }
+	constexpr const char* get_type_string(uint32_t) { return "uint32_t"; }
+	constexpr const char* get_type_string(char) { return "char"; }
+	constexpr const char* get_type_string(uint8_t) { return "byte"; }
+	constexpr const char* get_type_string(short) { return "short"; }
+	constexpr const char* get_type_string(uint16_t) { return "uint16_t"; }
+
+
+
+#if 0
+	template <typename Container, typename Compare>
+	void sort_helper(Container& c, Compare f, vectorlike_tag) {
+		std::sort(c.begin(), c.end(), f);
+	}
+
+	template <typename Container, typename Compare>
+	void sort_helper(Container& c, Compare f, listlike_tag) {
+		c.sort(f);
+	}
+#endif
+}
+
 // uses ummalloc
 template <typename T>
 class UAllocator
@@ -152,23 +224,28 @@ public:
 	using const_pointer = const value_type*;
 	using reference = value_type&;
 	using const_reference = const value_type&;
+	
+
 	//using propagate_on_container_move_assignment = std::true_type;
 	template <class U>
 	struct rebind { using other =  UAllocator<U> ; };
 
-	UAllocator() noexcept = default;
-	UAllocator(const UAllocator&) noexcept {}
-	UAllocator(UAllocator&& move) noexcept {}
+	UAllocator() noexcept  : type_tag() {
+		type_tag = typeid(T).name();
+	}
+	UAllocator(const UAllocator& copy) noexcept : type_tag(copy.tag()) {}
+	UAllocator(UAllocator&& move) noexcept : type_tag(move.tag()) {}
 	template <class U>
-	UAllocator(const UAllocator<U>&) noexcept {}
+	UAllocator(const UAllocator<U>&copy) noexcept : type_tag(copy.tag()) {}
 	template <class U>
-	UAllocator& operator=(const UAllocator<U>&) noexcept { return *this; }
+	UAllocator& operator=(const UAllocator<U>& copy) noexcept { type_tag = copy.tag();  return *this; }
 	~UAllocator() noexcept {}
 
 	pointer   allocate(size_type n)  {
 		assert(n >0);
 		//void* ret = umm_malloc(n);
-		void* ptr = Z_Malloc(n*sizeof(T));
+
+		void* ptr = Z_TagMalloc(n*sizeof(T), type_tag);
 		assert(ptr != 0);
 		return reinterpret_cast<T*>(ptr);
 	}
@@ -193,8 +270,15 @@ public:
 	void              destroy(pointer p) { p->~T(); }
 	size_type         max_size() const { return umm_maxsize(); }
 #endif
-
+	const char* tag() const { return type_tag; }
+private:
+	const char* type_tag;
 };
+//template <typename T>
+//const char* UAllocatorTraits<T>::debug_name = "unkonwn stl";
+
+
+
 template <typename T, typename U>
 inline bool operator == (const UAllocator<T>&, const UAllocator<U>&) {
 	return true;
@@ -370,15 +454,15 @@ template<typename T>
 struct z_delete {
 	void operator()(T *ptr) const noexcept { if (ptr) Z_Free(ptr); }
 };
+
+
 template<typename T>
 using ZUniquePtr = std::unique_ptr<T, z_delete<T>>;
 
 
 // some basic wrappers to use the doom memory system
 using ZString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
-using HString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
-using CacheString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
-using CacheStringStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
+
 using ZStringStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator<char>>;
 
 using UString = std::basic_string<char, std::char_traits<char>, UAllocator<char>>;
@@ -387,8 +471,11 @@ using UVector = std::vector<T, UAllocator<T>>;
 template<typename T>
 using UList = std::list<T, UAllocator<T>>;
 
-template<typename T>
-using USVector = std::vector<T, std::scoped_allocator_adaptor<T>>;
+
+template<typename K, typename V, typename H= std::hash<K>, typename E= std::equal_to<K>>
+using UMap = std::unordered_map<K, V, H, E, UAllocator<std::pair<const K, V>>>;
+
+
 //using StringList = std::vector<UString, UAllocator<UString>>;
 using StringList = std::list<UString, UAllocator<UString>>;
 using SStringList = std::vector<UString, std::scoped_allocator_adaptor<UString>>;

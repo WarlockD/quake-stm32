@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define _QUAKE_CLIENT_H_
 
 #include "common.h"
-
+#include "mathlib.h"
 typedef struct
 {
 	vec3_t	viewangles;
@@ -119,12 +119,14 @@ struct client_static_t
 	//quake::debug_t<cactive_t>	state;
 	cactive_t	state;
 // personalization data sent to server	
-	char		mapstring[MAX_QPATH];
-	char		spawnparms[MAX_MAPSTRING];	// to restart a level
+	quake::string mapstring;
+	quake::string spawnparms;
+	//char		mapstring[MAX_QPATH];
+	//char		spawnparms[MAX_MAPSTRING];	// to restart a level
 
 // demo loop control
 	int			demonum;		// -1 = don't play demos
-	char		demos[MAX_DEMOS][MAX_DEMONAME];		// when not playing
+	UVector <ZUniquePtr<char>> demos; // when not playing
 
 // demo recording info must be here, because record is started before
 // entering a map (and clearing client_state_t)
@@ -132,7 +134,7 @@ struct client_static_t
 	qboolean	demoplayback;
 	qboolean	timedemo;
 	int			forcetrack;			// -1 = use normal cd track
-	quake::iofstream	demofile;
+	std::fstream	demofile;
 	int			td_lastframe;		// to meter out one message a frame
 	int			td_startframe;		// host_framecount at start
 	idTime		td_starttime;		// realtime at second frame of timedemo
@@ -142,10 +144,17 @@ struct client_static_t
 	int			signon;			// 0 to SIGNONS
 	qsocket_t	*netcon;
 	sizebuf_t	message;		// writing buffer to send to server
-	
+	client_static_t();
+	void clear();		
+	void stop_playback();
+	void stop();
+	void establish_connection(const quake::string_view& host);
+	void disconnect();
+	void signon_reply();
+	void next_demo();
 } ;
 
-extern client_static_t	cls;
+
 
 //
 // the client_state_t structure is wiped completely at every
@@ -166,8 +175,8 @@ struct client_state_t
 // information for local display
 	int			stats[MAX_CL_STATS];	// health, etc
 	int			items;			// inventory bit flags
-	idTime	item_gettime[32];	// cl.time of aquiring item, for blinking
-	idTime		faceanimtime;	// use anim frame if cl.time < this
+	idTime	item_gettime[32];	// quake::cl.time of aquiring item, for blinking
+	idTime		faceanimtime;	// use anim frame if quake::cl.time < this
 
 	cshift_t	cshifts[NUM_CSHIFTS];	// color shifts for damage, powerups
 	cshift_t	prev_cshifts[NUM_CSHIFTS];	// and content types
@@ -207,7 +216,7 @@ struct client_state_t
 	idTime		time;			// clients view of time, should be between
 								// servertime and oldservertime to generate
 								// a lerp point for other data
-	idTime		oldtime;		// previous cl.time, time-oldtime is used
+	idTime		oldtime;		// previous quake::cl.time, time-oldtime is used
 								// to decay light values and smooth step ups
 	
 
@@ -220,7 +229,7 @@ struct client_state_t
 	sfx_t*		sound_precache[MAX_SOUNDS];
 
 	char		levelname[40];	// for display on solo scoreboard
-	int			viewentity;		// cl_entitites[cl.viewentity] = player
+	int			viewentity;		// cl_entitites[quake::cl.viewentity] = player
 	int			maxclients;
 	int			gametype;
 
@@ -234,16 +243,21 @@ struct client_state_t
 	int			cdtrack, looptrack;	// cd audio
 
 // frag scoreboard
-	scoreboard_t	*scores;		// [cl.maxclients]
-
+	scoreboard_t	*scores;		// [quake::cl.maxclients]
+	client_state_t();
+	void clear();
 #ifdef QUAKE2
 // light level at player's position including dlights
 // this is sent back to the server each frame
 // architectually ugly but it works
 	int			light_level;
 #endif
-} ;
 
+} ;
+namespace quake {
+	extern client_state_t cl;
+	extern client_static_t cls;
+}
 
 //
 // cvars
@@ -282,7 +296,7 @@ extern	cvar_t	m_side;
 #define	MAX_TEMP_ENTITIES	64			// lightning bolts, etc
 #define	MAX_STATIC_ENTITIES	128			// torches, etc
 
-extern	client_state_t	cl;
+
 
 // FIXME, allocate dynamically
 extern	efrag_t			cl_efrags[MAX_EFRAGS];
@@ -303,15 +317,15 @@ void	CL_DecayLights (void);
 
 void CL_Init (void);
 
-void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[]);
+//void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[]);
 void CL_Signon1 (void);
 void CL_Signon2 (void);
 void CL_Signon3 (void);
 void CL_Signon4 (void);
 
-void CL_Disconnect (void);
+//void CL_Disconnect (void);
 void CL_Disconnect_f (cmd_source_t source, size_t argc, const quake::string_view args[]);
-void CL_NextDemo (void);
+//void CL_NextDemo (void);
 
 #define			MAX_VISEDICTS	256
 extern	int				cl_numvisedicts;
@@ -351,7 +365,7 @@ const char *Key_KeynumToString (int keynum);
 //
 // cl_demo.c
 //
-void CL_StopPlayback (void);
+
 int CL_GetMessage (void);
 
 void CL_Stop_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
@@ -382,6 +396,6 @@ void V_SetContentsColor (int contents);
 // cl_tent
 //
 void CL_InitTEnts (void);
-void CL_SignonReply (void);
+//void CL_SignonReply (void);
 
 #endif

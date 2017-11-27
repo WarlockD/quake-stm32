@@ -312,8 +312,8 @@ void M_Menu_Main_f(cmd_source_t source, size_t argc, const quake::string_view ar
 {
 	if (key_dest != key_menu)
 	{
-		m_save_demonum = cls.demonum;
-		cls.demonum = -1;
+		m_save_demonum = quake::cls.demonum;
+		quake::cls.demonum = -1;
 	}
 	key_dest = key_menu;
 	m_state = m_main;
@@ -344,9 +344,9 @@ void M_Main_Key (int key)
 	case K_ESCAPE:
 		key_dest = key_game;
 		m_state = m_none;
-		cls.demonum = m_save_demonum;
-		if (cls.demonum != -1 && !cls.demoplayback && cls.state != ca_connected)
-			CL_NextDemo ();
+		quake::cls.demonum = m_save_demonum;
+		if (quake::cls.demonum != -1 && !quake::cls.demoplayback && quake::cls.state != ca_connected)
+			quake::cls.next_demo ();
 		break;
 
 	case K_DOWNARROW:
@@ -520,7 +520,7 @@ void M_Menu_Save_f(cmd_source_t source, size_t argc, const quake::string_view ar
 {
 	if (!sv.active)
 		return;
-	if (cl.intermission)
+	if (quake::cl.intermission)
 		return;
 	if (svs.maxclients != 1)
 		return;

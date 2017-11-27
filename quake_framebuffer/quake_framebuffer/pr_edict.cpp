@@ -959,9 +959,9 @@ void ED_LoadFromFile (const quake::string_view& data)
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
 }
 
- std::unordered_map<quake::string_view, ddef_t*> dprograms_t::globals;
- std::unordered_map<quake::string_view, ddef_t*> dprograms_t::fields;
- std::unordered_map<quake::string_view, dfunction_t*> dprograms_t::functions;
+UMap<quake::string_view, ddef_t*> dprograms_t::globals;
+UMap<quake::string_view, ddef_t*> dprograms_t::fields;
+UMap<quake::string_view, dfunction_t*> dprograms_t::functions;
 /*
 ===============
 PR_LoadProgs
