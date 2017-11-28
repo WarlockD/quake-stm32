@@ -91,7 +91,7 @@ quake::string_view  Cvar_CompleteVariable (const quake::string_view&	partial)
 		if (!Q_strncmp (partial.data(),cvar->name, partial.size()))
 			return cvar->name;
 
-	return nullptr;
+	return quake::string_view();
 }
 
 

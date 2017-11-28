@@ -224,9 +224,9 @@ struct dprograms_t
 	//dstatement_t* GetStatements(int offs)  { return reinterpret_cast<dstatement_t*>(reinterpret_cast<byte*>(this) + ofs_statements); }
 
 	// debugging, going to be used for lookup
-	static UMap<quake::string_view, ddef_t*> globals;
-	static UMap<quake::string_view, ddef_t*> fields;
-	static UMap<quake::string_view, dfunction_t*> functions;
+	static quake::FixedMap<quake::string_view, ddef_t*> globals;
+	static quake::FixedMap<quake::string_view, ddef_t*> fields;
+	static quake::FixedMap<quake::string_view, dfunction_t*> functions;
 } ;
 
 #endif

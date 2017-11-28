@@ -468,7 +468,7 @@ quake::string_view Cmd_CompleteCommand (const quake::string_view& partial)
 		if (!Q_strncmp (partial.data(),cmd->name, partial.size()))
 			return cmd->name;
 
-	return NULL;
+	return quake::string_view();
 }
 qboolean	Cvar_Command(size_t argc, const quake::string_view argv[]);
 

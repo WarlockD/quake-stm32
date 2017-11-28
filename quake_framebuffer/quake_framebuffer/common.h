@@ -38,6 +38,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <exception>
 #include <unordered_map>
 #include <unordered_set>
+#include <algorithm>
+#include  <functional>
 
 // we need the basic file functions
 #ifdef min
@@ -898,6 +900,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		inline const_iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
 	};
 #endif
+	// dumb string, must be c terminated
 
 	/// \class string ustring.h ustl.h
 	/// \ingroup Sequences
@@ -1650,6 +1653,392 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	auto make_ref_string_stream(quake::fixed_string<SIZE> & ref) { return std::move(ref_string_stream<fixed_string<SIZE>>(ref)); }
 #endif
 	using path_string = fixed_string<MAX_OSPATH>;
+
+	template<typename VT>
+	class FixedVector {
+
+		template <typename T>
+		inline void construct_at(T* p) { new (p) T; }
+		template <typename T>
+		inline void construct_at(T* p, const T& value) { new (p) T(value); }
+		template <typename T>
+		inline void construct_at(T* p, T&& value) { new (p) T(std::move<T>(value)); }
+		template <typename T> inline void construct(T* p) { construct_at(p); }
+	public:
+		using value_type = VT;
+		using reference = value_type&;
+		using const_reference = const value_type&;;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+		using reverse_iterator = std::reverse_iterator<iterator>;
+		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+		using size_type = size_t;
+
+
+		FixedVector() : _data(nullptr), _size(0U), _capacity(0U) {}
+		FixedVector(value_type* data, size_type capacity) : _data(data), _size(0U), _capacity(capacity) {}
+		size_type capacity() const { return _capacity; }
+		size_type size() const { return _size; }
+		pointer data()  { return _data; }
+		const_pointer data() const { return _data; }
+		iterator begin() { return _map; }
+		iterator eend() { return _map + _size; }
+		const_iterator begin() const { return _map; }
+		const_iterator end() const { return _map + _size; }
+		inline bool	empty(void) const { return _size == 0U; }
+		inline reference		at(size_type i) { assert(i < size()); return begin()[i]; }
+		inline const_reference	at(size_type i) const { assert(i < size()); return begin()[i]; }
+		inline reference		operator[] (size_type i) { return at(i); }
+		inline const_reference	operator[] (size_type i) const { return at(i); }
+		inline reference		front(void) { return at(0); }
+		inline const_reference	front(void) const { return at(0); }
+		inline reference		back(void) { assert(!empty()); return end()[-1]; }
+		inline const_reference	back(void) const { assert(!empty()); return end()[-1]; }
+		inline void			pop_back(void) { sif(_size > 0) { td::destroy(end() - 1); --_size; } }
+		inline void			clear(void) { std::destroy(begin(), end()); _data.clear(); }
+
+		void resize(size_type n) {
+			std::destroy(begin() + n, end());
+			assert(capacity() > nb);
+			std::uninitialized_default_construct_n(end(), nb - _size);
+			_size = nb;
+		}
+		inline void assign(const_iterator i1, const_iterator i2)
+		{
+			assert(i1 <= i2);
+			resize(std::distance(i1, i2));
+			std::copy(i1, i2, begin());
+		}
+		template<typename T>
+		inline void assign(size_type n, const T& v)
+		{
+			resize(n);
+			std::fill(begin(), end(), v);
+		}
+
+		inline iterator insert_hole(const_iterator ip, size_type n)
+		{
+			assert(data() || !n);
+			assert(cmemlink::begin() || !n);
+			assert(ip >= begin() && ip + n <= end());
+			iterator start = const_cast<iterator>(ip);
+			std::rotate(start, end() - n, end());
+			return start;
+		}
+		inline iterator insert_space(const_iterator ip, size_type n)
+		{
+			iterator ih = insert_hole(ip, n);
+			std::uninitialized_default_construct_n(ih, n);
+			return ih;
+		}
+		inline iterator insert(const_iterator ip, size_type n, const_reference v)
+		{
+			iterator d = insert_hole(ip, n);
+			std::uninitialized_fill_n(d, n, v);
+			return d;
+		}
+		inline iterator insert(const_iterator ip, const_reference v)
+		{
+			iterator d = insert_hole(ip, 1);
+			new(d)(v);
+			std::construct_at(d, v);
+			return d;
+		}
+		inline iterator insert(const_iterator ip, const_iterator i1, const_iterator i2)
+		{
+			assert(i1 <= i2);
+			iterator d = insert_hole(ip, distance(i1, i2));
+			std::uninitialized_copy(i1, i2, d);
+			return d;
+		}
+//		inline iterator		insert(const_iterator, const_reference v) { return insert(v).first; }
+		void			insert(const_iterator i1, const_iterator i2) { for (; i1 != i2; ++i1) insert(*i1); }
+
+		inline iterator erase(const_iterator cstart, size_type n)
+		{
+			assert(data() || !n);
+			assert(cmemlink::begin() || !n);
+			assert(cstart >= begin() && cstart + n <= end());
+			iterator d = const_cast<iterator>(cstart);
+			std::destroy_n(d, n);
+			iterator start = const_cast<iterator>(cstart);
+			std::rotate(start, start + n, end());
+			return start;
+	
+		}
+		inline iterator erase(const_iterator ep1, const_iterator ep2)
+		{
+			assert(ep1 <= ep2);
+			return erase(ep1, distance(ep1, ep2));
+		}
+		template<typename T>
+		void push_back(T&& v)
+		{
+			assert(_size + 1 < capacity());
+			_size++;
+			new(end()) value_type(std::move(v));
+		} 
+		template<typename T>
+		void push_back(const T& v = T())
+		{
+			assert(_size + 1 < capacity());
+			_size++;
+			new(end()) value_type(v);
+		}
+		template <typename... Args>
+		iterator  emplace(const_iterator ip, Args&&... args)
+		{
+			assert(_size + 1 < capacity());
+			return new (insert_hole(ip, 1)) T(std::forward<Args>(args)...);
+		}
+
+		/// Constructs value at the end of the vector.
+		template <typename... Args>
+		inline void emplace_back(Args&&... args)
+		{
+			assert(_size + 1 < capacity());
+			_size++;
+			new(end()) value_type(std::forward<Args>(args)...);
+		}
+	private:
+		value_type* _data;
+		size_type _size;
+		size_type _capacity;
+	};
+
+	
+	template <typename Pair, typename Comp>
+	struct pair_compare_first { //:  std::binary_function<Pair, Pair, bool> {
+		inline bool operator()(const Pair& a, const Pair& b) { return Comp()(a.first, b.first); }
+	};
+	template <typename K, typename V, typename Comp>
+	struct pair_compare_first_key { //:  std::binary_function<std::pair<K, V>, K, bool> {
+		inline bool operator()(const std::pair<K, V>& a, const K& b) { return Comp()(a.first, b); }
+		inline bool operator()(const K& a, const std::pair<K, V>& b) { return Comp()(a, b.first); }
+	};
+	/// \class map umap.h ustl.h
+	/// \ingroup AssociativeContainers
+	///
+	/// \brief A sorted associative container of pair<K,V>
+	///
+	template <typename K, typename V, typename Comp = less<K> >
+	class map : public FixedVector<std::pair<K, V> > {
+	public:
+		typedef K						key_type;
+		typedef V						data_type;
+		typedef const K&					const_key_ref;
+		typedef const V&					const_data_ref;
+		typedef const map<K, V, Comp>&			rcself_t;
+		typedef FixedVector<std::pair<K, V> >				base_class;
+		typedef typename base_class::value_type		value_type;
+		typedef typename base_class::size_type		size_type;
+		typedef typename base_class::pointer		pointer;
+		typedef typename base_class::const_pointer		const_pointer;
+		typedef typename base_class::reference		reference;
+		typedef typename base_class::const_reference	const_reference;
+		typedef typename base_class::const_iterator		const_iterator;
+		typedef typename base_class::iterator		iterator;
+		typedef typename base_class::reverse_iterator	reverse_iterator;
+		typedef typename base_class::const_reverse_iterator	const_reverse_iterator;
+		typedef std::pair<const_iterator, const_iterator>		const_range_t;
+		typedef std::pair<iterator, iterator>			range_t;
+		typedef std::pair<iterator, bool>				insertrv_t;
+		typedef Comp					key_compare;
+		typedef pair_compare_first<value_type, Comp>		value_compare;
+		typedef pair_compare_first_key<K, V, Comp>		value_key_compare;
+	public:
+		inline			map(void) : base_class() {}
+		map(value_type* data, size_type capacity) : base_class(data, capacity) {}
+#if 0
+		explicit inline		map(size_type n) : base_class(n) {}
+		inline			map(rcself_t v) : base_class(v) {}
+		inline			map(const_iterator i1, const_iterator i2) : base_class() { insert(i1, i2); }
+#endif
+		inline rcself_t		operator= (rcself_t v) { base_class::operator= (v); return *this; }
+		inline const_data_ref	at(const_key_ref k) const { assert(find(k) != end()); return find(k)->second; }
+		inline data_type&		at(const_key_ref k) { assert(find(k) != end()); return find(k)->second; }
+		inline const_data_ref	operator[] (const_key_ref i) const { return at(i); }
+		data_type&			operator[] (const_key_ref i);
+		inline key_compare		key_comp(void) const { return key_compare(); }
+		inline value_compare	value_comp(void) const { return value_compare(); }
+		inline size_type		size(void) const { return base_class::size(); }
+		inline iterator		begin(void) { return base_class::begin(); }
+		inline const_iterator	begin(void) const { return base_class::begin(); }
+		inline iterator		end(void) { return base_class::end(); }
+		inline const_iterator	end(void) const { return base_class::end(); }
+		inline void			assign(const_iterator i1, const_iterator i2) { clear(); insert(i1, i2); }
+		inline void			push_back(const_reference v) { insert(v); }
+		inline const_iterator	find(const_key_ref k) const;
+		inline iterator		find(const_key_ref k) { return const_cast<iterator> (const_cast<rcself_t>(*this).find(k)); }
+		inline const_iterator	find_data(const_data_ref v, const_iterator first = nullptr, const_iterator last = nullptr) const;
+		inline iterator		find_data(const_data_ref v, iterator first = nullptr, iterator last = nullptr) { return const_cast<iterator> (find_data(v, const_cast<const_iterator>(first), const_cast<const_iterator>(last))); }
+		const_iterator		lower_bound(const_key_ref k) const { return std::lower_bound(begin(), end(), k, value_key_compare()); }
+		inline iterator		lower_bound(const_key_ref k) { return const_cast<iterator>(const_cast<rcself_t>(*this).lower_bound(k)); }
+		const_iterator		upper_bound(const_key_ref k) const { return std::upper_bound(begin(), end(), k, value_key_compare()); }
+		inline iterator		upper_bound(const_key_ref k) { return const_cast<iterator>(const_cast<rcself_t>(*this).upper_bound(k)); }
+		const_range_t		equal_range(const_key_ref k) const { return std::equal_range(begin(), end(), k, value_key_compare()); }
+		inline range_t		equal_range(const_key_ref k) { return std::equal_range(begin(), end(), k, value_key_compare()); }
+		inline size_type		count(const_key_ref v) const { const_range_t r = equal_range(v); return std::distance(r.first, r.second); }
+		insertrv_t			insert(const_reference v);
+		inline iterator		insert(const_iterator, const_reference v) { return insert(v).first; }
+		void			insert(const_iterator i1, const_iterator i2) { for (; i1 != i2; ++i1) insert(*i1); }
+		inline void			erase(const_key_ref k);
+		inline iterator		erase(iterator ep) { return base_class::erase(ep); }
+		inline iterator		erase(iterator ep1, iterator ep2) { return base_class::erase(ep1, ep2); }
+		inline void			clear(void) { base_class::clear(); }
+		inline void			swap(map& v) { base_class::swap(v); }
+#if HAVE_CPP11
+		using initlist_t = std::initializer_list<value_type>;
+		inline			map(map&& v) : base_class(move(v)) {}
+		inline			map(initlist_t v) : base_class() { insert(v.begin(), v.end()); }
+		inline map&			operator= (map&& v) { base_class::operator= (move(v)); return *this; }
+		insertrv_t			insert(value_type&& v);
+		inline iterator		insert(const_iterator, value_type&& v) { return insert(move(v)).first; }
+		inline void			insert(initlist_t v) { insert(v.begin(), v.end()); }
+		template <typename... Args>
+		inline insertrv_t		emplace(Args&&... args) { return insert(value_type(forward<Args>(args)...)); }
+		template <typename... Args>
+		inline iterator		emplace_hint(const_iterator h, Args&&... args) { return insert(h, value_type(forward<Args>(args)...)); }
+		template <typename... Args>
+		inline insertrv_t		emplace_back(Args&&... args) { return insert(value_type(forward<Args>(args)...)); }
+#endif
+	};
+
+	/// Returns the pair<K,V> where K = \p k.
+	template <typename K, typename V, typename Comp>
+	inline typename map<K, V, Comp>::const_iterator map<K, V, Comp>::find(const_key_ref k) const
+	{
+		const_iterator i = lower_bound(k);
+		return (i < end() && Comp()(k, i->first)) ? end() : i;
+	}
+
+	/// Returns the pair<K,V> where V = \p v, occuring in range [first,last).
+	template <typename K, typename V, typename Comp>
+	inline typename map<K, V, Comp>::const_iterator map<K, V, Comp>::find_data(const_data_ref v, const_iterator first, const_iterator last) const
+	{
+		if (!first) first = begin();
+		if (!last) last = end();
+		for (; first != last && first->second != v; ++first);
+		return first;
+	}
+
+	/// Returns data associated with key \p k.
+	template <typename K, typename V, typename Comp>
+	typename map<K, V, Comp>::data_type& map<K, V, Comp>::operator[] (const_key_ref k)
+	{
+		iterator ip = lower_bound(k);
+		if (ip == end() || Comp()(k, ip->first))
+			ip = base_class::insert(ip, make_pair(k, V()));
+		return ip->second;
+	}
+
+	/// Inserts the pair into the container.
+	template <typename K, typename V, typename Comp>
+	typename map<K, V, Comp>::insertrv_t map<K, V, Comp>::insert(const_reference v)
+	{
+		iterator ip = lower_bound(v.first);
+		bool bInserted = ip == end() || Comp()(v.first, ip->first);
+		if (bInserted)
+			ip = base_class::insert(ip, v);
+		return make_pair(ip, bInserted);
+	}
+
+#if HAVE_CPP11
+	/// Inserts the pair into the container.
+	template <typename K, typename V, typename Comp>
+	typename map<K, V, Comp>::insertrv_t map<K, V, Comp>::insert(value_type&& v)
+	{
+		iterator ip = lower_bound(v.first);
+		bool bInserted = ip == end() || Comp()(v.first, ip->first);
+		if (bInserted)
+			ip = base_class::insert(ip, move(v));
+		return make_pair(ip, bInserted);
+	}
+#endif
+
+	/// Erases the element with key value \p k.
+	template <typename K, typename V, typename Comp>
+	inline void map<K, V, Comp>::erase(const_key_ref k)
+	{
+		iterator ip = find(k);
+		if (ip != end())
+			erase(ip);
+	}
+
+	// container that has a precreated map
+	template<typename K, typename V, typename Comp = std::less<K> >
+	class FixedMap {
+		
+	public:
+		using value_type = std::pair<K, V>;
+		using refrence = value_type&;
+		using const_refrence = const refrence;
+		using pointer = value_type*;
+		using const_pointer = const pointer;
+		using const_iterator = const_pointer;
+		using iterator = pointer;
+
+		using key_compare = Comp;
+		using key_type = K;
+		using data_type = V;
+		using const_key_ref = const K&;
+		using const_data_ref = const V&;;
+
+		using self_t = FixedMap<K, V, Comp>;
+		using rcself_t = const self_t&;
+
+		using const_key_ref = const K&;
+
+		struct value_key_compare {
+			Comp cmp;
+			constexpr bool operator()(const value_type& l, const value_type& r) const { return cmp(l.first, r.first); }
+			constexpr bool operator()(const value_type& l, const key_type& r) const { return cmp(l.first, r); }
+			constexpr bool operator()(const key_type& l, const value_type& r) const { return cmp(l, r.first); }
+		};
+	
+		static value_type* AllocHulk(size_t count) { return (value_type*)Hunk_Alloc(count * sizeof(value_type)); }
+		static value_type* AllocHulk(size_t count, const quake::string_view& v) { return (value_type*)Hunk_AllocName(count * sizeof(value_type), v); }
+		FixedMap() : _map(nullptr), _size(0) {}
+		FixedMap(value_type* ptr, size_t size) : _map(ptr), _size(0) {}
+		FixedMap(size_t count) : _map(AllocHulk(count)), _size(size) {}
+		FixedMap(size_t count, const quake::string_view& v) : _map(AllocHulk(count, v)), _size(size) {}
+		void alloc_hulk(size_t count) { _map = AllocHulk(count); _size = count; }
+		void alloc_hulk(size_t count, const quake::string_view& v) { _map = AllocHulk(count, v); _size = count; }
+		iterator begin() { return _map; }
+		iterator eend() { return _map + _size; }
+		const_iterator begin() const { return _map; }
+		const_iterator end() const { return _map + _size; }
+		size_t size() const { return _size; }
+		value_type* data() { return _map; }
+		const value_type* data() const { return _map; }
+		void sort() { 
+
+			std::sort(_map, _map + _size, value_key_compare());
+#if 0
+			std::sort(_map, _map+ _size,[](const value_type& l, const value_type& r) {
+				return l.first < r.first;
+			});
+#endif
+		}
+
+		const_iterator		lower_bound(const_key_ref k) const { return std::lower_bound(begin(), end(), k, value_key_compare()); }
+		inline iterator		lower_bound(const_key_ref k) { return const_cast<iterator>(const_cast<rcself_t>(*this).lower_bound(k)); }
+		const_iterator		upper_bound(const_key_ref k) const { return std::upper_bound(begin(), end(), k, value_key_compare()); }
+		inline iterator		upper_bound(const_key_ref k) { return const_cast<iterator>(const_cast<rcself_t>(*this).upper_bound(k)); }
+		inline value_type* find(const_key_ref k) const {
+			const_iterator i = lower_bound(k);
+			return (i < end() && Comp()(k, i->first)) ? end() : i;
+		}
+		
+		inline iterator		find(const_key_ref k) { return const_cast<iterator> (const_cast<rcself_t>(*this).find(k)); }
+
+	private:
+		value_type* _map;
+		size_t _size;
+	};
 };
 
 #if 0

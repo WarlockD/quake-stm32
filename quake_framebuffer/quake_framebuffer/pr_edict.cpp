@@ -197,7 +197,7 @@ ED_FindField
 ddef_t *ED_FindField (const quake::string_view& name)
 {
 	ddef_t		*def = nullptr;
-	assert(!dprograms_t::fields.empty());
+	assert(dprograms_t::fields.data());
 	auto it = dprograms_t::fields.find(name);
 	if (it != dprograms_t::fields.end()) def= it->second;
 #if 0
@@ -221,7 +221,7 @@ ED_FindGlobal
 ddef_t *ED_FindGlobal (const quake::string_view& name)
 {
 	ddef_t		*def = nullptr;
-	assert(!dprograms_t::globals.empty());
+	assert(dprograms_t::globals.data());
 	auto it = dprograms_t::globals.find(name);
 	if (it != dprograms_t::globals.end()) def = it->second;
 #if 0
@@ -246,7 +246,7 @@ ED_FindFunction
 dfunction_t *ED_FindFunction (const quake::string_view& name)
 {
 	dfunction_t		*func = nullptr;
-	assert(!dprograms_t::functions.empty());
+	assert(dprograms_t::functions.data());
 	auto it = dprograms_t::functions.find(name);
 	if (it != dprograms_t::functions.end()) func = it->second;
 #if 0
@@ -959,9 +959,9 @@ void ED_LoadFromFile (const quake::string_view& data)
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
 }
 
-UMap<quake::string_view, ddef_t*> dprograms_t::globals;
-UMap<quake::string_view, ddef_t*> dprograms_t::fields;
-UMap<quake::string_view, dfunction_t*> dprograms_t::functions;
+quake::FixedMap<quake::string_view, ddef_t*> dprograms_t::globals;
+quake::FixedMap<quake::string_view, ddef_t*> dprograms_t::fields;
+quake::FixedMap<quake::string_view, dfunction_t*> dprograms_t::functions;
 /*
 ===============
 PR_LoadProgs
@@ -972,9 +972,7 @@ void PR_LoadProgs(void)
 	int		i;
 
 	CRC_Init(&pr_crc);
-	dprograms_t::fields.clear();
-	dprograms_t::globals.clear();
-	dprograms_t::functions.clear();
+
 	progs = (dprograms_t *)COM_LoadHunkFile("progs.dat");
 	if (!progs)
 		Sys_Error("PR_LoadProgs: couldn't load progs.dat");
@@ -1013,41 +1011,59 @@ void PR_LoadProgs(void)
 		pr_statement->c = LittleShort(pr_statement->c);
 
 	}
-
-	for (i = 0; i < progs->numfunctions; i++)
 	{
-		pr_functions[i].first_statement = LittleLong(pr_functions[i].first_statement);
-		pr_functions[i].parm_start = LittleLong(pr_functions[i].parm_start);
-		pr_functions[i].s_name = LittleLong(pr_functions[i].s_name);
-		pr_functions[i].s_file = LittleLong(pr_functions[i].s_file);
-		pr_functions[i].numparms = LittleLong(pr_functions[i].numparms);
-		pr_functions[i].locals = LittleLong(pr_functions[i].locals);
-		const char* name = pr_strings + pr_functions[i].s_name;
-		dprograms_t::functions.emplace(name, &pr_functions[i]);
+		dprograms_t::functions.alloc_hulk(progs->numfunctions, "fmap");
+		auto ptr = dprograms_t::functions.begin();
+		for (i = 0; i < progs->numfunctions; i++)
+		{
+			pr_functions[i].first_statement = LittleLong(pr_functions[i].first_statement);
+			pr_functions[i].parm_start = LittleLong(pr_functions[i].parm_start);
+			pr_functions[i].s_name = LittleLong(pr_functions[i].s_name);
+			pr_functions[i].s_file = LittleLong(pr_functions[i].s_file);
+			pr_functions[i].numparms = LittleLong(pr_functions[i].numparms);
+			pr_functions[i].locals = LittleLong(pr_functions[i].locals);
+			const char* name = pr_strings + pr_functions[i].s_name;
+			ptr[i] = std::make_pair(name, &pr_functions[i]);
 
+
+		//	dprograms_t::functions.emplace(name, &pr_functions[i]);
+
+		}
+		dprograms_t::functions.sort();
 	}
-
-
-	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
-		pr_globaldefs[i].type = static_cast<etype_t>(LittleShort (static_cast<uint16_t>(pr_globaldefs[i].type)));
-		pr_globaldefs[i].ofs = LittleShort (pr_globaldefs[i].ofs);
-		pr_globaldefs[i].s_name = LittleLong (pr_globaldefs[i].s_name);
-		const char* name = pr_strings + pr_globaldefs[i].s_name;
-		dprograms_t::globals.emplace(name, &pr_globaldefs[i]);
+		//dprograms_t::globals.clear();
+		dprograms_t::globals.alloc_hulk(progs->numglobaldefs, "gmap");
+		auto ptr = dprograms_t::globals.begin();
+		for (i = 0; i < progs->numglobaldefs; i++)
+		{
+			pr_globaldefs[i].type = static_cast<etype_t>(LittleShort(static_cast<uint16_t>(pr_globaldefs[i].type)));
+			pr_globaldefs[i].ofs = LittleShort(pr_globaldefs[i].ofs);
+			pr_globaldefs[i].s_name = LittleLong(pr_globaldefs[i].s_name);
+			const char* name = pr_strings + pr_globaldefs[i].s_name;
+		//	dprograms_t::globals.emplace(name, &pr_globaldefs[i]);
+			ptr[i] = std::make_pair(name, &pr_globaldefs[i]);
+		}
+		dprograms_t::globals.sort();
 	}
-
-	for (i=0 ; i<progs->numfielddefs ; i++)
 	{
-		pr_fielddefs[i].type = static_cast<etype_t>(LittleShort(static_cast<uint16_t>(pr_fielddefs[i].type)));
-		if (idType(pr_fielddefs[i].type).saveglobal())   
-			Sys_Error ("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
-		pr_fielddefs[i].ofs = LittleShort (pr_fielddefs[i].ofs);
-		pr_fielddefs[i].s_name = LittleLong (pr_fielddefs[i].s_name);
-		const char* name = pr_strings + pr_fielddefs[i].s_name;
-		dprograms_t::fields.emplace(name, &pr_fielddefs[i]);
-	}
 
+		//dprograms_t::fields.clear();
+		dprograms_t::fields.alloc_hulk(progs->numfielddefs, "fimap");
+		auto ptr = dprograms_t::fields.begin();
+		for (i = 0; i < progs->numfielddefs; i++)
+		{
+			pr_fielddefs[i].type = static_cast<etype_t>(LittleShort(static_cast<uint16_t>(pr_fielddefs[i].type)));
+			if (idType(pr_fielddefs[i].type).saveglobal())
+				Sys_Error("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
+			pr_fielddefs[i].ofs = LittleShort(pr_fielddefs[i].ofs);
+			pr_fielddefs[i].s_name = LittleLong(pr_fielddefs[i].s_name);
+			const char* name = pr_strings + pr_fielddefs[i].s_name;
+			//dprograms_t::fields.emplace(name, &pr_fielddefs[i]);
+			ptr[i] = std::make_pair(name, &pr_fielddefs[i]);
+		}
+		dprograms_t::fields.sort();
+	}
 	for (i=0 ; i<progs->numglobals ; i++)
 		((int *)pr_globals)[i] = LittleLong (((int *)pr_globals)[i]);
 }
