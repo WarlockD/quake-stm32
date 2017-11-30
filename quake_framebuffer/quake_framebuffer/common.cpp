@@ -201,7 +201,7 @@ The file "parms.txt" will be read out of the game directory and appended to the 
 
 //============================================================================
 
-
+#if 0
 // ClearLink is used for new headnodes
 void ClearLink (link_t *l)
 {
@@ -228,7 +228,7 @@ void InsertLinkAfter (link_t *l, link_t *after)
 	l->prev->next = l;
 	l->next->prev = l;
 }
-
+#endif
 /*
 ============================================================================
 

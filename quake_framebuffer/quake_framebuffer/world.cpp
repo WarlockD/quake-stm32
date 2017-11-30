@@ -183,8 +183,10 @@ struct areanode_t
 	int		axis;		// -1 = leaf node
 	float	dist;
 	areanode_t	*children[2];
-	link_t	trigger_edicts;
-	link_t	solid_edicts;
+	link_list_t<edict_t, &edict_t::area> trigger_edicts;
+	link_list_t<edict_t, &edict_t::area> solid_edicts;
+	//link_t	trigger_edicts;
+	//link_t	solid_edicts;
 } ;
 
 #define	AREA_DEPTH	4
@@ -208,8 +210,10 @@ areanode_t *SV_CreateAreaNode (int depth, vec3_t mins, vec3_t maxs)
 	anode = &sv_areanodes[sv_numareanodes];
 	sv_numareanodes++;
 
-	ClearLink (&anode->trigger_edicts);
-	ClearLink (&anode->solid_edicts);
+	assert(anode->trigger_edicts.empty());
+	assert(anode->solid_edicts.empty());
+	//ClearLink (&anode->trigger_edicts);
+	//ClearLink (&anode->solid_edicts);
 	
 	if (depth == AREA_DEPTH)
 	{
@@ -259,14 +263,6 @@ void SV_ClearWorld (void)
 SV_UnlinkEdict
 
 ===============
-*/
-void edict_t::Unlink() 
-{
-	if (!area.prev)
-		return;		// not linked in anywhere
-	RemoveLink (&area);
-	area.prev = area.next = nullptr;
-}
 
 
 /*
@@ -276,37 +272,33 @@ SV_TouchLinks
 */
 void SV_TouchLinks ( edict_t *ent, areanode_t *node )
 {
-	link_t		*l, *next;
-	edict_t		*touch;
 	int			old_self, old_other;
 
 // touch linked edicts
-	for (l = node->trigger_edicts.next ; l != &node->trigger_edicts ; l = next)
-	{
-		next = l->next;
-		touch = EDICT_FROM_AREA(l);
-		if (touch == ent)
+	for (auto& touch : node->trigger_edicts) {
+		if (&touch == ent)
 			continue;
-		if (!touch->v.touch || touch->v.solid != SOLID_TRIGGER)
+		if (!touch.v.touch || touch.v.solid != SOLID_TRIGGER)
 			continue;
-		if (ent->v.absmin[0] > touch->v.absmax[0]
-		|| ent->v.absmin[1] > touch->v.absmax[1]
-		|| ent->v.absmin[2] > touch->v.absmax[2]
-		|| ent->v.absmax[0] < touch->v.absmin[0]
-		|| ent->v.absmax[1] < touch->v.absmin[1]
-		|| ent->v.absmax[2] < touch->v.absmin[2] )
+		if (ent->v.absmin[0] > touch.v.absmax[0]
+			|| ent->v.absmin[1] > touch.v.absmax[1]
+			|| ent->v.absmin[2] > touch.v.absmax[2]
+			|| ent->v.absmax[0] < touch.v.absmin[0]
+			|| ent->v.absmax[1] < touch.v.absmin[1]
+			|| ent->v.absmax[2] < touch.v.absmin[2])
 			continue;
 		old_self = pr_global_struct->self;
 		old_other = pr_global_struct->other;
 
-		pr_global_struct->self = EDICT_TO_PROG(touch);
+		pr_global_struct->self = EDICT_TO_PROG(&touch);
 		pr_global_struct->other = EDICT_TO_PROG(ent);
 		pr_global_struct->time = idCast<float>(sv.time);
-		PR_ExecuteProgram (touch->v.touch);
+		PR_ExecuteProgram(touch.v.touch);
 
 		pr_global_struct->self = old_self;
 		pr_global_struct->other = old_other;
 	}
+
 	
 // recurse down both sides
 	if (node->axis == -1)
@@ -373,8 +365,8 @@ void SV_LinkEdict (edict_t *ent, qboolean touch_triggers)
 {
 	areanode_t	*node;
 
-	if (ent->area.prev)
-		ent->Unlink ();	// unlink from old position
+	if (ent->area.islinked())
+		ent->area.remove<&edict_t::area>(); // unlink from old position
 		
 	if (ent == sv.edicts)
 		return;		// don't add the world
@@ -461,9 +453,9 @@ void SV_LinkEdict (edict_t *ent, qboolean touch_triggers)
 // link it in	
 
 	if (ent->v.solid == SOLID_TRIGGER)
-		InsertLinkBefore (&ent->area, &node->trigger_edicts);
+		node->trigger_edicts.push_front(ent);
 	else
-		InsertLinkBefore (&ent->area, &node->solid_edicts);
+		node->solid_edicts.push_front(ent);
 	
 // if touch_triggers, touch all entities at this node and decend for more
 	if (touch_triggers)
@@ -813,34 +805,29 @@ Mins and maxs enclose the entire area swept by the move
 */
 void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 {
-	link_t		*l, *next;
-	edict_t		*touch;
 	trace_t		trace;
 
 // touch linked edicts
-	for (l = node->solid_edicts.next ; l != &node->solid_edicts ; l = next)
-	{
-		next = l->next;
-		touch = EDICT_FROM_AREA(l);
-		if (touch->v.solid == SOLID_NOT)
+	for(auto& touch : node->solid_edicts) {
+		if (touch.v.solid == SOLID_NOT)
 			continue;
-		if (touch == clip->passedict)
+		if (&touch == clip->passedict)
 			continue;
-		if (touch->v.solid == SOLID_TRIGGER)
+		if (touch.v.solid == SOLID_TRIGGER)
 			Sys_Error ("Trigger in clipping list");
 
-		if (clip->type == MOVE_NOMONSTERS && touch->v.solid != SOLID_BSP)
+		if (clip->type == MOVE_NOMONSTERS && touch.v.solid != SOLID_BSP)
 			continue;
 
-		if (clip->boxmins[0] > touch->v.absmax[0]
-		|| clip->boxmins[1] > touch->v.absmax[1]
-		|| clip->boxmins[2] > touch->v.absmax[2]
-		|| clip->boxmaxs[0] < touch->v.absmin[0]
-		|| clip->boxmaxs[1] < touch->v.absmin[1]
-		|| clip->boxmaxs[2] < touch->v.absmin[2] )
+		if (clip->boxmins[0] > touch.v.absmax[0]
+		|| clip->boxmins[1] > touch.v.absmax[1]
+		|| clip->boxmins[2] > touch.v.absmax[2]
+		|| clip->boxmaxs[0] < touch.v.absmin[0]
+		|| clip->boxmaxs[1] < touch.v.absmin[1]
+		|| clip->boxmaxs[2] < touch.v.absmin[2] )
 			continue;
 
-		if (clip->passedict && clip->passedict->v.size[0] && !touch->v.size[0])
+		if (clip->passedict && clip->passedict->v.size[0] && !touch.v.size[0])
 			continue;	// points never interact
 
 	// might intersect, so do an exact clip
@@ -848,20 +835,20 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 			return;
 		if (clip->passedict)
 		{
-		 	if (PROG_TO_EDICT(touch->v.owner) == clip->passedict)
+		 	if (PROG_TO_EDICT(touch.v.owner) == clip->passedict)
 				continue;	// don't clip against own missiles
-			if (PROG_TO_EDICT(clip->passedict->v.owner) == touch)
+			if (PROG_TO_EDICT(clip->passedict->v.owner) == &touch)
 				continue;	// don't clip against owner
 		}
 
-		if ((int)touch->v.flags & FL_MONSTER)
-			trace = SV_ClipMoveToEntity (touch, clip->start, clip->mins2, clip->maxs2, clip->end);
+		if ((int)touch.v.flags & FL_MONSTER)
+			trace = SV_ClipMoveToEntity (&touch, clip->start, clip->mins2, clip->maxs2, clip->end);
 		else
-			trace = SV_ClipMoveToEntity (touch, clip->start, clip->mins, clip->maxs, clip->end);
+			trace = SV_ClipMoveToEntity (&touch, clip->start, clip->mins, clip->maxs, clip->end);
 		if (trace.allsolid || trace.startsolid ||
 		trace.fraction < clip->trace.fraction)
 		{
-			trace.ent = touch;
+			trace.ent = &touch;
 		 	if (clip->trace.startsolid)
 			{
 				clip->trace = trace;

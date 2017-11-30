@@ -442,6 +442,15 @@
     <ClInclude Include="icommon.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="list.hpp">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="slist.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tailq.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="quake_types.natvis" />

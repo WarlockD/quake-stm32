@@ -180,6 +180,54 @@ void *Z_Malloc(size_t size)
 }
 
 
+/*
+========================
+Z_Realloc
+========================
+*/
+void *Z_Realloc(void *ptr, size_t size,const void* tag)
+{
+	size_t old_size;
+	void *old_ptr;
+	memblock_t *block;
+
+	if (!ptr)
+		return Z_TagMalloc(size, tag);
+
+	block = (memblock_t *)((byte *)ptr - sizeof(memblock_t));
+	if (block->id != ZONEID)
+		Sys_Error("Z_Realloc: realloced a pointer without ZONEID");
+	if (block->tag == 0)
+		Sys_Error("Z_Realloc: realloced a freed pointer");
+	if(block->tag != tag )
+		Sys_Error("Z_Realloc: tage diffreent than what was on the pointer");
+
+	old_size = block->size;
+	old_size -= (4 + (int)sizeof(memblock_t));	/* see Z_TagMalloc() */
+	old_ptr = ptr;
+
+	Z_Free(ptr);
+	ptr = Z_TagMalloc(size, tag);
+	if (!ptr)
+		Sys_Error("Z_Realloc: failed on allocation of %i bytes", size);
+
+	if (ptr != old_ptr)
+		std::memmove(ptr, old_ptr, std::min(old_size, size));
+	if (old_size < size)
+		std::memset((byte *)ptr + old_size, 0, size - old_size);
+
+	return ptr;
+}
+
+char *Z_Strdup(const char *s)
+{
+	size_t sz = std::strlen(s) + 1;
+	char *ptr = (char *)Z_TagMalloc(sz,"strdup");
+	std::memcpy(ptr, s, sz);
+	ptr[sz] = 0; // just to be safe if zmalloc changes
+	return ptr;
+}
+
 memzone_t	*mainzone;
 
 void Z_ClearZone (memzone_t *zone, size_t size);

@@ -41,6 +41,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <algorithm>
 #include  <functional>
 
+// my personal link list implmentation
+// based of sys\queue.h  could always use that I suppose
+#include "list.hpp"
+
 // we need the basic file functions
 #ifdef min
 #undef min
@@ -61,7 +65,7 @@ public:
 	template<typename T, typename R>
 	constexpr idTime(const std::chrono::duration<T, R>& f) : _time(std::chrono::duration_cast<time_t>(f)) {}
 	constexpr auto count() const { return _time.count(); }
-	constexpr int seconds() const { return std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
+	constexpr int seconds() const { return (int)std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
 	
 //	explicit constexpr operator time_t&()  { return _time; }
 //	explicit constexpr operator const time_t&() const { return _time; }
@@ -190,10 +194,167 @@ operator<<(std::basic_ostream<C, CT>& os, const T& s) {
 }
 #endif
 #include "sys.h"
+// don't mind this, just me trying to reinvent the god damn wheel again
+
+
+template<typename T> using link_t = list::entry<T>;
+
+template<typename T, typename list::field<T> FIELD>
+using link_list_t = list::head<T, FIELD>;
+
+#if 0
+template<typename E>
+struct link_t {
+	using field_t = E **E::*;
+
+	link_t(E* ptr) : next(ptr),
+		E* next;
+	field_t prev;
+};
+// this is a bit of a round about way.  It also adds a refrence humm
+// trust the compiler?
+
+// https://stackoverflow.com/questions/4936987/c-class-member-variable-knowing-its-own-offset
+namespace priv {
+	template< class C, class T >
+	ptrdiff_t offset_of(T C::*q) {
+		return (ptrdiff_t)&((*(C*)0).*q);
+	}
+	template<typename T, typename U> constexpr size_t offsetOf(U T::*member)
+	{
+		return (char*)&((T*)nullptr->*member) - (char*)nullptr;
+	}
+}
+// say this is some existing structure. And we want to use
+// a list. We can tell it that the next pointer
+// is apple::next.
+struct apple {
+	int data;
+	apple * next;
+};
+
+// simple example of a minimal intrusive list. Could specify the
+// member pointer as template argument too, if we wanted:
+// template<typename E, E *E::*next_ptr>
+template<typename E>
+struct List {
+	List(E *E::*next_ptr) :head(0), next_ptr(next_ptr) { }
+
+	void add(E &e) {
+		// access its next pointer by the member pointer
+		e.*next_ptr = head;
+		head = &e;
+	}
+
+	E * head;
+	E *E::*next_ptr;
+};
+
+
+
+
+
+
+template<typename T, link_t<T>::* Member> 
+class link_list_t {
+public:
+	static constexpr ptrdiff_t member_offset = offsetof(T, Member);
+	using value_type = T;
+	using linke_type = link_t<T>;
+	link_list_t() : _head(nullptr) {}
+	template<typename T, typename U> constexpr size_t next(T& ptr) { // U T::*member)
+	{
+			(ptr.*Member)->_next
+		return (char*)(ptr).*Member->_next - (char*)nullptr;
+	}
+private:
+	linke_type* _head;
+};
+
+template<typename T,
+	 template<typename T, typename U> constexpr T* next(U T::*member)
+	 {
+		 return (char*)&((T*)nullptr->*member) - (char*)nullptr;
+	 }
+	constexpr link_t() : _prev(this), _next(this) {}
+	// ClearLink is used for new headnodes
+	void ClearLink() { _prev = _next = this; }
+	void RemoveLink() { _next->_prev = _prev; _prev->_next = _next; }
+
+
+	void InsertLinkBefore(link_t *before)
+	{
+		_next = before;
+		_prev = before->_prev;
+		_prev->_next = this;
+		_next->_prev = this;
+	}
+	void InsertLinkAfter(link_t *after)
+	{
+		_next = after->_next;
+		_prev = after;
+		_prev->_next = this;
+		_next->_prev = this;
+	}
+	bool IsLinked() const { return _priv &&  _priv != this; }
+};
+
+template<typename Owner, link_t Owner::*Member>
+class link_functions_t{
+	//static constexpr
+	static constexpr Owner *get_owner(link_t* ptr) { return ptr ? reinterpret_cast<Owner *>(reinterpret_cast<char *>(ptr) - Tag::offset()) : nullptr; }
+	static constexpr const Owner *get_owner(const void* ptr) { return ptr ? reinterpret_cast<const Owner *>(reinterpret_cast<const char *>(ptr) - offsetof(Owner,Member)) : nullptr; }
+	constexpr Owner *owner() { return get_owner(this); }
+	constexpr const Owner *owner() const { return get_owner(this); }
+	constexpr link_t* self() { return reinterpret_cast<const Owner *>(reinterpret_cast<const char *>(this) - sizeof(link_t)); /// so god damn hacky 
+	} 
+public:
+	//using self_type = link_functions_t<Owner, Member>;
+
+
+	operator Owner*() { return get_owner(this); }
+	operator const Owner*() const { return get_owner(this); }
+	Owner* next() { return get_owner(_next); }
+	Owner* prev() { return get_owner(_prev); }
+	const Owner* next() const { return get_owner(_next); }
+	const Owner* prev() const { return get_owner(_prev); }
+	void InsertLinkBefore(link_t *before) { self()->InsertLinkBefore(before); }
+	void InsertLinkAfter(link_t *after) { self()->InsertLinkAfter(after); }
+	void ClearLink() { self()->ClearLink(); }
+	void RemoveLink() { self()->RemoveLink(); }
+
+private:
+
+};
+struct link_test {
+	link_t nhuh_tag;
+
+	link_functions_t<link_test, &link_test::nhuh_tag> nhuh;
+
+};
+#define QUAKE_LINK(Owner, name) \
+	link_t name
+
+#if 0
+	link_t name ## _tag; \
+	link_functions_t<Owner,  & ## Owner ## ::##name ## _tag> name
+#endif
+
+#if 0
+void ClearLink(link_t *l);
+void RemoveLink(link_t *l);
+void InsertLinkBefore(link_t *l, link_t *before);
+void InsertLinkAfter(link_t *l, link_t *after);
+#endif
+// (type *)STRUCT_FROM_LINK(link_t *link, type, member)
+// ent = STRUCT_FROM_LINK(link,entity_t,order)
+// FIXME: remove this mess!
+#define	STRUCT_FROM_LINK(l,t,m) ((t *)((byte *)l - (int)&(((t *)0)->m)))
+
 
 // does a varargs printf into a temp buffer
 
-
+#endif
 //============================================================================
 
 //http://videocortex.io/2017/custom-stream-buffers/
@@ -324,7 +485,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		size_t read(void* dest, size_t count) { return _file.read(dest, count); }
 		size_t write(const void* src, size_t count) { return _file.write(src, count); }
 		size_t seek(int32_t offset) {
-			assert(offset < _length);
+			assert(offset < (int32_t)_length);
 			return _file.seek(_offset + offset);
 		}
 		void close() { _file.close(); }
@@ -1819,6 +1980,50 @@ inline type name (const string& str, size_t* idx = nullptr) \
 		inline bool operator()(const std::pair<K, V>& a, const K& b) { return Comp()(a.first, b); }
 		inline bool operator()(const K& a, const std::pair<K, V>& b) { return Comp()(a, b.first); }
 	};
+	// quake hash map
+	//
+	// hash map tables are Zmallcoed always, but the individual leafs can be anything
+
+
+	// special case string set that manages strings
+	// so we can lookup and and save them
+
+	class StringSet {
+		static constexpr size_t inital_buckets = 16;
+		struct string_bucket {
+			link_t<string_bucket> chain;
+			quake::string_view str;
+			string_bucket* next;
+		};
+	public:
+		//StringSet() : _buckets(16) {}
+
+	private:
+		//UVector<string_bucket*> _buckets;
+
+	};
+	// humm work on this more
+#if 0
+	template<typename K, typename V, typename H, typename E, quake::Alloc A> class unordered_map;
+	// used mainly for strings and other hash items that only last per level
+	// you cannot erase individual items without wipeing them all
+	template<typename K, typename V, typename H=std::hash<K>, typename E= std::equal_to<K>>
+	class unordered_map<K, V, H, E, Alloc::HulkLow> {
+	public:
+		static constexpr size_t inital_buckets = 16;
+		using value_type = std::pair<K, V>;
+		using key_value_type = std::pair<value_type, value_type*>;
+
+		unordered_map() : _buckets((key_value_type*)Z_Malloc(inital_buckets * sizeof(key_value_type), 16)), _count(0) {}
+
+
+		void clear() { _buckets.clear(); }
+
+	private:
+		FixedVector<key_value_type> _buckets;
+		size_t _count;
+	};
+#endif
 	/// \class map umap.h ustl.h
 	/// \ingroup AssociativeContainers
 	///
@@ -2192,21 +2397,6 @@ void SZ_Print(sizebuf_t *buf, char c);
 #endif
 //============================================================================
 
-typedef struct link_s
-{
-	struct link_s	*prev, *next;
-} link_t;
-
-
-void ClearLink (link_t *l);
-void RemoveLink (link_t *l);
-void InsertLinkBefore (link_t *l, link_t *before);
-void InsertLinkAfter (link_t *l, link_t *after);
-
-// (type *)STRUCT_FROM_LINK(link_t *link, type, member)
-// ent = STRUCT_FROM_LINK(link,entity_t,order)
-// FIXME: remove this mess!
-#define	STRUCT_FROM_LINK(l,t,m) ((t *)((byte *)l - (int)&(((t *)0)->m)))
 
 //============================================================================
 

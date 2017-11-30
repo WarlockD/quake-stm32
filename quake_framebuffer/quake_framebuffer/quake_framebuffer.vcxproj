@@ -259,6 +259,7 @@
     <ClInclude Include="icommon.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="keys.h" />
+    <ClInclude Include="list.hpp" />
     <ClInclude Include="mathlib.h" />
     <ClInclude Include="menu.h" />
     <ClInclude Include="model.h" />
@@ -288,9 +289,11 @@
     <ClInclude Include="sbar.h" />
     <ClInclude Include="screen.h" />
     <ClInclude Include="server.h" />
+    <ClInclude Include="slist.hpp" />
     <ClInclude Include="sound.h" />
     <ClInclude Include="spritegn.h" />
     <ClInclude Include="sys.h" />
+    <ClInclude Include="tailq.hpp" />
     <ClInclude Include="umm_malloc.h" />
     <ClInclude Include="umm_malloc_cfg.h" />
     <ClInclude Include="vgamodes.h" />

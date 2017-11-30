@@ -40,9 +40,24 @@ union eval_t
 
 struct edict_t
 {
+#ifdef USE_OLD_EDICT_SYSTEM
 	qboolean	free;
-	link_t		area;				// linked to a division node or leaf
-	
+	void Free();
+	void Unlink();
+	void Clear();
+#else
+	static void create_edict_pool(size_t count, size_t edict_size);
+	static int edict_to_prog(const edict_t* e);
+	static edict_t* prog_to_edict(int prog);
+#endif
+	link_t<edict_t>  area; // linked to a division node or leaf
+	edict_t();
+	~edict_t();
+	static void* operator new(size_t size);
+	static void operator delete(void* ptr);
+
+	inline int to_prog() const { return edict_to_prog(this); }
+
 	int			num_leafs;
 	short		leafnums[MAX_ENT_LEAFS];
 
@@ -68,12 +83,19 @@ struct edict_t
 		value_t(dfunction_t* v) :value(v), type(etype_t::ev_function) {}
 	};
 	using map_t = std::unordered_map<quake::string_view, value_t>;
-	map_t* vars;
-	entvars_t	v;					// C exported fields from progs
-	void Free();
-	void Unlink();
-	void Clear();
+	map_t vars;
+	union {
+		eval_t  fields[1]; // must be the last
+		entvars_t v;					// C exported fields from progs
+	};
+
+	eval_t* get_field(const quake::string_view& name);
+	const eval_t* get_field(const quake::string_view& name)const;
+	eval_t* get_field(ptrdiff_t offset);
+	const eval_t* get_field(ptrdiff_t offset)const;
+
 	void Print();
+
 // other fields from progs come immediately after
 } ;
 namespace quake {
@@ -154,10 +176,10 @@ edict_t *EDICT_NUM(int n);
 int NUM_FOR_EDICT(edict_t *e);
 
 #define	NEXT_EDICT(e) ((edict_t *)( (byte *)e + pr_edict_size))
-
+#ifdef USE_OLD_EDICT_SYSTEM
 #define	EDICT_TO_PROG(e) ((byte *)e - (byte *)sv.edicts)
 #define PROG_TO_EDICT(e) ((edict_t *)((byte *)sv.edicts + e))
-
+#endif
 //============================================================================
 
 #define	G_FLOAT(o) (pr_globals[o])

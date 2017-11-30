@@ -88,14 +88,24 @@ Zone block
 //#include "common.h"
 // included in common
 
-
-
+namespace quake {
+	// used for some templates
+	enum class Alloc {
+		ZMalloc,
+		HulkLow,
+		HulkHigh,
+		Cache,
+		Temp
+	};
+}
+#define	PR_STRING_ALLOCSLOTS	256
 void Memory_Init(void *buf, size_t size);
 
 void Z_Free(void *ptr);
 void *Z_Malloc(size_t size);			// returns 0 filled memory
-void *Z_TagMalloc(size_t size, const void* tag);
-
+void *Z_TagMalloc(size_t size, const void* tag );
+void *Z_Realloc(void *ptr, size_t size, const void* tag = nullptr);
+char *Z_Strdup(const char *s);
 
 void Z_CheckHeap(void);
 void *Hunk_Alloc(size_t size);		// returns 0 filled memory

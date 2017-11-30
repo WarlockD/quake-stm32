@@ -1019,7 +1019,7 @@ void SV_SaveSpawnparms (void)
 			continue;
 
 	// call the progs to get default spawn parms for the new client
-		pr_global_struct->self = EDICT_TO_PROG(host_client->edict);
+		pr_global_struct->self = host_client->edict->in_prog();
 		PR_ExecuteProgram (pr_global_struct->SetChangeParms);
 		for (j=0 ; j<NUM_SPAWN_PARMS ; j++)
 			host_client->spawn_parms[j] = (&pr_global_struct->parm1)[j];
@@ -1035,6 +1035,8 @@ This is called at the start of each level
 ================
 */
 extern idTime		scr_centertime_off;
+std::vector<edict_t*> debug_edicts;
+
 
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
@@ -1042,7 +1044,7 @@ void SV_SpawnServer (char *server, char *startspot)
 void SV_SpawnServer (const char *server)
 #endif
 {
-
+	debug_edicts.clear();
 	edict_t		*ent;
 	int			i;
 
@@ -1092,10 +1094,18 @@ void SV_SpawnServer (const char *server)
 	PR_LoadProgs ();
 
 // allocate server memory
+#ifdef USE_OLD_EDICT_SYSTEM
 	sv.max_edicts = MAX_EDICTS;
 	
 	sv.edicts = (decltype(sv.edicts))Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
+	for (size_t i = 0; i < pr_edict_size; i++) {
+		debug_edicts.push_back(new(sv.edicts + i) edict_t);
+	}
 
+	else
+
+
+#endif
 	sv.datagram=sizebuf_t(sv.datagram_buf, sizeof(sv.datagram_buf));
 	sv.reliable_datagram = sizebuf_t(sv.reliable_datagram_buf, sizeof(sv.reliable_datagram_buf));
 	sv.signon = sizebuf_t(sv.signon_buf , sizeof(sv.signon_buf));

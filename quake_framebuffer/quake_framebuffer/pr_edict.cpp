@@ -63,6 +63,97 @@ cvar_t	saved4 = {"saved4", "0", true};
 
 
 
+edict_t *EDICT_NUM(int n)
+{
+	if (n < 0 || n >= sv.max_edicts)
+		Sys_Error("EDICT_NUM: bad number %i", n);
+	return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
+}
+
+int NUM_FOR_EDICT(edict_t *e)
+{
+	int		b;
+
+	b = (byte *)e - (byte *)sv.edicts;
+	b = b / pr_edict_size;
+
+	if (b < 0 || b >= sv.num_edicts)
+		Sys_Error("NUM_FOR_EDICT: bad pointer");
+	return b;
+}
+struct edict_manager_t {
+	link_list_t<edict_t, &edict_t::area> edict_free_pool;
+	//quake::link_list_t<edict_t, &edict_t::area> edict_free_pool;
+	edict_t* edicts;
+	size_t used;
+	size_t capasity;
+	size_t edict_size;
+	edict_manager_t() : edict_free_pool(), edicts(nullptr), used(0U), capasity(0U), edict_size(0) {}
+	edict_manager_t(size_t capasity, size_t edict_size) :
+		edict_free_pool(), 
+		edicts((edict_t*)Hunk_AllocName(capasity * edict_size, "edicts")),
+		used(0U),
+			capasity(capasity),
+			edict_size(edict_size) {
+		// we need to link all the free edicts
+		edict_t* last = nullptr;
+		for (size_t i = 0; i < capasity; i++) {
+			edict_t* ent = edicts + (i * edict_size);
+			
+			ent->free = true; // make sure this flag is set at least
+			if (last) last->area.insert_after<&edict_t::area>(last);
+			else edict_free_pool.push_front(ent);
+			last = ent;
+		}
+	}
+	edict_t* allocate(size_t size) {
+		edict_t* ent = nullptr;
+		if (used < capasity) {
+			assert(size < edict_size);
+			edict_t* ent = edict_free_pool.pop_front();
+			assert(ent);
+			++used;
+			ent->area = link_t<edict_t>();
+			std::memset(&v, 0, sizeof(entvars_t));
+		}
+		return ent;
+	}
+	void free(edict_t* ptr) {
+		assert(used);
+		const ptrdiff_t pos = (ptrdiff_t)ptr;
+		assert((ptrdiff_t)ptr >= (ptrdiff_t)edicts && (ptrdiff_t)ptr <= ((ptrdiff_t)edicts - edict_size)); // make sure its in range
+		std::memset(ptr, 0, edict_size); // we clear it on delete as we might reuse it
+		ptr.freetime = sv.time;
+		edict_free_pool.push_front(ptr);
+		--used;
+	}
+};
+
+static edict_manager_t all_edicts;
+int edict_t::edict_to_prog(const edict_t* e) {
+	return reinterpret_cast<const char*>(e) - reinterpret_cast<const char*>(all_edicts.edicts);
+}
+edict_t* edict_t::prog_to_edict(int prog) {
+	return reinterpret_cast<edict_t*>(reinterpret_cast<char*>(all_edicts.edicts) + prog);
+}
+
+
+void edict_t::create_edict_pool(size_t count, size_t edict_size) {
+	all_edicts = edict_manager_t(count, edict_size);
+}
+
+void* edict_t::operator new(size_t size) { return all_edicts.allocate(size); }
+void edict_t::operator delete(void* ptr) { all_edicts.free((edict_t*)ptr); }
+
+edict_t::edict_t() {
+	VectorCopy(vec3_origin, origin);
+	VectorCopy(vec3_origin, angles);
+	extthink = idTime(-1s);
+
+}
+edict_t::~edict_t() {
+	if (area.islinked()) area.remove<&edict_t::area>();
+}
 
 /*
 =================
@@ -73,9 +164,19 @@ Sets everything to NULL
 */
 void edict_t::Clear ()
 {
-	memset (&v, 0, progs->entityfields * 4);
+	const size_t total_size = pr_edict_size;
+	const size_t var_size = sizeof(entvars_t);
+	const size_t bentityfields = progs->entityfields * 4;
+	const size_t size_of_entvars = bentityfields - var_size;
+	const size_t edict_value_size = pr_edict_size - sizeof(edict_t) + var_size;
+	const size_t field_size = progs->entityfields * sizeof(uint32_t);
+	//return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
+//	assert(field_size == var_size);
+	std::memset (&v, 0, sizeof(entvars_t));
 	if (vars) vars->clear();
 	else vars = new map_t;
+	if (area.le_prev == nullptr) { area.le_prev = &(this->area.le_next); area.le_next = nullptr; }
+	assert(area.islinked());
 	free = false;
 }
 
@@ -90,6 +191,7 @@ instead of being removed and recreated, which can cause interpolated
 angles and bad trails.
 =================
 */
+#if 0
 edict_t *ED_Alloc (void)
 {
 	int			i;
@@ -116,7 +218,33 @@ edict_t *ED_Alloc (void)
 
 	return e;
 }
+#endif
+ddef_t *ED_FindField(const quake::string_view& name);
+//static_assert(sizeof(eval_t) == sizeof(uint32_t), "Eval union needs to be 4 bytes");
+void edict_t::Unlink() 
+{
+	if (area.islinked()) area.remove<&edict_t::area>();
+}
 
+eval_t* edict_t::get_field(const quake::string_view& field) {
+	ddef_t* def = ED_FindField(field);
+	assert(def);
+	return get_field(def->ofs);
+}
+const eval_t* edict_t::get_field(const quake::string_view& field) const {
+	ddef_t* def = ED_FindField(field);
+	assert(def);
+	return get_field(def->ofs);
+}
+
+eval_t* edict_t::get_field(ptrdiff_t offset) {
+	assert(offset < progs->numfielddefs);
+	return &fields[offset];
+}
+const eval_t* edict_t::get_field(ptrdiff_t offset) const {
+	assert(offset < progs->numfielddefs);
+	return &fields[offset];
+}
 /*
 =================
 ED_Free
@@ -131,7 +259,7 @@ void edict_t::Free ()
 
 	Unlink();		// unlink from world bsp
 
-	free = true;
+	//free = true;
 	v.model = 0;
 	v.takedamage = 0;
 	v.modelindex = 0;
@@ -567,6 +695,46 @@ void ED_ParseGlobals (COM_Parser& parser)
 }
 
 //============================================================================
+// lets make  this a hash table
+
+struct string_save_t {
+
+};
+static	const char	**pr_knownstrings=nullptr;
+static	int		pr_maxknownstrings=0;
+static	int		pr_numknownstrings=0;
+
+static void PR_AllocStringSlots(void)
+{
+	pr_maxknownstrings += PR_STRING_ALLOCSLOTS;
+	Con_DPrintf("PR_AllocStringSlots: realloc'ing for %d slots\n", pr_maxknownstrings);
+	pr_knownstrings = (const char **)Z_Realloc((void *)pr_knownstrings, pr_maxknownstrings * sizeof(char *));
+}
+
+int PR_AllocString(int size, char **ptr)
+{
+	int		i;
+
+	if (!size)
+		return 0;
+	for (i = 0; i < pr_numknownstrings; i++)
+	{
+		if (!pr_knownstrings[i])
+			break;
+	}
+	//	if (i >= pr_numknownstrings)
+	//	{
+	if (i >= pr_maxknownstrings)
+		PR_AllocStringSlots();
+	pr_numknownstrings++;
+	//	}
+	pr_knownstrings[i] = (char *)Hunk_AllocName(size, "string");
+	if (ptr)
+		*ptr = (char *)pr_knownstrings[i];
+	return -1 - i;
+}
+
+
 
 
 /*
@@ -967,6 +1135,7 @@ quake::FixedMap<quake::string_view, dfunction_t*> dprograms_t::functions;
 PR_LoadProgs
 ===============
 */
+
 void PR_LoadProgs(void)
 {
 	int		i;
@@ -1095,21 +1264,3 @@ void PR_Init (void)
 
 
 
-edict_t *EDICT_NUM(int n)
-{
-	if (n < 0 || n >= sv.max_edicts)
-		Sys_Error ("EDICT_NUM: bad number %i", n);
-	return (edict_t *)((byte *)sv.edicts+ (n)*pr_edict_size);
-}
-
-int NUM_FOR_EDICT(edict_t *e)
-{
-	int		b;
-	
-	b = (byte *)e - (byte *)sv.edicts;
-	b = b / pr_edict_size;
-	
-	if (b < 0 || b >= sv.num_edicts)
-		Sys_Error ("NUM_FOR_EDICT: bad pointer");
-	return b;
-}

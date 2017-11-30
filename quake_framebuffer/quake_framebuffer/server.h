@@ -59,11 +59,19 @@ struct server_t
 	model_t		*models[MAX_MODELS];
 	char		*sound_precache[MAX_SOUNDS];	// NULL terminated
 	char		*lightstyles[MAX_LIGHTSTYLES];
+
+
+#ifdef USE_OLD_EDICT_SYSTEM
 	int			num_edicts;
 	int			max_edicts;
 	edict_t		*edicts;			// can NOT be array indexed, because
 									// edict_t is variable sized, but can
 									// be used to reference the world ent
+#else
+	// alright, the first major change to the edict system
+	// new and delete work with it now from a pool created from load_progs
+
+#endif
 	server_state_t	state;			// some actions are only valid during load
 
 	sizebuf_t	datagram;
