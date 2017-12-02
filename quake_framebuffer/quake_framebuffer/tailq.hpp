@@ -12,7 +12,7 @@
 #ifndef _DEBUG_STRUCTURES_DEFINED
 #define _DEBUG_STRUCTURES_DEFINED
 
-#include <diag\Trace.h>
+
 //#define TRACK_LIST_OWNER
 
 #ifdef QUEUE_MACRO_DEBUG
@@ -91,7 +91,8 @@ namespace tailq {
 		using reference = T&;
 		using const_pointer = const_value_type*;
 		using const_reference = const_value_type&;
-		constexpr static pointer UNLINK_MAGIC = reinterpret_cast<pointer>(UNLINK_MAGIC_VALUE);
+		constexpr static uintptr_t UNLINK_MAGIC = UNLINK_MAGIC_VALUE;
+		constexpr static uintptr_t NOENTRY = UNLINK_MAGIC;
 	};
 
 	template<typename T, field<T> FIELD>
@@ -105,15 +106,18 @@ namespace tailq {
 		using const_pointer = typename btraits::const_pointer;
 		using const_reference = typename btraits::const_reference;
 		using iterator_category = std::bidirectional_iterator_tag;
-		constexpr static pointer NOENTRY = btraits::NOENTRY;
+		constexpr static uintptr_t NOENTRY = btraits::NOENTRY;
 		using entry_type = entry<T>;
 		using field_type = field<T>;
 		using head_type = head_impl<T, FIELD>;
 		using container_type = pcontainer<T, FIELD>;
-		constexpr static pointer UNLINK_MAGIC = reinterpret_cast<pointer>(UNLINK_MAGIC_VALUE);
+		constexpr static uintptr_t UNLINK_MAGIC = UNLINK_MAGIC_VALUE;
 		friend head_type;
 		constexpr static field_type member = FIELD;
-		constexpr static field_type member_offset = member == nullptr ? 0 : (size_t) &(reinterpret_cast<pointer>(0)->*member);
+		template<typename T, typename U> static constexpr size_t offsetOf(U T::*member)
+		{
+			return (char*)&((T*)nullptr->*member) - (char*)nullptr;
+		}
 		constexpr static inline  pointer& next(pointer p) {
 			static_assert(member != nullptr, "Don't know what field you want!");
 			return (p->*member).tqe_next;
@@ -122,6 +126,20 @@ namespace tailq {
 			static_assert(member != nullptr, "Don't know what field you want!");
 			return (p->*member).tqe_prev;
 		}
+		// from offset
+		constexpr static inline  pointer from_entry(entry_type* p) {
+			return reinterpret_cast<pointer>(reinterpret_cast<char*>(p) - offsetOf(member));
+		}
+		constexpr static inline  const pointer from_entry(const  entry_type* p) {
+			return reinterpret_cast<const  pointer>(reinterpret_cast<const  char*>(p) - offsetOf(member));
+		}
+		constexpr static inline  entry_type* to_entry(pointer p) {
+			return reinterpret_cast<entry_type*>(reinterpret_cast<char*>(p) + offsetOf(member));
+		}
+		constexpr static inline  const entry_type* to_entry(const_pointer p) {
+			return reinterpret_cast<const  entry_type*>(reinterpret_cast<const char*>(p) + offsetOf(member));
+		}
+
 #ifdef TAILQ_TRACK_HEAD_IN_ENTRY
 		constexpr static inline head_type** elm_head(pointer p) {
 			static_assert(member != nullptr, "Don't know what field you want!");
@@ -360,7 +378,7 @@ namespace tailq {
 		using reference = typename traits::reference;;
 		using const_pointer = typename traits::const_pointer;
 		using const_reference = typename traits::const_reference;
-		constexpr static pointer NOENTRY = traits::NOENTRY;
+		constexpr static uintptr_t NOENTRY = traits::NOENTRY;
 		friend T;
 #ifdef TAILQ_TRACK_HEAD_IN_ENTRY
 		void* tqe_head;
