@@ -24,10 +24,53 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 using namespace std::chrono;
 server_t		sv;
 server_static_t	svs;
+#include <map>
 
-server_t::server_t() : datagram(datagram_buf, sizeof(datagram_buf)), reliable_datagram(reliable_datagram_buf, sizeof(reliable_datagram_buf)), signon(signon_buf, sizeof(signon_buf)){
 
+
+server_t::server_t() : 
+	datagram(datagram_buf, sizeof(datagram_buf)), 
+	reliable_datagram(reliable_datagram_buf, sizeof(reliable_datagram_buf)), 
+	signon(signon_buf, sizeof(signon_buf)),
+	worldedict(nullptr),
+	active(false),
+	paused(false),
+	loadgame(false),
+	time(),
+	lastcheck(0),
+	lastchecktime(),
+	name{ 0 },
+	modelname{ 0 },		// maps/<name>.bsp, for model_precache[0]
+worldmodel(nullptr ),
+model_precache{},
+models{},
+sound_precache{},
+lightstyles{},
+state{ ss_loading }			// some actions are only valid during load
+
+
+{
+	//signon.Clear();
+	//reliable_datagram.Clear();
+	//datagram.Clear();
 }
+#if 0
+edict_t *vm_system_t::vm.EDICT_NUM(int n) {
+	auto it = edicts.find(n);
+	assert(it != edicts.end());
+	return second;
+}
+int vm_system_t:vm.NUM_FOR_EDICT(edict_t *e) { return e->num; }
+edict_t* vm_system_t::AllocEdict(int num) {
+	edict_t* e = new edict_t(num);
+	edicts.emplace(num, e);
+	return e;
+}
+void vm_system_t::Unlink(edict_t *e) {
+	edicts.remove(e);
+	delete e;
+}
+#endif
 char	localmodels[MAX_MODELS][5];			// inline model names for precache
 
 //============================================================================
@@ -119,7 +162,7 @@ Larger attenuations will drop off.  (max 4 attenuation)
 
 ==================
 */  
-void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
+void SV_StartSound (edict_t *entity, int channel, const char *sample, int volume,
     float attenuation)
 {       
     int         sound_num;
@@ -151,7 +194,7 @@ void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
         return;
     }
     
-	ent = NUM_FOR_EDICT(entity);
+	ent = vm.NUM_FOR_EDICT(entity);
 
 	channel = (ent<<3) | channel;
 
@@ -192,11 +235,11 @@ This will be sent on the initial connection and upon each server load.
 */
 void SV_SendServerinfo (client_t *client)
 {
-	char			**s;
+	const char			**s;
 	char			message[2048];
 
 	client->message.WriteByte(svc_print);
-	Q_sprintf (message, "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, pr_crc);
+	Q_sprintf (message, "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, vm.pr_crc);
 	client->message.WriteString(message);
 
 	client->message.WriteByte(svc_serverinfo);
@@ -208,7 +251,7 @@ void SV_SendServerinfo (client_t *client)
 	else
 		client->message.WriteByte(GAME_COOP);
 
-	Q_sprintf (message, pr_strings+sv.edicts->v.message);
+	Q_sprintf (message, vm.pr_strings+sv.worldedict->v.message);
 
 	client->message.WriteString(message);
 
@@ -222,12 +265,12 @@ void SV_SendServerinfo (client_t *client)
 
 // send music
 	client->message.WriteByte(svc_cdtrack);
-	client->message.WriteByte(static_cast<int>(sv.edicts->v.sounds));
-	client->message.WriteByte(static_cast<int>(sv.edicts->v.sounds));
+	client->message.WriteByte(static_cast<int>(sv.worldedict->v.sounds));
+	client->message.WriteByte(static_cast<int>(sv.worldedict->v.sounds));
 
 // set view	
 	client->message.WriteByte(svc_setview);
-	client->message.WriteShort(NUM_FOR_EDICT(client->edict));
+	client->message.WriteShort(vm.NUM_FOR_EDICT(client->edict));
 
 	client->message.WriteByte(svc_signonnum);
 	client->message.WriteByte(1);
@@ -259,7 +302,7 @@ void SV_ConnectClient (int clientnum)
 
 	edictnum = clientnum+1;
 
-	ent = EDICT_NUM(edictnum);
+	ent = vm.EDICT_NUM(edictnum);
 	
 // set up the client_t
 	netconnection = client->netconnection;
@@ -286,9 +329,9 @@ void SV_ConnectClient (int clientnum)
 	else
 	{
 	// call the progs to get default spawn parms for the new client
-		PR_ExecuteProgram (pr_global_struct->SetNewParms);
+		PR_ExecuteProgram (vm.pr_global_struct->SetNewParms);
 		for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
-			client->spawn_parms[i] = (&pr_global_struct->parm1)[i];
+			client->spawn_parms[i] = (&vm.pr_global_struct->parm1)[i];
 	}
 
 	SV_SendServerinfo (client);
@@ -428,7 +471,7 @@ SV_WriteEntitiesToClient
 */
 void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 {
-	int		e, i;
+	int		 i;
 	int		bits;
 	byte	*pvs;
 	vec3_t	org;
@@ -440,9 +483,9 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 	pvs = SV_FatPVS (org);
 
 // send over all entities (excpet the client) that touch the pvs
-	ent = NEXT_EDICT(sv.edicts);
-	for (e=1 ; e<sv.num_edicts ; e++, ent = NEXT_EDICT(ent))
-	{
+		for(auto& it : vm) {
+			ent = &it;
+			
 #ifdef QUAKE2
 		// don't send if flagged for NODRAW and there are no lighting effects
 		if (ent->v.effects == EF_NODRAW)
@@ -453,7 +496,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 		if (ent != clent)	// clent is ALLWAYS sent
 		{
 // ignore ents without visible models
-			if (!ent->v.modelindex || !pr_strings[ent->v.model])
+			if (!ent->v.modelindex || !vm.pr_strings[ent->v.model])
 				continue;
 
 			for (i=0 ; i < ent->num_leafs ; i++)
@@ -507,7 +550,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 		if (ent->baseline.modelindex != ent->v.modelindex)
 			bits |= U_MODEL;
 
-		if (e >= 256)
+		if (vm.NUM_FOR_EDICT(ent) >= 256)
 			bits |= U_LONGENTITY;
 			
 		if (bits >= 256)
@@ -521,9 +564,9 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 		if (bits & U_MOREBITS)
 			msg->WriteByte(bits>>8);
 		if (bits & U_LONGENTITY)
-			msg->WriteShort(e);
+			msg->WriteShort(vm.NUM_FOR_EDICT(ent));
 		else
-			msg->WriteByte(e);
+			msg->WriteByte(vm.NUM_FOR_EDICT(ent));
 
 		if (bits & U_MODEL)
 			msg->WriteByte(static_cast<int>(ent->v.modelindex));
@@ -558,12 +601,10 @@ SV_CleanupEnts
 */
 void SV_CleanupEnts (void)
 {
-	int		e;
 	edict_t	*ent;
 	
-	ent = NEXT_EDICT(sv.edicts);
-	for (e=1 ; e<sv.num_edicts ; e++, ent = NEXT_EDICT(ent))
-	{
+	for (auto& it : vm) {
+		ent = &it;
 		ent->v.effects = static_cast<float>(static_cast<int>(ent->v.effects) & ~EF_MUZZLEFLASH);
 	}
 
@@ -590,7 +631,7 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 //
 	if (ent->v.dmg_take || ent->v.dmg_save)
 	{
-		other = PROG_TO_EDICT(ent->v.dmg_inflictor);
+		other = vm.PROG_TO_EDICT(ent->v.dmg_inflictor);
 		msg->WriteByte(svc_damage);
 		msg->WriteByte(static_cast<int>(ent->v.dmg_save));
 		msg->WriteByte(static_cast<int>(ent->v.dmg_take));
@@ -628,12 +669,12 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 #ifdef QUAKE2
 	items = (int)ent->v.items | ((int)ent->v.items2 << 23);
 #else
-	val = GetEdictFieldValue(ent, "items2");
+	val = &ent->get_field( "items2");
 
 	if (val)
 		items = (int)ent->v.items | ((int)val->_float << 23);
 	else
-		items = (int)ent->v.items | ((int)pr_global_struct->serverflags << 28);
+		items = (int)ent->v.items | ((int)vm.pr_global_struct->serverflags << 28);
 #endif
 
 	bits |= SU_ITEMS;
@@ -688,7 +729,7 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 	if (bits & SU_ARMOR)
 		msg->WriteByte(ent->v.armorvalue);
 	if (bits & SU_WEAPON)
-		msg->WriteByte(SV_ModelIndex(pr_strings+ent->v.weaponmodel));
+		msg->WriteByte(SV_ModelIndex(vm.pr_strings+ent->v.weaponmodel));
 	
 	msg->WriteShort(ent->v.health);
 	msg->WriteByte(ent->v.currentammo);
@@ -924,12 +965,11 @@ void SV_CreateBaseline (void)
 	edict_t			*svent;
 	int				entnum;	
 		
-	for (entnum = 0; entnum < sv.num_edicts ; entnum++)
+	for(auto& e : vm)
 	{
 	// get the current server version
-		svent = EDICT_NUM(entnum);
-		if (svent->free)
-			continue;
+		svent = &e;
+
 		if (entnum > svs.maxclients && !svent->v.modelindex)
 			continue;
 
@@ -949,7 +989,7 @@ void SV_CreateBaseline (void)
 		{
 			svent->baseline.colormap = 0;
 			svent->baseline.modelindex =
-				SV_ModelIndex(pr_strings + svent->v.model);
+				SV_ModelIndex(vm.pr_strings + svent->v.model);
 		}
 		
 	//
@@ -1011,7 +1051,7 @@ void SV_SaveSpawnparms (void)
 {
 	int		i, j;
 
-	svs.serverflags = static_cast<int>(pr_global_struct->serverflags);
+	svs.serverflags = static_cast<int>(vm.pr_global_struct->serverflags);
 
 	for (i=0, host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)
 	{
@@ -1019,10 +1059,10 @@ void SV_SaveSpawnparms (void)
 			continue;
 
 	// call the progs to get default spawn parms for the new client
-		pr_global_struct->self = host_client->edict->in_prog();
-		PR_ExecuteProgram (pr_global_struct->SetChangeParms);
+		vm.pr_global_struct->self = vm.EDICT_TO_PROG(host_client->edict); 
+		PR_ExecuteProgram (vm.pr_global_struct->SetChangeParms);
 		for (j=0 ; j<NUM_SPAWN_PARMS ; j++)
-			host_client->spawn_parms[j] = (&pr_global_struct->parm1)[j];
+			host_client->spawn_parms[j] = (&vm.pr_global_struct->parm1)[j];
 	}
 }
 
@@ -1082,22 +1122,22 @@ void SV_SpawnServer (const char *server)
 //
 	Host_ClearMemory ();
 
-	Q_memset (&sv, 0, sizeof(sv));
-
+	//Q_memset (&sv, 0, sizeof(sv));
+	sv = server_t();
 	Q_strcpy (sv.name, server);
 #ifdef QUAKE2
 	if (startspot)
 		strcpy(sv.startspot, startspot);
 #endif
 
-// load progs to get entity field count
-	PR_LoadProgs ();
+	// load progs to get entity field count
+	vm.LoadProgs();
 
-// allocate server memory
+	// allocate server memory
 #ifdef USE_OLD_EDICT_SYSTEM
 	sv.max_edicts = MAX_EDICTS;
-	
-	sv.edicts = (decltype(sv.edicts))Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
+
+	sv.edicts = (decltype(sv.edicts))Hunk_AllocName(sv.max_edicts*pr_edict_size, "edicts");
 	for (size_t i = 0; i < pr_edict_size; i++) {
 		debug_edicts.push_back(new(sv.edicts + i) edict_t);
 	}
@@ -1106,18 +1146,17 @@ void SV_SpawnServer (const char *server)
 
 
 #endif
-	sv.datagram=sizebuf_t(sv.datagram_buf, sizeof(sv.datagram_buf));
-	sv.reliable_datagram = sizebuf_t(sv.reliable_datagram_buf, sizeof(sv.reliable_datagram_buf));
-	sv.signon = sizebuf_t(sv.signon_buf , sizeof(sv.signon_buf));
-	sv.signon.Clear();
-	sv.reliable_datagram.Clear();
-	sv.datagram.Clear();
 
+	vm.pr_num_edicts = 0;
+	vm.ED_HulkAllocEdicts(MAX_EDICTS);
 // leave slots at start for clients only
-	sv.num_edicts = svs.maxclients+1;
+	sv.worldedict = vm.ED_Alloc(true);
+	assert(vm.NUM_FOR_EDICT(sv.worldedict) == 0);// needs to be zero?
+	vm.pr_num_edicts = svs.maxclients+1;
 	for (i=0 ; i<svs.maxclients ; i++)
 	{
-		ent = EDICT_NUM(i+1);
+		ent = vm.ED_Alloc(true);
+		assert(vm.NUM_FOR_EDICT(ent) == (i+1));// needs to be zero?
 		svs.clients[i].edict = ent;
 	}
 	
@@ -1142,9 +1181,9 @@ void SV_SpawnServer (const char *server)
 //
 	SV_ClearWorld ();
 	
-	sv.sound_precache[0] = pr_strings;
+	sv.sound_precache[0] = vm.pr_strings;
 
-	sv.model_precache[0] = pr_strings;
+	sv.model_precache[0] = vm.pr_strings;
 	sv.model_precache[1] = sv.modelname;
 	for (i=1 ; i<sv.worldmodel->numsubmodels ; i++)
 	{
@@ -1155,26 +1194,26 @@ void SV_SpawnServer (const char *server)
 //
 // load the rest of the entities
 //	
-	ent = EDICT_NUM(0);
-	Q_memset (&ent->v, 0, progs->entityfields * 4);
-	ent->free = false;
-	ent->v.model = sv.worldmodel->name - pr_strings;
+	ent = vm.EDICT_NUM(0);
+	//Q_memset (&ent->v, 0, vm.progs->entityfields * 4);
+
+	ent->v.model = sv.worldmodel->name - vm.pr_strings;
 	ent->v.modelindex = 1;		// world model
 	ent->v.solid = SOLID_BSP;
 	ent->v.movetype = MOVETYPE_PUSH;
 
 	if (coop.value)
-		pr_global_struct->coop = coop.value;
+		vm.pr_global_struct->coop = coop.value;
 	else
-		pr_global_struct->deathmatch = deathmatch.value;
+		vm.pr_global_struct->deathmatch = deathmatch.value;
 
-	pr_global_struct->mapname = sv.name - pr_strings;
+	vm.pr_global_struct->mapname = sv.name - vm.pr_strings;
 #ifdef QUAKE2
-	pr_global_struct->startspot = sv.startspot - pr_strings;
+	vm.pr_global_struct->startspot = sv.startspot - pr_strings;
 #endif
 
 // serverflags are for cross level information (sigils)
-	pr_global_struct->serverflags = static_cast<float>(svs.serverflags);
+	vm.pr_global_struct->serverflags = static_cast<float>(svs.serverflags);
 	
 	ED_LoadFromFile (sv.worldmodel->entities);
 

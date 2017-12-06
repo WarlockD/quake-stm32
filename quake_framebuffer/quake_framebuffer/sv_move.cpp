@@ -104,7 +104,7 @@ SV_movestep
 Called by monster program code.
 The move will be adjusted for slopes and stairs, but if the move isn't
 possible, no move is done, false is returned, and
-pr_global_struct->trace_normal is set to the normal of the blocking wall
+vm.pr_global_struct->trace_normal is set to the normal of the blocking wall
 =============
 */
 qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
@@ -126,10 +126,10 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 		for (i=0 ; i<2 ; i++)
 		{
 			VectorAdd (ent->v.origin, move, neworg);
-			enemy = PROG_TO_EDICT(ent->v.enemy);
-			if (i == 0 && enemy != sv.edicts)
+			enemy = vm.PROG_TO_EDICT(ent->v.enemy);
+			if (i == 0 && enemy != sv.worldedict)
 			{
-				dz = ent->v.origin[2] - PROG_TO_EDICT(ent->v.enemy)->v.origin[2];
+				dz = ent->v.origin[2] - vm.PROG_TO_EDICT(ent->v.enemy)->v.origin[2];
 				if (dz > 40)
 					neworg[2] -= 8;
 				if (dz < 30)
@@ -148,7 +148,7 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 				return true;
 			}
 			
-			if (enemy == sv.edicts)
+			if (enemy == sv.worldedict)
 				break;
 		}
 		
@@ -209,7 +209,7 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 //		Con_Printf ("back on ground\n"); 
 		ent->v.flags = static_cast<float>(static_cast<int>(ent->v.flags) & ~FL_PARTIALGROUND);
 	}
-	ent->v.groundentity = EDICT_TO_PROG(trace.ent);
+	ent->v.groundentity = vm.EDICT_TO_PROG(trace.ent);
 
 // the move is ok
 	if (relink)
@@ -398,22 +398,22 @@ void SV_MoveToGoal (void)
 	edict_t		*enemy;
 #endif
 
-	ent = PROG_TO_EDICT(pr_global_struct->self);
-	goal = PROG_TO_EDICT(ent->v.goalentity);
-	dist = G_FLOAT(OFS_PARM0);
+	ent = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+	goal = vm.PROG_TO_EDICT(ent->v.goalentity);
+	dist = vm.G_FLOAT(OFS_PARM0);
 
 	if ( !( (int)ent->v.flags & (FL_ONGROUND|FL_FLY|FL_SWIM) ) )
 	{
-		G_FLOAT(OFS_RETURN) = 0;
+		vm.G_FLOAT(OFS_RETURN) = 0;
 		return;
 	}
 
 // if the next step hits the enemy, return immediately
 #ifdef QUAKE2
-	enemy = PROG_TO_EDICT(ent->v.enemy);
+	enemy = vm.PROG_TO_EDICT(ent->v.enemy);
 	if (enemy != sv.edicts &&  SV_CloseEnough (ent, enemy, dist) )
 #else
-	if ( PROG_TO_EDICT(ent->v.enemy) != sv.edicts &&  SV_CloseEnough (ent, goal, dist) )
+	if (vm.PROG_TO_EDICT(ent->v.enemy) != sv.worldedict &&  SV_CloseEnough (ent, goal, dist) )
 #endif
 		return;
 

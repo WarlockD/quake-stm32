@@ -301,6 +301,7 @@ void CL_ParseTEnt (void)
 CL_NewTempEntity
 =================
 */
+// what..the..he.. is this
 entity_t *CL_NewTempEntity (void)
 {
 	entity_t	*ent;

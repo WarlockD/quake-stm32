@@ -220,6 +220,179 @@ namespace type_tags {
 	}
 #endif
 }
+template<typename T,typename ALLOC = std::allocator<char>>
+class custom_size_allocator {
+public:
+	typedef T value_type;
+	typedef std::true_type propagate_on_container_copy_assignment;
+	typedef std::true_type propagate_on_container_move_assignment;
+	typedef std::true_type propagate_on_container_swap;
+	template<typename U,typename A>
+	struct rebind {
+		typedef custom_size_allocator<U,A> other;
+	};
+	typedef T * pointer;
+	typedef const T * const_pointer;
+	typedef T & reference;
+	typedef const T & const_reference;
+
+	custom_size_allocator() : _alloc(), _type_size(sizeof(T)) {}
+	custom_size_allocator(size_t size) : _alloc(), _type_size(size) { assert(size >= sizeof(T)); }
+	custom_size_allocator(ALLOC a, size_t size) : _alloc(a), _type_size(size) { assert(size >= sizeof(T)); }
+
+	template<typename U,typename A>
+	custom_size_allocator(const custom_size_allocator<U,A> &copy) : _alloc(copy._alloc), _type_size(copy._type_size) {}
+	custom_size_allocator(const custom_size_allocator &copy) : _alloc(copy._alloc), _type_size(copy._type_size) {}
+	custom_size_allocator(custom_size_allocator && move) : _alloc(std::move(move._alloc)), _type_size(move._type_size) {}
+	custom_size_allocator & operator=(const custom_size_allocator &) { _alloc = copy._alloc; _type_size = copy._type_size; return *this; }
+	custom_size_allocator & operator=(custom_size_allocator && move) { _alloc = std::move(move._alloc); _type_size = std::move(move._type_size); return *this; }
+
+
+	bool operator==(const custom_size_allocator & other) const { return this == &other; }
+	bool operator!=(const custom_size_allocator & other) const { return !(*this == other); }
+	T * allocate(size_t count)
+	{
+		char* ptr = _alloc.allocate(_type_size* count);
+		assert(ptr);
+		return reinterpret_cast<T*>(ptr);
+	}
+	void deallocate(T * ptr, size_t count)
+	{
+		char* ptr = reinterpret_cast<char*>(ptr);
+		_alloc.deallocate(ptr, count * _type_size);
+	}
+private:
+	ALLOC _alloc;
+	size_t _type_size;
+};
+
+class umm_allocator {
+public:
+	using bindex_t = unsigned short int;
+	constexpr static size_t max_align_t = alignof(std::max_align_t);
+private:
+	struct umm_block_t* _heap;
+	size_t _numblocks;
+	bindex_t umm_blocks(size_t size);
+	void umm_make_new_block(bindex_t c, bindex_t blocks, bindex_t freemask);
+	void umm_disconnect_from_free_list(bindex_t c);
+	void umm_assimilate_up(bindex_t c);
+	bindex_t umm_assimilate_down(bindex_t c, bindex_t freemask);
+	bool umm_pointer_in_heap(void* p) const noexcept;
+public:
+	umm_allocator() : _heap(nullptr), _numblocks(0U) {}
+	umm_allocator(void* heap, size_t heap_size);
+	size_t numblocks() const;
+	size_t maxsize() const;
+	// ----------------------------------------------------------------------------
+
+	void* allocate(std::size_t n);
+	void* allocate(std::size_t n,void* ptr); // basicly this is realloc
+	void deallocate(void * ptr);
+
+};
+template<size_t size>
+class umm_stack_allocator : public umm_allocator {
+	std::array<char, size> _buffer;
+public:
+	umm_stack_allocator() : umm_allocator(_buffer.data(), _buffer.size()) {}
+
+};
+
+class memory_area
+{
+	constexpr static size_t alignment = alignof(std::max_align_t);
+	char* _memory;
+	size_t _capasity;
+	char** _ptr; // stored in the first part of _memory
+public:
+	memory_area() noexcept : _memory(nullptr), _capasity(0U), _ptr(nullptr) {}
+	// we store _ptr inside memory so that we are allowed to copy and move
+	memory_area(char* memory, size_t capasity) noexcept : _memory(memory),_capasity(capasity- alignment), _ptr(&memory) { *_ptr = memory + alignment; }
+	memory_area(const memory_area& copy) : _memory(copy._memory),  _capasity(copy._capasity),  _ptr(copy._ptr) {}
+	memory_area& operator=(const memory_area&copy) { _memory = copy._memory; _capasity = copy._capasity; _ptr=copy._ptr; return *this; } 
+	memory_area(memory_area&& move) : _memory(move._memory), _capasity(move._capasity), _ptr(move._ptr) { move._memory = nullptr; move._capasity = 0U; }
+	memory_area& operator=(memory_area&& move) { _memory = move._memory; _capasity = move._capasity; _ptr = move._ptr; move._memory = nullptr; move._capasity = 0U;  return *this; }
+	~memory_area() {}
+
+	template <std::size_t ReqAlign>
+	char* allocate(std::size_t n) {
+		static_assert(ReqAlign <= alignment, "alignment is too small for this arena");
+		assert(pointer_in_buffer(*_ptr) && "short_alloc has outlived arena");
+		auto const aligned_n = align_up(n);
+		if (static_cast<decltype(aligned_n)>(_memory + _capasity - *_ptr) >= aligned_n)
+		{
+			char* r = *_ptr;
+			*_ptr += aligned_n;
+			return r;
+		}
+		assert(0); // ugh
+		static_assert(alignment <= alignof(std::max_align_t), "you've chosen an "
+			"alignment that is larger than alignof(std::max_align_t), and "
+			"cannot be guaranteed by normal operator new");
+		return static_cast<char*>(::operator new(n));
+	}
+	void deallocate(char* p, std::size_t n) noexcept {
+		assert(pointer_in_buffer(*_ptr) && "short_alloc has outlived arena");
+		if (pointer_in_buffer(p))
+		{
+			n = align_up(n);
+			if (p + n == *_ptr)
+				*_ptr = p;
+		}
+		else
+			::operator delete(p);
+	}
+	std::size_t used() const noexcept { return static_cast<std::size_t>(*_ptr - _memory); }
+	void reset() noexcept { *_ptr = _memory; }
+
+private:
+	static size_t align_up(std::size_t n) noexcept { return (n + (alignment - 1)) & ~(alignment - 1); }
+
+	bool pointer_in_buffer(char* p) noexcept { return _memory <= p && p <= _memory + _capasity; }
+};
+template<size_t stack_size>
+class stack_area : public memory_area {
+	char _buffer[stack_size+ memory_area::alignment];
+public:
+	stack_area() :memory_area(_buffer, stack_size) {}
+
+};
+
+template <class T>
+class short_alloc
+{
+public:
+	using value_type = T;
+	template <class _Up> struct rebind { using other = short_alloc<_Up>; };
+
+	short_alloc(const short_alloc&) = default;
+	short_alloc& operator=(const short_alloc&) = delete;
+
+	short_alloc(memory_area& a) noexcept : _a(a)
+	{
+		static_assert(size % alignment == 0,
+			"size N needs to be a multiple of alignment Align");
+	}
+	template <class U>
+	short_alloc(const short_alloc<U>& a) noexcept : _a(a._a) {}
+
+
+	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate<alignof(T)>(n * sizeof(T))); }
+	void deallocate(T* p, std::size_t n) noexcept { _a.deallocate(reinterpret_cast<char*>(p), n * sizeof(T)); }
+
+	template <class U> friend class short_alloc;
+
+	template<typename U>
+	bool operator==(const short_alloc<U>& other) const { return &_a == &other._a; }
+	template<typename U>
+	bool operator!=(const short_alloc<U>& other) const { return &_a != &other._a; }
+
+private:
+	memory_area& _a;
+};
+
+
 
 // uses ummalloc
 template <typename T>

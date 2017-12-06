@@ -156,7 +156,6 @@ Host_FindMaxClients
 */
 void	Host_FindMaxClients (void)
 {
-	int		i;
 
 	svs.maxclients = 1;
 	quake::string_view value;
@@ -354,10 +353,10 @@ void SV_DropClient (qboolean crash)
 		{
 		// call the prog function for removing a client
 		// this will set the body to a dead frame, among other things
-			saveSelf = pr_global_struct->self;
-			pr_global_struct->self = EDICT_TO_PROG(host_client->edict);
-			PR_ExecuteProgram (pr_global_struct->ClientDisconnect);
-			pr_global_struct->self = saveSelf;
+			saveSelf = vm.pr_global_struct->self;
+			vm.pr_global_struct->self = vm.EDICT_TO_PROG(host_client->edict);
+			PR_ExecuteProgram (vm.pr_global_struct->ClientDisconnect);
+			vm.pr_global_struct->self = saveSelf;
 		}
 
 		Sys_Printf ("Client %s removed\n",host_client->name);
@@ -454,11 +453,22 @@ void Host_ShutdownServer(qboolean crash)
 //
 // clear structures
 //
-	Q_memset (&sv, 0, sizeof(sv));
+	sv = server_t();
+	//Q_memset (&sv, 0, sizeof(sv));
 	Q_memset (svs.clients, 0, svs.maxclientslimit*sizeof(client_t));
 }
 
+void pr_system_t::Clear() {
+	// clear eveything and reset pools
+	std::destroy_at(&pr_strings_lookup);
+	std::memset(this, 0, sizeof(pr_system_t));
+	// hacks so we can use memory set
+	new(&pr_strings_lookup) string_lookup_t;
+	new(&free_pool) edict_list_t;
+	new(&used_pool) edict_list_t;
+	new(&reserved_pool) edict_list_t;
 
+}
 /*
 ================
 Host_ClearMemory
@@ -475,11 +485,10 @@ void Host_ClearMemory (void)
 	if (host_hunklevel)
 		Hunk_FreeToLowMark (host_hunklevel);
 
-	
-	for (size_t i = 0; i < sv.num_edicts; i++) {
-		if (sv.edicts[i].vars) delete(sv.edicts[i].vars);
-	}
-	memset (&sv, 0, sizeof(sv));
+	vm.Clear();
+	sv = server_t();
+
+
 	quake::cl.clear();
 	quake::cls.signon = 0;
 }
@@ -498,7 +507,7 @@ Returns false if the time is too short to run a frame
 qboolean Host_FilterTime (idTime time)
 {
 	using namespace std::chrono;
-	static constexpr idTime max_framerate = idCast<idTime>(1.0f / 72.0f);
+	static const idTime max_framerate= idTime(1.0f / 72.0f);
 	realtime += time;
 
 	const idTime new_time = (realtime - oldrealtime);
@@ -554,7 +563,7 @@ Host_ServerFrame
 void _Host_ServerFrame (void)
 {
 // run the world state	
-	pr_global_struct->frametime = host_frametime;
+	vm.pr_global_struct->frametime = host_frametime;
 
 // read client messages
 	SV_RunClients ();
@@ -571,7 +580,7 @@ void Host_ServerFrame (void)
 	float	temp_host_frametime;
 
 // run the world state	
-	pr_global_struct->frametime = host_frametime;
+	vm.pr_global_struct->frametime = host_frametime;
 
 // set the time and clear the general datagram
 	SV_ClearDatagram ();
@@ -600,7 +609,7 @@ void Host_ServerFrame (void)
 void Host_ServerFrame (void)
 {
 // run the world state	
-	pr_global_struct->frametime = host_frametime;
+	vm.pr_global_struct->frametime = host_frametime;
 
 // set the time and clear the general datagram
 	SV_ClearDatagram ();
@@ -861,7 +870,7 @@ void Host_Init (quakeparms_t *parms)
 	Key_Init ();
 	Con_Init ();	
 	M_Init ();	
-	PR_Init ();
+	vm.Init();
 	Mod_Init ();
 	NET_Init ();
 	SV_Init ();
@@ -907,7 +916,6 @@ void Host_Init (quakeparms_t *parms)
 		IN_Init ();
 #endif
 	}
-	_CrtCheckMemory();
 	Cbuf_InsertText ("exec quake.rc\n");
 
 	Hunk_AllocName (0, "-HOST_HUNKLEVEL-");

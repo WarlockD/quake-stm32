@@ -521,7 +521,9 @@ void execute_args(const UVector<quake::string_view>& args, cmd_source_t src) {
 	{
 		if (lower == cmd->name)
 		{
-			cmd->function(src, args.size(), args.data());
+			const size_t count = args.size();
+			const quake::string_view* data = args.data();
+			cmd->function(src, count, data);
 #ifdef DEBUG_ARGS
 			quake::debug << "CALL: " << lower << '(';
 			for (size_t i = 1; i < args.size(); i++) {

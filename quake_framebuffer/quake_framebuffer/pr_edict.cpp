@@ -31,21 +31,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 using namespace std::chrono;
 
+
+pr_system_t vm;
+#if 0
 dprograms_t		*progs;
 dfunction_t		*pr_functions;
 char			*pr_strings;
 ddef_t			*pr_fielddefs;
 ddef_t			*pr_globaldefs;
 dstatement_t	*pr_statements;
-globalvars_t	*pr_global_struct;
-float			*pr_globals;			// same as pr_global_struct
+globalvars_t	*vm.pr_global_struct;
+float			*pr_globals;			// same as vm.pr_global_struct
 int				pr_edict_size;	// in bytes
 
-unsigned short		pr_crc;
 
+#endif
 
-
-ddef_t *ED_FieldAtOfs (int ofs);
 qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
@@ -63,98 +64,17 @@ cvar_t	saved4 = {"saved4", "0", true};
 
 
 
-edict_t *EDICT_NUM(int n)
-{
-	if (n < 0 || n >= sv.max_edicts)
-		Sys_Error("EDICT_NUM: bad number %i", n);
-	return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
-}
+edict_t::edict_t(int num) : num(num) , vars() , free(false) {
+	VectorCopy(vec3_origin, v.origin);
+	VectorCopy(vec3_origin, v.angles);
 
-int NUM_FOR_EDICT(edict_t *e)
-{
-	int		b;
-
-	b = (byte *)e - (byte *)sv.edicts;
-	b = b / pr_edict_size;
-
-	if (b < 0 || b >= sv.num_edicts)
-		Sys_Error("NUM_FOR_EDICT: bad pointer");
-	return b;
-}
-struct edict_manager_t {
-	link_list_t<edict_t, &edict_t::area> edict_free_pool;
-	//quake::link_list_t<edict_t, &edict_t::area> edict_free_pool;
-	edict_t* edicts;
-	size_t used;
-	size_t capasity;
-	size_t edict_size;
-	edict_manager_t() : edict_free_pool(), edicts(nullptr), used(0U), capasity(0U), edict_size(0) {}
-	edict_manager_t(size_t capasity, size_t edict_size) :
-		edict_free_pool(), 
-		edicts((edict_t*)Hunk_AllocName(capasity * edict_size, "edicts")),
-		used(0U),
-			capasity(capasity),
-			edict_size(edict_size) {
-		// we need to link all the free edicts
-		edict_t* last = nullptr;
-		for (size_t i = 0; i < capasity; i++) {
-			edict_t* ent = edicts + (i * edict_size);
-			
-			ent->free = true; // make sure this flag is set at least
-			if (last) last->area.insert_after<&edict_t::area>(last);
-			else edict_free_pool.push_front(ent);
-			last = ent;
-		}
-	}
-	edict_t* allocate(size_t size) {
-		edict_t* ent = nullptr;
-		if (used < capasity) {
-			assert(size < edict_size);
-			edict_t* ent = edict_free_pool.pop_front();
-			assert(ent);
-			++used;
-			ent->area = link_t<edict_t>();
-			std::memset(&v, 0, sizeof(entvars_t));
-		}
-		return ent;
-	}
-	void free(edict_t* ptr) {
-		assert(used);
-		const ptrdiff_t pos = (ptrdiff_t)ptr;
-		assert((ptrdiff_t)ptr >= (ptrdiff_t)edicts && (ptrdiff_t)ptr <= ((ptrdiff_t)edicts - edict_size)); // make sure its in range
-		std::memset(ptr, 0, edict_size); // we clear it on delete as we might reuse it
-		ptr.freetime = sv.time;
-		edict_free_pool.push_front(ptr);
-		--used;
-	}
-};
-
-static edict_manager_t all_edicts;
-int edict_t::edict_to_prog(const edict_t* e) {
-	return reinterpret_cast<const char*>(e) - reinterpret_cast<const char*>(all_edicts.edicts);
-}
-edict_t* edict_t::prog_to_edict(int prog) {
-	return reinterpret_cast<edict_t*>(reinterpret_cast<char*>(all_edicts.edicts) + prog);
-}
-
-
-void edict_t::create_edict_pool(size_t count, size_t edict_size) {
-	all_edicts = edict_manager_t(count, edict_size);
-}
-
-void* edict_t::operator new(size_t size) { return all_edicts.allocate(size); }
-void edict_t::operator delete(void* ptr) { all_edicts.free((edict_t*)ptr); }
-
-edict_t::edict_t() {
-	VectorCopy(vec3_origin, origin);
-	VectorCopy(vec3_origin, angles);
-	extthink = idTime(-1s);
+	v.nextthink = idTime(-1s);
 
 }
 edict_t::~edict_t() {
 	if (area.islinked()) area.remove<&edict_t::area>();
 }
-
+void edict_t::ClearFields() { std::memset(&v, 0, vm.progs->entityfields * 4); }
 /*
 =================
 ED_ClearEdict
@@ -162,23 +82,7 @@ ED_ClearEdict
 Sets everything to NULL
 =================
 */
-void edict_t::Clear ()
-{
-	const size_t total_size = pr_edict_size;
-	const size_t var_size = sizeof(entvars_t);
-	const size_t bentityfields = progs->entityfields * 4;
-	const size_t size_of_entvars = bentityfields - var_size;
-	const size_t edict_value_size = pr_edict_size - sizeof(edict_t) + var_size;
-	const size_t field_size = progs->entityfields * sizeof(uint32_t);
-	//return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
-//	assert(field_size == var_size);
-	std::memset (&v, 0, sizeof(entvars_t));
-	if (vars) vars->clear();
-	else vars = new map_t;
-	if (area.le_prev == nullptr) { area.le_prev = &(this->area.le_next); area.le_next = nullptr; }
-	assert(area.islinked());
-	free = false;
-}
+
 
 /*
 =================
@@ -191,60 +95,49 @@ instead of being removed and recreated, which can cause interpolated
 angles and bad trails.
 =================
 */
+void pr_system_t::ED_HulkAllocEdicts(size_t size) {
+
+	const size_t total_size = pr_edict_size;
+	const size_t var_size = sizeof(entvars_t);
+	const size_t bentityfields = progs->entityfields * 4;
+	const size_t size_of_entvars = bentityfields - var_size;
+	const size_t edict_value_size = pr_edict_size - sizeof(edict_t) + var_size;
+	const size_t field_size = progs->entityfields * sizeof(uint32_t);
+	//return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
+	new(&free_pool) edict_list_t;
+	new(&used_pool) edict_list_t;
+	new(&reserved_pool) edict_list_t;
+	pr_edicts.clear();
+	pr_edicts.reserve(size);
+	char* ptr = (char*)Hunk_AllocName(size*pr_edict_size, "edicts");
+	pr_max_edicts = size;
+	for (size_t i = 0; i < pr_max_edicts; i++) {
+		edict_t* e = new(ptr + (i * pr_edict_size)) edict_t(i);
+		e->free = true;
+		pr_edicts.emplace_back(e);
+		free_pool.push_back(e);
+
 #if 0
-edict_t *ED_Alloc (void)
-{
-	int			i;
-	edict_t		*e;
+		block_header_t* b = reinterpret_cast<block_header_t*>(ptr + (i * pr_edict_size));
+		new(b) block_header_t;
 
-	for ( i=svs.maxclients+1 ; i<sv.num_edicts ; i++)
-	{
-		e = EDICT_NUM(i);
-		// the first couple seconds of server time can involve a lot of
-		// freeing and allocating, so relax the replacement policy
-		if (e->free && ( e->freetime < 2s || sv.time - e->freetime > 500ms ) )
-		{
-			e->Clear();
-			return e;
-		}
-	}
-	
-	if (i == MAX_EDICTS)
-		Sys_Error ("ED_Alloc: no free edicts");
-		
-	sv.num_edicts++;
-	e = EDICT_NUM(i);
-	e->Clear();
-
-	return e;
-}
+		free_pool.push_back(b);
 #endif
-ddef_t *ED_FindField(const quake::string_view& name);
-//static_assert(sizeof(eval_t) == sizeof(uint32_t), "Eval union needs to be 4 bytes");
-void edict_t::Unlink() 
+	}
+}
+edict_t *pr_system_t::ED_Alloc(bool reserve)
 {
-	if (area.islinked()) area.remove<&edict_t::area>();
+	edict_t* eb = free_pool.pop_front();
+	assert(eb && eb->free);
+	eb->free = false;
+	++pr_num_edicts;
+	if (reserve)
+		reserved_pool.push_back(eb);
+	else
+		used_pool.push_back(eb);
+	return eb;
 }
 
-eval_t* edict_t::get_field(const quake::string_view& field) {
-	ddef_t* def = ED_FindField(field);
-	assert(def);
-	return get_field(def->ofs);
-}
-const eval_t* edict_t::get_field(const quake::string_view& field) const {
-	ddef_t* def = ED_FindField(field);
-	assert(def);
-	return get_field(def->ofs);
-}
-
-eval_t* edict_t::get_field(ptrdiff_t offset) {
-	assert(offset < progs->numfielddefs);
-	return &fields[offset];
-}
-const eval_t* edict_t::get_field(ptrdiff_t offset) const {
-	assert(offset < progs->numfielddefs);
-	return &fields[offset];
-}
 /*
 =================
 ED_Free
@@ -253,29 +146,45 @@ Marks the edict as free
 FIXME: walk all entities and NULL out references to this entity
 =================
 */
-void edict_t::Free ()
+void pr_system_t::ED_Free(edict_t *e)
 {
-	using namespace std::chrono;
-
-	Unlink();		// unlink from world bsp
-
-	//free = true;
-	v.model = 0;
-	v.takedamage = 0;
-	v.modelindex = 0;
-	v.colormap = 0;
-	v.skin = 0;
-	v.frame = 0;
-	VectorCopy (vec3_origin, v.origin);
-	VectorCopy (vec3_origin, v.angles);
-	v.nextthink = idTime(-1s);
-	v.solid = 0;
-	if (vars) {
-		delete(vars);
-		vars = nullptr;
+	if (!e->free) {
+		--pr_num_edicts;
+		used_pool.remove(e);
+		e->ClearFields();
+		VectorCopy(vec3_origin, e->v.angles);
+		VectorCopy(vec3_origin, e->v.origin);
+		e->v.nextthink = idTime(-1s);
+		e->freetime = sv.time;
+		free_pool.push_back(e);
+		e->vars.clear();
+		e->free = true;
 	}
-	freetime = sv.time;
+	//	assert(field_size == var_size);
+#if 0
+	std::memset(&v, 0, sizeof(entvars_t));
+	if (vars) vars->clear();
+	else vars = new map_t;
+	if (area.le_prev == nullptr) { area.le_prev = &(this->area.le_next); area.le_next = nullptr; }
+	assert(area.islinked());
+	free = false;
+#endif
 }
+//static_assert(sizeof(eval_t) == sizeof(uint32_t), "Eval union needs to be 4 bytes");
+
+
+eval_t& edict_t::get_field(const quake::string_view& field) {
+	ddef_t* def = vm.ED_FindField(field);
+	assert(def);
+	return get_field(def->ofs);
+}
+const eval_t& edict_t::get_field(const quake::string_view& field) const {
+	ddef_t* def = vm.ED_FindField(field);
+	assert(def);
+	return get_field(def->ofs);
+}
+
+
 
 //===========================================================================
 
@@ -284,7 +193,7 @@ void edict_t::Free ()
 ED_GlobalAtOfs
 ============
 */
-ddef_t *ED_GlobalAtOfs (int ofs)
+ddef_t *pr_system_t::ED_GlobalAtOfs (int ofs)
 {
 	ddef_t		*def;
 	int			i;
@@ -303,7 +212,7 @@ ddef_t *ED_GlobalAtOfs (int ofs)
 ED_FieldAtOfs
 ============
 */
-ddef_t *ED_FieldAtOfs (int ofs)
+ddef_t *pr_system_t::ED_FieldAtOfs (int ofs)
 {
 	ddef_t		*def;
 	int			i;
@@ -322,7 +231,7 @@ ddef_t *ED_FieldAtOfs (int ofs)
 ED_FindField
 ============
 */
-ddef_t *ED_FindField (const quake::string_view& name)
+ddef_t *pr_system_t::ED_FindField (const quake::string_view& name)
 {
 	ddef_t		*def = nullptr;
 	assert(dprograms_t::fields.data());
@@ -333,7 +242,7 @@ ddef_t *ED_FindField (const quake::string_view& name)
 	for (int i =0 ; i<progs->numfielddefs ; i++)
 	{
 		def = &pr_fielddefs[i];
-		const char* def_name = pr_strings + def->s_name;
+		const char* def_name = vm.pr_strings + def->s_name;
 		if (name == def_name) return def;
 	}
 #endif
@@ -346,22 +255,12 @@ ddef_t *ED_FindField (const quake::string_view& name)
 ED_FindGlobal
 ============
 */
-ddef_t *ED_FindGlobal (const quake::string_view& name)
+ddef_t *pr_system_t::ED_FindGlobal (const quake::string_view& name)
 {
 	ddef_t		*def = nullptr;
 	assert(dprograms_t::globals.data());
 	auto it = dprograms_t::globals.find(name);
 	if (it != dprograms_t::globals.end()) def = it->second;
-#if 0
-	int			i;
-	
-	for (i=0 ; i<progs->numglobaldefs ; i++)
-	{
-		def = &pr_globaldefs[i];
-		const char* def_name = pr_strings + def->s_name;
-		if (name == def_name) return def;
-	}
-#endif
 	return def;
 }
 
@@ -371,7 +270,7 @@ ddef_t *ED_FindGlobal (const quake::string_view& name)
 ED_FindFunction
 ============
 */
-dfunction_t *ED_FindFunction (const quake::string_view& name)
+dfunction_t *pr_system_t::ED_FindFunction (const quake::string_view& name)
 {
 	dfunction_t		*func = nullptr;
 	assert(dprograms_t::functions.data());
@@ -381,19 +280,11 @@ dfunction_t *ED_FindFunction (const quake::string_view& name)
 	for (int i=0 ; i<progs->numfunctions ; i++)
 	{
 		func = &pr_functions[i];
-		const char* func_name = pr_strings + func->s_name;
+		const char* func_name = vm.pr_strings + func->s_name;
 		if (name == func_name) return func;
 	}
 #endif
 	return func;
-}
-
-
-eval_t *GetEdictFieldValue(edict_t *ed, const quake::string_view& field)
-{
-	ddef_t* def = ED_FindField(field);
-	if (!def) return nullptr;
-	return (eval_t *)((uint8_t *)&ed->v + def->ofs*sizeof(uint32_t));
 }
 
 
@@ -416,21 +307,21 @@ public:
 		switch (type)
 		{
 		case etype_t::ev_string:
-			os << (const char*)(pr_strings + val->string);
+			os << (const char*)(vm.pr_strings + val->string);
 			break;
 		case etype_t::ev_entity:
-			os << (int)(NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+			os << (int)(vm.NUM_FOR_EDICT(vm.PROG_TO_EDICT(val->edict)));
 			break;
 		case etype_t::ev_function:
 		{
-			dfunction_t	*f = pr_functions + val->function;
-			os << (const char*)(pr_strings + f->s_name);
+			dfunction_t	*f = vm.pr_functions + val->function;
+			os << (const char*)(vm.pr_strings + f->s_name);
 		}
 		break;
 		case etype_t::ev_field:
 		{
-			ddef_t		*def = ED_FieldAtOfs(val->_int);
-			os << (const char*)(pr_strings + def->s_name);
+			ddef_t		*def = vm.ED_FieldAtOfs(val->_int);
+			os << (const char*)(vm.pr_strings + def->s_name);
 		}
 		break;
 		case etype_t::ev_void:
@@ -470,17 +361,13 @@ void edict_t::Print()
 	char	*name;
 	int j;
 	auto ed = this;
-	if (ed->free)
-	{
-		quake::con << "FREE" << std::endl;
-		return;
-	}
+
 	quake::con << std::endl;
-	quake::con << "EDICT " << NUM_FOR_EDICT(ed) << ':' << std::endl;
-	for (int i=1 ; i<progs->numfielddefs ; i++)
+	quake::con << "EDICT " << vm.NUM_FOR_EDICT(ed) << ':' << std::endl;
+	for (int i=1 ; i<vm.progs->numfielddefs ; i++)
 	{
-		d = &pr_fielddefs[i];
-		name = pr_strings + d->s_name;
+		d = &vm.pr_fielddefs[i];
+		name = vm.pr_strings + d->s_name;
 		if (name[strlen(name)-2] == '_')
 			continue;	// skip _x, _y, _z vars
 			
@@ -507,7 +394,7 @@ ED_Write
 For savegames
 =============
 */
-void ED_Write (std::ostream& f, edict_t *ed)
+void ED_Write(std::ostream& f, edict_t *ed)
 {
 	ddef_t	*d;
 	int		*v;
@@ -516,34 +403,33 @@ void ED_Write (std::ostream& f, edict_t *ed)
 	idType	type;
 
 	f << '{' << std::endl;
-	if (!ed->free)
+
+	for (size_t i = 1; i < (size_t)vm.progs->numfielddefs; i++)
 	{
-		for (size_t i = 1; i < (size_t)progs->numfielddefs; i++)
-		{
-			d = &pr_fielddefs[i];
-			name = pr_strings + d->s_name;
-			if (name[strlen(name) - 2] == '_')
-				continue;	// skip _x, _y, _z vars
+		d = &vm.pr_fielddefs[i];
+		name = vm.pr_strings + d->s_name;
+		if (name[strlen(name) - 2] == '_')
+			continue;	// skip _x, _y, _z vars
 
-			v = (int *)((char *)&ed->v + d->ofs * 4);
+		v = (int *)((char *)&ed->v + d->ofs * 4);
 
-			// if the value is still all 0, skip the field
+		// if the value is still all 0, skip the field
 
-			type = d->type;
-			for (j = 0; j < type.size(); j++)
-				if (v[j])
-					break;
-			if (j == type.size())
-				continue;
-			f << '"' << name << "\" \"" << PR_UglyValueString(d->type, (eval_t *)v) << '"' << std::endl;
-		}
+		type = d->type;
+		for (j = 0; j < type.size(); j++)
+			if (v[j])
+				break;
+		if (j == type.size())
+			continue;
+		f << '"' << name << "\" \"" << PR_UglyValueString(d->type, (eval_t *)v) << '"' << std::endl;
 	}
+
 	f << ')' << std::endl;
 }
 
 void ED_PrintNum (int ent)
 {
-	EDICT_NUM(ent)->Print ();
+	vm.EDICT_NUM(ent)->Print ();
 }
 
 /*
@@ -557,8 +443,8 @@ void ED_PrintEdicts()
 {
 	int		i;
 	
-	Con_Printf ("%i entities\n", sv.num_edicts);
-	for (i=0 ; i<sv.num_edicts ; i++)
+	Con_Printf ("%i entities\n", vm.pr_num_edicts);
+	for (i=0 ; i<vm.pr_num_edicts; i++)
 		ED_PrintNum (i);
 }
 
@@ -574,7 +460,7 @@ void ED_PrintEdict_f(cmd_source_t source, size_t argc, const quake::string_view 
 	int		i;
 	
 	i = Q_atoi (argv[1]);
-	if (i >= sv.num_edicts)
+	if (i >= vm.pr_num_edicts)
 	{
 		Con_Printf("Bad edict number\n");
 		return;
@@ -596,25 +482,21 @@ void ED_Count(cmd_source_t source, size_t argc, const quake::string_view argv[])
 	int		active, models, solid, step;
 
 	active = models = solid = step = 0;
-	for (i=0 ; i<sv.num_edicts ; i++)
-	{
-		ent = EDICT_NUM(i);
-		if (ent->free)
-			continue;
+	for (const edict_t& ent : vm) {
 		active++;
-		if (ent->v.solid)
+		if (ent.v.solid)
 			solid++;
-		if (ent->v.model) {
+		if (ent.v.model) {
 			models++;
-			assert(ent->vars->find("model") != ent->vars->end());
+			//assert(ent.vars->find("model") != ent.vars.end());
 
 		}
 
-		if (ent->v.movetype == MOVETYPE_STEP)
+		if (ent.v.movetype == MOVETYPE_STEP)
 			step++;
 	}
 
-	Con_Printf ("num_edicts:%3i\n", sv.num_edicts);
+	Con_Printf ("num_edicts:%3i\n", vm.pr_num_edicts);
 	Con_Printf ("active    :%3i\n", active);
 	Con_Printf ("view      :%3i\n", models);
 	Con_Printf ("touch     :%3i\n", solid);
@@ -641,9 +523,9 @@ void ED_WriteGlobals (std::ostream& f)
 	ddef_t		*def;
 	idType		type;
 	f << '{' << std::endl;
-	for (int i=0 ; i<progs->numglobaldefs ; i++)
+	for (int i=0 ; i<vm.progs->numglobaldefs ; i++)
 	{
-		def = &pr_globaldefs[i];
+		def = &vm.pr_globaldefs[i];
 		type = def->type;
 		if ( !type.saveglobal())
 			continue;
@@ -651,8 +533,8 @@ void ED_WriteGlobals (std::ostream& f)
 		case etype_t::ev_string:
 		case etype_t::ev_float:
 		case etype_t::ev_entity:
-			const char* name = pr_strings + def->s_name;
-			f << '"' << name << "\" \"" << PR_UglyValueString(type, (eval_t *)&pr_globals[def->ofs]) << '"' << std::endl;
+			const char* name = vm.pr_strings + def->s_name;
+			f << '"' << name << "\" \"" << PR_UglyValueString(type, (eval_t *)&vm.pr_globals[def->ofs]) << '"' << std::endl;
 		}
 		break;
 	}
@@ -682,14 +564,14 @@ void ED_ParseGlobals (COM_Parser& parser)
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 
-		ddef_t	* key = ED_FindGlobal (keyname);
+		ddef_t	* key = vm.ED_FindGlobal (keyname);
 		if (!key)
 		{
 			quake::con << '"' << keyname << "\" is not global" << std::endl;
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)pr_globals, key, value))
+		if (!ED_ParseEpair ((void *)vm.pr_globals, key, value))
 			Host_Error ("ED_ParseGlobals: parse error");
 	}
 }
@@ -742,11 +624,16 @@ int PR_AllocString(int size, char **ptr)
 ED_NewString
 =============
 */
-char *ED_NewString (const quake::string_view& string)
+const pr_system_t::string_lookup_t::value_type& pr_system_t::ED_NewString (const quake::string_view& string)
 {
+	// first check if its in the hash
+	auto it = pr_strings_lookup.find(string);
+	if (it != pr_strings_lookup.end()) {
+		return *it;
+	}
 	char	*new_ptr, *new_p;	
 	size_t l = string.size() + 1;
-	new_ptr = (char*)Hunk_Alloc (l);
+	new_ptr = (char*)Hunk_AllocName(l,"string");
 	new_p = new_ptr;
 	for (auto it = string.begin(); it != string.end();it++) {
 		if (*it == '\\') {
@@ -758,8 +645,9 @@ char *ED_NewString (const quake::string_view& string)
 		else *new_p++ = *it;
 	}
 	*new_p = 0;
-	
-	return new_ptr;
+	// else we got a new string
+	string_t index = new_ptr - pr_strings;
+	return *pr_strings_lookup.emplace(new_ptr, index).first;
 }
 
 
@@ -775,7 +663,7 @@ returns false if error
 
 qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& value)
 {
-	const char* key_name = key->s_name + pr_strings;
+	const char* key_name = key->s_name + vm.pr_strings;
 	float*  f;
 	int		i;
 	char	string[128];
@@ -793,14 +681,14 @@ qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& valu
 	vd.base = (void *)((int *)base + key->ofs);
 	d = (void *)((int *)base + key->ofs);
 	idType type = key->type;
-	if (!ent->vars) ent->vars = new edict_t::map_t;
+	
 	switch (type)
 	{
 	case etype_t::ev_string:
 	{
-		const char* v = ED_NewString(value);
-		ent->vars->emplace(key_name,edict_t::value_t( quake::string_view(v)));
-		*(string_t *)d = v - pr_strings;
+		auto v = vm.ED_NewString(value);
+		ent->vars.emplace(key_name,edict_t::value_t( v.first));
+		*(string_t *)d = v.second;
 	}
 		break;
 
@@ -808,7 +696,7 @@ qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& valu
 	{
 		float v;
 		assert(quake::to_number(value, v));
-		ent->vars->emplace(key_name, edict_t::value_t(v));
+		ent->vars.emplace(key_name, edict_t::value_t(v));
 	}
 		break;
 
@@ -823,37 +711,37 @@ qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& valu
 		assert(quake::to_number(fv, v.value[1]));
 		assert(parser.Next(fv));
 		assert(quake::to_number(fv, v.value[2]));
-		ent->vars->emplace(key_name, edict_t::value_t(v));
+		ent->vars.emplace(key_name, edict_t::value_t(v));
 		::memcpy(d, v.value, sizeof(v.value));
 	}
 	break;
 
 	case etype_t::ev_entity:
 		assert(quake::to_number(value, i));
-		ent->vars->emplace(key_name, edict_t::value_t(EDICT_NUM(i)));
-		*(int *)d = EDICT_TO_PROG(EDICT_NUM(i));
+		ent->vars.emplace(key_name, edict_t::value_t(vm.EDICT_NUM(i)));
+		*(int *)d = vm.EDICT_TO_PROG(vm.EDICT_NUM(i));
 		break;
 
 	case etype_t::ev_field:
-		def = ED_FindField(value);
+		def = vm.ED_FindField(value);
 		if (!def)
 		{
 			quake::con << "Can't find field " << value << std::endl;
 			return false;
 		}
-		ent->vars->emplace(key_name, edict_t::value_t(G_INT(def->ofs)));
-		*(int *)d = G_INT(def->ofs);
+		ent->vars.emplace(key_name, edict_t::value_t(vm.G_INT(def->ofs)));
+		*(int *)d = vm.G_INT(def->ofs);
 		break;
 
 	case etype_t::ev_function:
-		func = ED_FindFunction(value);
+		func = vm.ED_FindFunction(value);
 		if (!func)
 		{
 			quake::con << "Can't find function " << value << std::endl;
 			return false;
 		}
-		ent->vars->emplace(key_name, edict_t::value_t(func));
-		*(func_t *)d = func - pr_functions;
+		ent->vars.emplace(key_name, edict_t::value_t(func));
+		*(func_t *)d = func - vm.pr_functions;
 		break;
 
 	default:
@@ -884,7 +772,7 @@ qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 	switch (type)
 	{
 	case etype_t::ev_string:
-		*(string_t *)d = ED_NewString(value) - pr_strings;
+		*(string_t *)d = vm.ED_NewString(value).second;
 		break;
 
 	case etype_t::ev_float:
@@ -908,27 +796,27 @@ qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
 
 	case etype_t::ev_entity:
 		assert(quake::to_number(value,i));
-		*(int *)d = EDICT_TO_PROG(EDICT_NUM(i));
+		*(int *)d = vm.EDICT_TO_PROG(vm.EDICT_NUM(i));
 		break;
 
 	case etype_t::ev_field:
-		def = ED_FindField(value);
+		def = vm.ED_FindField(value);
 		if (!def)
 		{
 			quake::con << "Can't find field " << value << std::endl;
 			return false;
 		}
-		*(int *)d = G_INT(def->ofs);
+		*(int *)d = vm.G_INT(def->ofs);
 		break;
 
 	case etype_t::ev_function:
-		func = ED_FindFunction(value);
+		func = vm.ED_FindFunction(value);
 		if (!func)
 		{
 			quake::con << "Can't find function " << value << std::endl;
 			return false;
 		}
-		*(func_t *)d = func - pr_functions;
+		*(func_t *)d = func - vm.pr_functions;
 		break;
 
 	default:
@@ -947,7 +835,7 @@ Used for initial level load and for savegames.
 ====================
 */
 static std::unordered_map<quake::string_view, edict_t*> loaded_edicts;
-void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
+bool ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 {
 	ddef_t		*key;
 	qboolean	anglehack;
@@ -959,14 +847,13 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 	//COM_Parser parser(data);
 
 	// clear it
-	if (ent != sv.edicts) {
-		//ent = new(ent) edict_t;
-		memset(&ent->v, 0, progs->entityfields * 4);
-		if (!ent->vars)
-			ent->vars = new edict_t::map_t;
+	if (ent != sv.worldedict) {
+
+		//memset(&ent->v, 0, vm.progs->entityfields * 4);
+		ent->vars.clear();
 	}
 		// hack
-		
+	assert(!vm.is_edict_free(ent));
 
 	// go through all the dictionary pairs
 	// debugging
@@ -1004,7 +891,7 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		if (keyname.front() == '_')
 			continue;
 
-		key = ED_FindField(keyname);
+		key = vm.ED_FindField(keyname);
 		if (key == nullptr) {
 			quake::con << '\'' << keyname << "' is not a field" << std::endl;
 			continue;
@@ -1026,13 +913,13 @@ void ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 
 	}
 
-	if (!init)
-		ent->free = true;
+	if (!init) return false;
 
 	assert(ent->v.classname);
 
-	const char* classname = pr_strings + ent->v.classname; 
+	const char* classname = vm.pr_strings + ent->v.classname; 
 	loaded_edicts[classname] = ent;
+	return true;
 }
 
 
@@ -1059,7 +946,7 @@ void ED_LoadFromFile (const quake::string_view& data)
 	
 	ent = NULL;
 	inhibit = 0;
-	pr_global_struct->time = sv.time;
+	vm.pr_global_struct->time = sv.time;
 	COM_Parser parser(data);
 	quake::string_view token;
 // parse ents
@@ -1073,9 +960,9 @@ void ED_LoadFromFile (const quake::string_view& data)
 		}
 
 		if (!ent)
-			ent = EDICT_NUM(0);
+			ent = vm.EDICT_NUM(0);
 		else
-			ent = ED_Alloc ();
+			ent = vm.ED_Alloc ();
 		ED_ParseEdict (parser, ent);
 
 // remove things from different skill levels or deathmatch
@@ -1083,7 +970,7 @@ void ED_LoadFromFile (const quake::string_view& data)
 		{
 			if (((int)ent->v.spawnflags & SPAWNFLAG_NOT_DEATHMATCH))
 			{
-				ent->Free();
+				vm.ED_Free(ent);
 				inhibit++;
 				continue;
 			}
@@ -1092,7 +979,7 @@ void ED_LoadFromFile (const quake::string_view& data)
 				|| (current_skill == 1 && ((int)ent->v.spawnflags & SPAWNFLAG_NOT_MEDIUM))
 				|| (current_skill >= 2 && ((int)ent->v.spawnflags & SPAWNFLAG_NOT_HARD)) )
 		{
-			ent->Free();
+			vm.ED_Free(ent);
 			inhibit++;
 			continue;
 		}
@@ -1104,24 +991,24 @@ void ED_LoadFromFile (const quake::string_view& data)
 		{
 			Con_Printf ("No classname for:\n");
 			ent->Print ();
-			ent->Free ();
+			vm.ED_Free(ent);
 			continue;
 		}
 
 	// look for the spawn function
-		quake::string_view ref(pr_strings + ent->v.classname);
-		func = ED_FindFunction (ref);
+		quake::string_view ref(vm.pr_strings + ent->v.classname);
+		func = vm.ED_FindFunction (ref);
 
 		if (!func)
 		{
 			Con_Printf ("No spawn function for:\n");
 			ent->Print ();
-			ent->Free ();
+			vm.ED_Free(ent);
 			continue;
 		}
 
-		pr_global_struct->self = EDICT_TO_PROG(ent);
-		PR_ExecuteProgram (func - pr_functions);
+		vm.pr_global_struct->self = vm.EDICT_TO_PROG(ent);
+		PR_ExecuteProgram (func - vm.pr_functions);
 	}	
 
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
@@ -1135,8 +1022,26 @@ quake::FixedMap<quake::string_view, dfunction_t*> dprograms_t::functions;
 PR_LoadProgs
 ===============
 */
+pr_system_t::pr_system_t() :
+	progs(nullptr), pr_functions(nullptr), pr_strings(nullptr), pr_globaldefs(nullptr), pr_fielddefs(nullptr), 
+	pr_statements(nullptr), pr_global_struct(nullptr), pr_globals(nullptr), pr_edict_size(0), pr_edicts(), pr_max_edicts(MAX_EDICTS)
+	{
+#if 0
+	dprograms_t		*progs=nullptr;
+	dfunction_t		*pr_functions;
+	char			*pr_strings;
+	ddef_t			*pr_globaldefs;
+	ddef_t			*pr_fielddefs;
+	dstatement_t	*pr_statements;
+	globalvars_t	*vm.pr_global_struct;
+	float			*pr_globals;			// same as vm.pr_global_struct
 
-void PR_LoadProgs(void)
+	int				pr_edict_size;	// in bytes
+	edict_t *		pr_edicts;		// makes sence to put the edicts here 
+	size_t			pr_max_edicts;
+#endif
+}
+void pr_system_t::LoadProgs(void)
 {
 	int		i;
 
@@ -1169,6 +1074,22 @@ void PR_LoadProgs(void)
 	pr_globals = (float *)pr_global_struct;
 
 	pr_edict_size = progs->entityfields * 4 + sizeof(edict_t) - sizeof(entvars_t);
+	// round off to next highest whole word address (esp for Alpha)
+	// this ensures that pointers in the engine data area are always
+	// properly aligned
+	pr_edict_size += sizeof(void *) - 1;
+	pr_edict_size &= ~(sizeof(void *) - 1);
+
+	// So we don't keep allocating all new strings, we will create a reverse lookup
+	pr_strings_lookup.clear();
+	{
+		string_t last_offset = 0;
+		for (size_t i = 0; i < progs->numstrings; i++) {
+			quake::string_view s = pr_strings + last_offset;
+			pr_strings_lookup.emplace(s, last_offset);
+			last_offset += s.size() + 1;
+		}
+	}
 
 	// byte swap the lumps
 	for (i = 0; i < progs->numstatements; i++)
@@ -1243,7 +1164,7 @@ void PR_LoadProgs(void)
 PR_Init
 ===============
 */
-void PR_Init (void)
+void pr_system_t::Init(void)
 {
 	Cmd_AddCommand ("edict", ED_PrintEdict_f);
 	Cmd_AddCommand ("edicts", (xcommand_t)ED_PrintEdicts);

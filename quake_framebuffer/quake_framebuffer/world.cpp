@@ -287,16 +287,16 @@ void SV_TouchLinks ( edict_t *ent, areanode_t *node )
 			|| ent->v.absmax[1] < touch.v.absmin[1]
 			|| ent->v.absmax[2] < touch.v.absmin[2])
 			continue;
-		old_self = pr_global_struct->self;
-		old_other = pr_global_struct->other;
+		old_self = vm.pr_global_struct->self;
+		old_other = vm.pr_global_struct->other;
 
-		pr_global_struct->self = EDICT_TO_PROG(&touch);
-		pr_global_struct->other = EDICT_TO_PROG(ent);
-		pr_global_struct->time = idCast<float>(sv.time);
+		vm.pr_global_struct->self = vm.EDICT_TO_PROG(&touch);
+		vm.pr_global_struct->other = vm.EDICT_TO_PROG(ent);
+		vm.pr_global_struct->time = idCast<float>(sv.time);
 		PR_ExecuteProgram(touch.v.touch);
 
-		pr_global_struct->self = old_self;
-		pr_global_struct->other = old_other;
+		vm.pr_global_struct->self = old_self;
+		vm.pr_global_struct->other = old_other;
 	}
 
 	
@@ -368,11 +368,8 @@ void SV_LinkEdict (edict_t *ent, qboolean touch_triggers)
 	if (ent->area.islinked())
 		ent->area.remove<&edict_t::area>(); // unlink from old position
 		
-	if (ent == sv.edicts)
+	if (ent == nullptr)
 		return;		// don't add the world
-
-	if (ent->free)
-		return;
 
 // set the abs box
 
@@ -547,7 +544,7 @@ edict_t	*SV_TestEntityPosition (edict_t *ent)
 	trace = SV_Move (ent->v.origin, ent->v.mins, ent->v.maxs, ent->v.origin, 0, ent);
 	
 	if (trace.startsolid)
-		return sv.edicts;
+		return sv.worldedict;
 		
 	return NULL;
 }
@@ -835,9 +832,9 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 			return;
 		if (clip->passedict)
 		{
-		 	if (PROG_TO_EDICT(touch.v.owner) == clip->passedict)
+		 	if (vm.PROG_TO_EDICT(touch.v.owner) == clip->passedict)
 				continue;	// don't clip against own missiles
-			if (PROG_TO_EDICT(clip->passedict->v.owner) == &touch)
+			if (vm.PROG_TO_EDICT(clip->passedict->v.owner) == &touch)
 				continue;	// don't clip against owner
 		}
 
@@ -915,7 +912,7 @@ trace_t SV_Move (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int type, e
 	memset ( &clip, 0, sizeof ( moveclip_t ) );
 
 // clip to world
-	clip.trace = SV_ClipMoveToEntity ( sv.edicts, start, mins, maxs, end );
+	clip.trace = SV_ClipMoveToEntity ( sv.worldedict, start, mins, maxs, end );
 
 	clip.start = start;
 	clip.end = end;

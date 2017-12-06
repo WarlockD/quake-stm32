@@ -118,7 +118,7 @@ void Host_God_f(cmd_source_t source, size_t argc, const quake::string_view argv[
 		return;
 	}
 
-	if (pr_global_struct->deathmatch && !host_client->privileged)
+	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	sv_player->v.flags = (int)sv_player->v.flags ^ FL_GODMODE;
@@ -136,7 +136,7 @@ void Host_Notarget_f(cmd_source_t source, size_t argc, const quake::string_view 
 		return;
 	}
 
-	if (pr_global_struct->deathmatch && !host_client->privileged)
+	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	sv_player->v.flags = (int)sv_player->v.flags ^ FL_NOTARGET;
@@ -156,7 +156,7 @@ void Host_Noclip_f(cmd_source_t source, size_t argc, const quake::string_view ar
 		return;
 	}
 
-	if (pr_global_struct->deathmatch && !host_client->privileged)
+	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	if (sv_player->v.movetype != MOVETYPE_NOCLIP)
@@ -188,7 +188,7 @@ void Host_Fly_f(cmd_source_t source, size_t argc, const quake::string_view argv[
 		return;
 	}
 
-	if (pr_global_struct->deathmatch && !host_client->privileged)
+	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	if (sv_player->v.movetype != MOVETYPE_FLY)
@@ -526,11 +526,14 @@ void Host_Savegame_f(cmd_source_t source, size_t argc, const quake::string_view 
 
 
 	ED_WriteGlobals (f);
-	for (i=0 ; i<sv.num_edicts ; i++)
-	{
-		ED_Write (f, EDICT_NUM(i));
+	for (auto& a : vm) {
+		ED_Write(f, &a);
 		f.flush();
+
+
 	}
+
+
 	f.close();
 	quake::con << "done." << std::endl;
 }
@@ -627,8 +630,9 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
 		fscanf (f, "%s\n", str);
-		sv.lightstyles[i] = (char*)Hunk_Alloc (Q_strlen(str)+1);
-		strcpy (sv.lightstyles[i], str);
+		sv.lightstyles[i] = vm.ED_NewString(str).first.data();
+
+
 	}
 
 // load the edicts out of the savegame file
@@ -664,22 +668,24 @@ void Host_Loadgame_f(cmd_source_t source, size_t argc, const quake::string_view 
 		}
 		else
 		{	// parse an edict
-
-			ent = EDICT_NUM(entnum);
-			if (!ent->vars) ent->vars = new edict_t::map_t;
-			std::memset (&ent->v, 0, progs->entityfields * 4);
-			ent->free = false;
-			ED_ParseEdict (parser, ent);
+			ent = vm.ED_Alloc(false);
+			assert(vm.NUM_FOR_EDICT(ent) == entnum);
+			//ent = vm.EDICT_NUM(entnum);
+			//std::memset (&ent->v, 0, vm.progs->entityfields * 4);
+			assert(vm.is_edict_free(ent));
+			;
 	
 		// link it into the bsp tree
-			if (!ent->free)
-				SV_LinkEdict (ent, false);
+			if (ED_ParseEdict(parser, ent))
+				SV_LinkEdict(ent, false);
+			else
+				vm.ED_Free(ent);
 		}
 
 		entnum++;
 	}
 	
-	sv.num_edicts = entnum;
+	//sv.num_edicts = entnum;
 	sv.time = idCast<idTime>(time);
 
 	fclose (f);
@@ -735,7 +741,7 @@ void SaveGamestate()
 
 	for (i=svs.maxclients+1 ; i<sv.num_edicts ; i++)
 	{
-		ent = EDICT_NUM(i);
+		ent = vm.EDICT_NUM(i);
 		if ((int)ent->v.flags & FL_ARCHIVE_OVERRIDE)
 			continue;
 		fprintf (f, "%i\n",i);
@@ -829,7 +835,7 @@ int LoadGamestate(char *level, char *startspot)
 			
 		// parse an edict
 
-		ent = EDICT_NUM(entnum);
+		ent = vm.EDICT_NUM(entnum);
 		memset (&ent->v, 0, progs->entityfields * 4);
 		ent->free = false;
 		ED_ParseEdict (start, ent);
@@ -926,7 +932,7 @@ void Host_Name_f(cmd_source_t source, size_t argc, const quake::string_view argv
 	static_cast<quake::string_view>(newName.str()).copy(host_client->name, sizeof(host_client->name));
 	host_client->name[newName.size()] = 0;
 
-	host_client->edict->v.netname = host_client->name - pr_strings;
+	host_client->edict->v.netname = host_client->name - vm.pr_strings;
 	
 // send notification to all clients
 	
@@ -1175,9 +1181,9 @@ void Host_Kill_f(cmd_source_t source, size_t argc, const quake::string_view argv
 		return;
 	}
 	
-	pr_global_struct->time = sv.time;
-	pr_global_struct->self = EDICT_TO_PROG(sv_player);
-	PR_ExecuteProgram (pr_global_struct->ClientKill);
+	vm.pr_global_struct->time = sv.time;
+	vm.pr_global_struct->self = vm.EDICT_TO_PROG(sv_player);
+	PR_ExecuteProgram (vm.pr_global_struct->ClientKill);
 }
 
 
@@ -1202,11 +1208,11 @@ void Host_Pause_f(cmd_source_t source, size_t argc, const quake::string_view arg
 
 		if (sv.paused)
 		{
-			SV_BroadcastPrintf ("%s paused the game\n", pr_strings + sv_player->v.netname);
+			SV_BroadcastPrintf ("%s paused the game\n", vm.pr_strings + sv_player->v.netname);
 		}
 		else
 		{
-			SV_BroadcastPrintf ("%s unpaused the game\n",pr_strings + sv_player->v.netname);
+			SV_BroadcastPrintf ("%s unpaused the game\n",vm.pr_strings + sv_player->v.netname);
 		}
 
 	// send notification to all clients
@@ -1277,26 +1283,26 @@ void Host_Spawn_f(cmd_source_t source, size_t argc, const quake::string_view arg
 		// set up the edict
 		ent = host_client->edict;
 
-		memset (&ent->v, 0, progs->entityfields * 4);
-		ent->v.colormap = NUM_FOR_EDICT(ent);
+		// memset (&ent->v, 0, vm.progs->entityfields * 4);
+		ent->v.colormap =vm.NUM_FOR_EDICT(ent);
 		ent->v.team = (host_client->colors & 15) + 1;
-		ent->v.netname = host_client->name - pr_strings;
+		ent->v.netname = host_client->name - vm.pr_strings;
 
 		// copy spawn parms out of the client_t
 
 		for (i=0 ; i< NUM_SPAWN_PARMS ; i++)
-			(&pr_global_struct->parm1)[i] = host_client->spawn_parms[i];
+			(&vm.pr_global_struct->parm1)[i] = host_client->spawn_parms[i];
 
 		// call the spawn function
 
-		pr_global_struct->time = sv.time;
-		pr_global_struct->self = EDICT_TO_PROG(sv_player);
-		PR_ExecuteProgram (pr_global_struct->ClientConnect);
+		vm.pr_global_struct->time = sv.time;
+		vm.pr_global_struct->self = vm.EDICT_TO_PROG(sv_player);
+		PR_ExecuteProgram (vm.pr_global_struct->ClientConnect);
 
 		if ((Sys_FloatTime() - host_client->netconnection->connecttime) <= sv.time)
 			Sys_Printf ("%s entered the game\n", host_client->name);
 
-		PR_ExecuteProgram (pr_global_struct->PutClientInServer);	
+		PR_ExecuteProgram (vm.pr_global_struct->PutClientInServer);	
 	}
 
 
@@ -1333,19 +1339,19 @@ void Host_Spawn_f(cmd_source_t source, size_t argc, const quake::string_view arg
 //
 	host_client->message.WriteByte(svc_updatestat);
 	host_client->message.WriteByte(STAT_TOTALSECRETS);
-	host_client->message.WriteLong(pr_global_struct->total_secrets);
+	host_client->message.WriteLong(vm.pr_global_struct->total_secrets);
 
 	host_client->message.WriteByte(svc_updatestat);
 	host_client->message.WriteByte(STAT_TOTALMONSTERS);
-	host_client->message.WriteLong(pr_global_struct->total_monsters);
+	host_client->message.WriteLong(vm.pr_global_struct->total_monsters);
 
 	host_client->message.WriteByte(svc_updatestat);
 	host_client->message.WriteByte(STAT_SECRETS);
-	host_client->message.WriteLong(pr_global_struct->found_secrets);
+	host_client->message.WriteLong(vm.pr_global_struct->found_secrets);
 
 	host_client->message.WriteByte(svc_updatestat);
 	host_client->message.WriteByte(STAT_MONSTERS);
-	host_client->message.WriteLong(pr_global_struct->killed_monsters);
+	host_client->message.WriteLong(vm.pr_global_struct->killed_monsters);
 
 	
 //
@@ -1354,7 +1360,7 @@ void Host_Spawn_f(cmd_source_t source, size_t argc, const quake::string_view arg
 // in a state where it is expecting the client to correct the angle
 // and it won't happen if the game was just loaded, so you wind up
 // with a permanent head tilt
-	ent = EDICT_NUM( 1 + (host_client - svs.clients) );
+	ent = vm.EDICT_NUM( 1 + (host_client - svs.clients) );
 	host_client->message.WriteByte(svc_setangle);
 	for (i=0 ; i < 2 ; i++)
 		host_client->message.WriteAngle(ent->v.angles[i] );
@@ -1408,7 +1414,7 @@ void Host_Kick_f (cmd_source_t source, size_t argc, const quake::string_view arg
 			return;
 		}
 	}
-	else if (pr_global_struct->deathmatch && !host_client->privileged)
+	else if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	save = host_client;
@@ -1492,7 +1498,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
 		return;
 	}
 
-	if (pr_global_struct->deathmatch && !host_client->privileged)
+	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
 	quake::string_view t = argv[1];
@@ -1537,7 +1543,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 's':
 		if (rogue)
 		{
-	        val = GetEdictFieldValue(sv_player, "ammo_shells1");
+	        val = &sv_player->get_field( "ammo_shells1");
 		    if (val)
 			    val->_float = v;
 		}
@@ -1547,7 +1553,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'n':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_nails1");
+			val = &sv_player->get_field( "ammo_nails1");
 			if (val)
 			{
 				val->_float = v;
@@ -1563,7 +1569,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'l':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_lava_nails");
+			val = &sv_player->get_field( "ammo_lava_nails");
 			if (val)
 			{
 				val->_float = v;
@@ -1575,7 +1581,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'r':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_rockets1");
+			val = &sv_player->get_field( "ammo_rockets1");
 			if (val)
 			{
 				val->_float = v;
@@ -1591,7 +1597,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'm':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_multi_rockets");
+			val = &sv_player->get_field( "ammo_multi_rockets");
 			if (val)
 			{
 				val->_float = v;
@@ -1606,7 +1612,8 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'c':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_cells1");
+
+			val = &sv_player->get_field( "ammo_cells1");
 			if (val)
 			{
 				val->_float = v;
@@ -1622,7 +1629,7 @@ void Host_Give_f(cmd_source_t source, size_t argc, const quake::string_view argv
     case 'p':
 		if (rogue)
 		{
-			val = GetEdictFieldValue(sv_player, "ammo_plasma");
+			val = &sv_player->get_field( "ammo_plasma");
 			if (val)
 			{
 				val->_float = v;
@@ -1639,10 +1646,8 @@ edict_t	*FindViewthing (void)
 	int		i;
 	edict_t	*e;
 	
-	for (i=0 ; i<sv.num_edicts ; i++)
-	{
-		e = EDICT_NUM(i);
-		if ( !strcmp (pr_strings + e->v.classname, "viewthing") )
+	for(auto& ee : vm) {
+		if ( !strcmp (vm.pr_strings + ee.v.classname, "viewthing") )
 			return e;
 	}
 	Con_Printf ("No viewthing on map\n");

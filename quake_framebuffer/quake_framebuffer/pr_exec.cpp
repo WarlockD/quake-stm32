@@ -37,13 +37,10 @@ int			localstack_used;
 
 
 qboolean	pr_trace;
-dfunction_t	*pr_xfunction;
-int			pr_xstatement;
 
 
 int		pr_argc;
-ddef_t *ED_GlobalAtOfs(int ofs);
-ddef_t *ED_FieldAtOfs(int ofs);
+
 
 static const char *pr_opnames[] =
 {
@@ -146,21 +143,21 @@ void quake::PR_ValueString::text_output(std::ostream& os) const {
 	switch (type)
 	{
 	case etype_t::ev_string:
-		os << (const char*)(pr_strings + val->string);
+		os << (const char*)(vm.pr_strings + val->string);
 		break;
 	case etype_t::ev_entity:
-		os << "entity " << NUM_FOR_EDICT(PROG_TO_EDICT(val->edict));
+		os << "entity " <<vm.NUM_FOR_EDICT(vm.PROG_TO_EDICT(val->edict));
 		break;
 	case etype_t::ev_function:
 	{
-		dfunction_t	*f = pr_functions + val->function;
-		os << (const char*)(pr_strings + f->s_name) << "()";
+		dfunction_t	*f = vm.pr_functions + val->function;
+		os << (const char*)(vm.pr_strings + f->s_name) << "()";
 	}
 	break;
 	case etype_t::ev_field:
 	{
-		ddef_t *def = ED_FieldAtOfs(val->_int);
-		os << '.' << (const char*)(pr_strings + def->s_name);
+		ddef_t *def = vm.ED_FieldAtOfs(val->_int);
+		os << '.' << (const char*)(vm.pr_strings + def->s_name);
 	}
 	break;
 	case etype_t::ev_void:
@@ -194,23 +191,23 @@ padded to 20 field width
 void quake::PR_GlobalString::text_output(std::ostream& os)  const  {
 	quake::fixed_string_stream<64> line;
 
-	void	*val = (void *)&pr_globals[ofs];
-	ddef_t	*def = ED_GlobalAtOfs(ofs);
+	void	*val = (void *)&vm.pr_globals[ofs];
+	ddef_t	*def = vm.ED_GlobalAtOfs(ofs);
 	if (!def)
 		line << ofs << "(???)";
 	else
-		line << ofs << '(' << (const char*)(pr_strings + def->s_name) << ')' << PR_ValueString(def->type, (eval_t*)val);
+		line << ofs << '(' << (const char*)(vm.pr_strings + def->s_name) << ')' << PR_ValueString(def->type, (eval_t*)val);
 	os << std::setw(20) << line.rdbuf();
 }
 
 void quake::PR_GlobalStringNoContents::text_output(std::ostream& os)  const  {
 	quake::fixed_string_stream<128> line;
 
-	ddef_t	*def = ED_GlobalAtOfs(ofs);
+	ddef_t	*def = vm.ED_GlobalAtOfs(ofs);
 	if (!def)
 		line << ofs << "(???)";
 	else
-		line << ofs << '(' << (const char*)(pr_strings + def->s_name) << ')';
+		line << ofs << '(' << (const char*)(vm.pr_strings + def->s_name) << ')';
 	os << std::setw(20) << line.rdbuf();
 }
 
@@ -261,14 +258,14 @@ void PR_StackTrace (std::ostream& os)
 		return;
 	}
 	
-	pr_stack[pr_depth].f = pr_xfunction;
+	pr_stack[pr_depth].f = vm.pr_xfunction;
 	for (int i=pr_depth ; i>=0 ; i--)
 	{
 		dfunction_t	*f = pr_stack[i].f;
 		if (!f)
 			os << "<NO FUNCTION>" << std::endl;
 		else
-			os << std::setw(12) << (const char*)(pr_strings + f->s_file) << " : " << (const char*)(pr_strings + f->s_name) << std::endl;
+			os << std::setw(12) << (const char*)(vm.pr_strings + f->s_file) << " : " << (const char*)(vm.pr_strings + f->s_name) << std::endl;
 	}
 }
 
@@ -291,9 +288,9 @@ void PR_Profile_f(cmd_source_t source, size_t argc, const quake::string_view arg
 	{
 		max = 0;
 		best = NULL;
-		for (i=0 ; i<progs->numfunctions ; i++)
+		for (i=0 ; i<vm.progs->numfunctions ; i++)
 		{
-			f = &pr_functions[i];
+			f = &vm.pr_functions[i];
 			if (f->profile > max)
 			{
 				max = f->profile;
@@ -303,7 +300,7 @@ void PR_Profile_f(cmd_source_t source, size_t argc, const quake::string_view arg
 		if (best)
 		{
 			if (num < 10)
-				quake::con << std::setw(7) << best->profile << ' ' << (const char*)(pr_strings + best->s_name) << std::endl;
+				quake::con << std::setw(7) << best->profile << ' ' << (const char*)(vm.pr_strings + best->s_name) << std::endl;
 			num++;
 			best->profile = 0;
 		}
@@ -327,7 +324,7 @@ protected:
 	// Inherited via quake_console_buffer
 	void text_out(const char * text, size_t size) override final
 	{
-		quake::con << *(pr_statements + pr_xstatement);
+		quake::con << *(vm.pr_statements + vm.pr_xstatement);
 		PR_StackTrace(quake::con);
 		quake::con << text; 
 
@@ -339,7 +336,7 @@ protected:
 void PR_RunError(const char* message) {
 	pr_run_error_buffer_t _buf;
 	std::ostream ss(&_buf);
-	quake::con << *(pr_statements + pr_xstatement);
+	quake::con << *(vm.pr_statements + vm.pr_xstatement);
 	PR_StackTrace(quake::con);
 	quake::con << message << std::endl;
 
@@ -365,8 +362,8 @@ int PR_EnterFunction (dfunction_t *f)
 {
 	int		i, j, c, o;
 
-	pr_stack[pr_depth].s = pr_xstatement;
-	pr_stack[pr_depth].f = pr_xfunction;	
+	pr_stack[pr_depth].s = vm.pr_xstatement;
+	pr_stack[pr_depth].f = vm.pr_xfunction;
 	pr_depth++;
 	if (pr_depth >= PR_MAX_STACK_DEPTH)
 		PR_RunError ("stack overflow");
@@ -378,7 +375,7 @@ int PR_EnterFunction (dfunction_t *f)
 
 
 	for (i=0 ; i < c ; i++)
-		localstack[localstack_used+i] = ((int *)pr_globals)[f->parm_start + i];
+		localstack[localstack_used+i] = ((int *)vm.pr_globals)[f->parm_start + i];
 	localstack_used += c;
 
 // copy parameters
@@ -387,12 +384,12 @@ int PR_EnterFunction (dfunction_t *f)
 	{
 		for (j=0 ; j<f->parm_size[i] ; j++)
 		{
-			((int *)pr_globals)[o] = ((int *)pr_globals)[OFS_PARM0+i*3+j];
+			((int *)vm.pr_globals)[o] = ((int *)vm.pr_globals)[OFS_PARM0+i*3+j];
 			o++;
 		}
 	}
 
-	pr_xfunction = f;
+	vm.pr_xfunction = f;
 	return f->first_statement - 1;	// offset the s++
 }
 
@@ -409,17 +406,17 @@ int PR_LeaveFunction (void)
 		Sys_Error ("prog stack underflow");
 
 // restore locals from the stack
-	c = pr_xfunction->locals;
+	c = vm.pr_xfunction->locals;
 	localstack_used -= c;
 	if (localstack_used < 0)
 		PR_RunError ("PR_ExecuteProgram: locals stack underflow");
 
 	for (i=0 ; i < c ; i++)
-		((int *)pr_globals)[pr_xfunction->parm_start + i] = localstack[localstack_used+i];
+		((int *)vm.pr_globals)[vm.pr_xfunction->parm_start + i] = localstack[localstack_used+i];
 
 // up stack
 	pr_depth--;
-	pr_xfunction = pr_stack[pr_depth].f;
+	vm.pr_xfunction = pr_stack[pr_depth].f;
 	return pr_stack[pr_depth].s;
 }
 
@@ -441,14 +438,14 @@ void PR_ExecuteProgram(func_t fnum)
 	int		exitdepth;
 	eval_t	*ptr;
 
-	if (!fnum || fnum >= progs->numfunctions)
+	if (!fnum || fnum >= vm.progs->numfunctions)
 	{
-		if (pr_global_struct->self)
-			PROG_TO_EDICT(pr_global_struct->self)->Print();
+		if (vm.pr_global_struct->self)
+			vm.PROG_TO_EDICT(vm.pr_global_struct->self)->Print();
 		Host_Error("PR_ExecuteProgram: NULL function");
 	}
 
-	f = &pr_functions[fnum];
+	f = &vm.pr_functions[fnum];
 
 	runaway = 100000;
 	pr_trace = false;
@@ -462,16 +459,16 @@ void PR_ExecuteProgram(func_t fnum)
 	{
 		s++;	// next statement
 
-		st = &pr_statements[s];
-		a = (eval_t *)&pr_globals[st->a];
-		b = (eval_t *)&pr_globals[st->b];
-		c = (eval_t *)&pr_globals[st->c];
+		st = &vm.pr_statements[s];
+		a = (eval_t *)&vm.pr_globals[st->a];
+		b = (eval_t *)&vm.pr_globals[st->b];
+		c = (eval_t *)&vm.pr_globals[st->c];
 
 		if (!--runaway)
 			PR_RunError("runaway loop error");
 
-		pr_xfunction->profile++;
-		pr_xstatement = s;
+		vm.pr_xfunction->profile++;
+		vm.pr_xstatement = s;
 
 		if (pr_trace) quake::con << *st;
 
@@ -553,13 +550,13 @@ void PR_ExecuteProgram(func_t fnum)
 			c->_float = !a->vector[0] && !a->vector[1] && !a->vector[2];
 			break;
 		case OP_NOT_S:
-			c->_float = !a->string || !pr_strings[a->string];
+			c->_float = !a->string || !vm.pr_strings[a->string];
 			break;
 		case OP_NOT_FNC:
 			c->_float = !a->function;
 			break;
 		case OP_NOT_ENT:
-			c->_float = (PROG_TO_EDICT(a->edict) == sv.edicts);
+			c->_float = (vm.PROG_TO_EDICT(a->edict) == sv.worldedict);
 			break;
 
 		case OP_EQ_F:
@@ -571,7 +568,7 @@ void PR_ExecuteProgram(func_t fnum)
 				(a->vector[2] == b->vector[2]);
 			break;
 		case OP_EQ_S:
-			c->_float = !strcmp(pr_strings + a->string, pr_strings + b->string);
+			c->_float = !strcmp(vm.pr_strings + a->string, vm.pr_strings + b->string);
 			break;
 		case OP_EQ_E:
 			c->_float = a->_int == b->_int;
@@ -590,7 +587,7 @@ void PR_ExecuteProgram(func_t fnum)
 				(a->vector[2] != b->vector[2]);
 			break;
 		case OP_NE_S:
-			c->_float = (float)strcmp(pr_strings + a->string, pr_strings + b->string);
+			c->_float = (float)strcmp(vm.pr_strings + a->string, vm.pr_strings + b->string);
 			break;
 		case OP_NE_E:
 			c->_float = a->_int != b->_int;
@@ -618,24 +615,24 @@ void PR_ExecuteProgram(func_t fnum)
 		case OP_STOREP_FLD:		// integers
 		case OP_STOREP_S:
 		case OP_STOREP_FNC:		// pointers
-			ptr = (eval_t *)((byte *)sv.edicts + b->_int);
+			ptr = (eval_t *)((byte *)sv.worldedict + b->_int);
 			ptr->_int = a->_int;
 			break;
 		case OP_STOREP_V:
-			ptr = (eval_t *)((byte *)sv.edicts + b->_int);
+			ptr = (eval_t *)((byte *)sv.worldedict + b->_int);
 			ptr->vector[0] = a->vector[0];
 			ptr->vector[1] = a->vector[1];
 			ptr->vector[2] = a->vector[2];
 			break;
 
 		case OP_ADDRESS:
-			ed = PROG_TO_EDICT(a->edict);
+			ed = vm.PROG_TO_EDICT(a->edict);
 #ifdef PARANOID
-			NUM_FOR_EDICT(ed);		// make sure it's in range
+		vm.NUM_FOR_EDICT(ed);		// make sure it's in range
 #endif
-			if (ed == (edict_t *)sv.edicts && sv.state == ss_active)
+			if (ed == (edict_t *)sv.worldedict && sv.state == ss_active)
 				PR_RunError("assignment to world entity");
-			c->_int = (byte *)((int *)&ed->v + b->_int) - (byte *)sv.edicts;
+			c->_int = (byte *)((int *)&ed->v + b->_int) - (byte *)sv.worldedict;
 			break;
 
 		case OP_LOAD_F:
@@ -643,18 +640,18 @@ void PR_ExecuteProgram(func_t fnum)
 		case OP_LOAD_ENT:
 		case OP_LOAD_S:
 		case OP_LOAD_FNC:
-			ed = PROG_TO_EDICT(a->edict);
+			ed = vm.PROG_TO_EDICT(a->edict);
 #ifdef PARANOID
-			NUM_FOR_EDICT(ed);		// make sure it's in range
+		vm.NUM_FOR_EDICT(ed);		// make sure it's in range
 #endif
 			a = (eval_t *)((int *)&ed->v + b->_int);
 			c->_int = a->_int;
 			break;
 
 		case OP_LOAD_V:
-			ed = PROG_TO_EDICT(a->edict);
+			ed = vm.PROG_TO_EDICT(a->edict);
 #ifdef PARANOID
-			NUM_FOR_EDICT(ed);		// make sure it's in range
+		vm.NUM_FOR_EDICT(ed);		// make sure it's in range
 #endif
 			a = (eval_t *)((int *)&ed->v + b->_int);
 			c->vector[0] = a->vector[0];
@@ -691,7 +688,7 @@ void PR_ExecuteProgram(func_t fnum)
 			if (!a->function)
 				PR_RunError("NULL function");
 
-			newf = &pr_functions[a->function];
+			newf = &vm.pr_functions[a->function];
 
 			if (newf->first_statement < 0)
 			{	// negative statements are built in functions
@@ -707,9 +704,9 @@ void PR_ExecuteProgram(func_t fnum)
 
 		case OP_DONE:
 		case OP_RETURN:
-			pr_globals[OFS_RETURN] = pr_globals[st->a];
-			pr_globals[OFS_RETURN + 1] = pr_globals[st->a + 1];
-			pr_globals[OFS_RETURN + 2] = pr_globals[st->a + 2];
+			vm.pr_globals[OFS_RETURN] = vm.pr_globals[st->a];
+			vm.pr_globals[OFS_RETURN + 1] = vm.pr_globals[st->a + 1];
+			vm.pr_globals[OFS_RETURN + 2] = vm.pr_globals[st->a + 2];
 
 			s = PR_LeaveFunction();
 			if (pr_depth == exitdepth)
@@ -717,11 +714,11 @@ void PR_ExecuteProgram(func_t fnum)
 			break;
 
 		case OP_STATE:
-			ed = PROG_TO_EDICT(pr_global_struct->self);
+			ed = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
 #ifdef FPS_20
-			ed->v.nextthink = pr_global_struct->time + 0.05;
+			ed->v.nextthink = vm.pr_global_struct->time + 0.05;
 #else
-			ed->v.nextthink = pr_global_struct->time + 100ms;
+			ed->v.nextthink = vm.pr_global_struct->time + 100ms;
 #endif
 			if (a->_float != ed->v.frame)
 			{

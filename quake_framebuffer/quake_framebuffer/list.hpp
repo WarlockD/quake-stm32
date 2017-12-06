@@ -6,7 +6,7 @@
 #include <functional>
 #include <type_traits>
 #include <cassert>
-
+#include "iqueue.h"
 
 
 #define LIST_ENTRY_DETECT_IN_LIST

@@ -8,6 +8,8 @@
 #include <utility>
 #include <algorithm>
 
+// because, some times, we got to use something we know that works, and might be a shit ton of macros
+#include "iqueue.h"
 namespace quake {
 	/// Returns the number of elements in a static vector
 #define VectorSize(v)	(sizeof(v) / sizeof(*v))

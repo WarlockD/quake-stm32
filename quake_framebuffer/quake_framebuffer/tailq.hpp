@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <cassert>
 
+#include "iqueue.h"
 
 #ifndef _DEBUG_STRUCTURES_DEFINED
 #define _DEBUG_STRUCTURES_DEFINED
@@ -126,6 +127,14 @@ namespace tailq {
 			static_assert(member != nullptr, "Don't know what field you want!");
 			return (p->*member).tqe_prev;
 		}
+		constexpr static inline  const_pointer next(const_pointer p) {
+			static_assert(member != nullptr, "Don't know what field you want!");
+			return (p->*member).tqe_next;
+		}
+		constexpr static inline  const_pointer* prev(const_pointer p) {
+			static_assert(member != nullptr, "Don't know what field you want!");
+			return (p->*member).tqe_prev;
+		}
 		// from offset
 		constexpr static inline  pointer from_entry(entry_type* p) {
 			return reinterpret_cast<pointer>(reinterpret_cast<char*>(p) - offsetOf(member));
@@ -147,8 +156,8 @@ namespace tailq {
 			return reinterpret_cast<head_type**>(&(p->*member).tqe_head);
 		}
 #endif
-		static inline void unlink(pointer elm) { next(elm) = UNLINK_MAGIC; }
-		static inline bool islinked(pointer elm) { return next(elm) != UNLINK_MAGIC; }
+		static inline void unlink(pointer elm) { next(elm) = (pointer)UNLINK_MAGIC; }
+		static inline bool islinked(const_pointer elm) { return (uintptr_t)next(elm) != UNLINK_MAGIC; }
 #ifdef QUEUE_MACRO_DEBUG_TRASH
 		static constexpr inline void trashit(pointer& elm) {
 			elm = reinterpret_cast<pointer>((void*)-1);
@@ -382,7 +391,7 @@ namespace tailq {
 		friend T;
 #ifdef TAILQ_TRACK_HEAD_IN_ENTRY
 		void* tqe_head;
-		constexpr entry() : tqe_head(nullptr), tqe_next(traits::UNLINK_MAGIC), tqe_prev(&tqe_next) {}
+		constexpr entry() : tqe_head(nullptr), tqe_next((pointer)traits::UNLINK_MAGIC), tqe_prev(&tqe_next) {}
 #else
 		constexpr entry() : tqe_next(traits::UNLINK_MAGIC), tqe_prev(&tqe_next) {}
 #endif

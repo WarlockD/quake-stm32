@@ -1381,7 +1381,7 @@ QUAKE FILESYSTEM
 
 =============================================================================
 */
-
+static 	umm_stack_allocator<0xFFFF> umm_memory;
 namespace quake {
 
 	memblock::memblock(void) noexcept		: memlink(), _capacity(0) { }
@@ -1412,7 +1412,7 @@ namespace quake {
 		if (_capacity) {
 			assert(cdata() && "Internal error: space allocated, but the pointer is nullptr");
 			assert(data() && "Internal error: read-only block is marked as allocated space");
-			umm_free(data());
+			umm_memory.deallocate(data());
 		}
 		unlink();
 	}
@@ -1455,6 +1455,9 @@ namespace quake {
 	/// only one purpose, and try to get that purpose to use similar amounts
 	/// of memory on each iteration.
 	///
+	// HACK
+
+
 	void memblock::reserve(size_type newSize, bool bExact)
 	{
 		if ((newSize += minimumFreeCapacity()) <= _capacity)
@@ -1463,7 +1466,7 @@ namespace quake {
 		const size_t alignedSize(NextPow2(newSize));
 		if (!bExact)
 			newSize = alignedSize;
-		pointer newBlock = (pointer)umm_realloc(oldBlock, newSize);
+		pointer newBlock = (pointer)umm_memory.allocate(newSize, oldBlock);
 		if (!newBlock)
 			throw std::bad_alloc();
 		if (!oldBlock & (cdata() != nullptr))
@@ -1477,7 +1480,7 @@ namespace quake {
 	{
 		if (is_linked())
 			return;
-		pointer newBlock = (pointer)umm_realloc(begin(), size());
+		pointer newBlock = (pointer)umm_memory.allocate(size(),newBlock);
 		if (!newBlock && size())
 			throw std::bad_alloc();
 		_capacity = size();

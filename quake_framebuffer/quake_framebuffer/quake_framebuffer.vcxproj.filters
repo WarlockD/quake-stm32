@@ -225,9 +225,6 @@
     <ClCompile Include="global.cpp">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="umm_malloc.cpp">
-      <Filter>quake</Filter>
-    </ClCompile>
     <ClCompile Include="icommon.cpp">
       <Filter>quake</Filter>
     </ClCompile>
@@ -433,12 +430,6 @@
     <ClInclude Include="globals.h">
       <Filter>quake</Filter>
     </ClInclude>
-    <ClInclude Include="umm_malloc.h">
-      <Filter>quake</Filter>
-    </ClInclude>
-    <ClInclude Include="umm_malloc_cfg.h">
-      <Filter>quake</Filter>
-    </ClInclude>
     <ClInclude Include="icommon.h">
       <Filter>quake</Filter>
     </ClInclude>
@@ -450,6 +441,9 @@
     </ClInclude>
     <ClInclude Include="tailq.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="iqueue.h">
+      <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

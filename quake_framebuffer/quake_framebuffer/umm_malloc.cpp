@@ -614,7 +614,7 @@ void umm_init(void* heap, size_t size) {
 #define UMM_NBLOCK(b) (UMM_BLOCK(b).header.used.next)
 #define UMM_PBLOCK(b) (UMM_BLOCK(b).header.used.prev)
 #define UMM_NFREE(b)  (UMM_BLOCK(b).body.free.next)
-#define UMM_PFREE(b)  (UMM_BLOCK(b).body.free.prev)
+#define UMM_PFREE(b)  (UMM_BLOCK(b).body.free.bindex_t)
 #define UMM_DATA(b)   (UMM_BLOCK(b).body.data)
 
 // ----------------------------------------------------------------------------

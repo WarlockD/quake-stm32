@@ -46,17 +46,16 @@ struct edict_t
 	void Unlink();
 	void Clear();
 #else
-	static void create_edict_pool(size_t count, size_t edict_size);
-	static int edict_to_prog(const edict_t* e);
-	static edict_t* prog_to_edict(int prog);
-#endif
-	link_t<edict_t>  area; // linked to a division node or leaf
-	edict_t();
-	~edict_t();
-	static void* operator new(size_t size);
-	static void operator delete(void* ptr);
 
-	inline int to_prog() const { return edict_to_prog(this); }
+#endif
+	tailq::entry<edict_t>  alloc_list; // linked to a division node or leaf
+	bool free;
+	list::entry<edict_t>  area; // linked to a division node or leaf
+	const int num;
+
+	edict_t(int num);
+	~edict_t();
+	void ClearFields();
 
 	int			num_leafs;
 	short		leafnums[MAX_ENT_LEAFS];
@@ -85,19 +84,32 @@ struct edict_t
 	using map_t = std::unordered_map<quake::string_view, value_t>;
 	map_t vars;
 	union {
-		eval_t  fields[1]; // must be the last
+		float  fields[1]; // must be the last
 		entvars_t v;					// C exported fields from progs
 	};
+	inline float& E_FLOAT(ptrdiff_t o) { return fields[o]; }
+	inline const float& E_FLOAT(ptrdiff_t o) const { return fields[o]; }
+	inline int& E_INT(ptrdiff_t o) { return reinterpret_cast<int&>(fields[o]); }
+	inline const int& E_INT(ptrdiff_t o) const { return reinterpret_cast<const int&>(fields[o]); }
+	inline vec3_t& E_VECTOR(ptrdiff_t o) { return reinterpret_cast<vec3_t&>(fields[o]); }
+	inline const vec3_t& E_VECTOR(ptrdiff_t o) const { return reinterpret_cast<const vec3_t&>(fields[o]); }
+	inline const char* E_STRING(ptrdiff_t o) const;
 
-	eval_t* get_field(const quake::string_view& name);
-	const eval_t* get_field(const quake::string_view& name)const;
-	eval_t* get_field(ptrdiff_t offset);
-	const eval_t* get_field(ptrdiff_t offset)const;
+
+	eval_t& edict_t::get_field(ptrdiff_t o) { return reinterpret_cast<eval_t&>(fields[o]); }
+	const eval_t& edict_t::get_field(ptrdiff_t o) const { return reinterpret_cast<const eval_t&>(fields[o]); }
+	eval_t& edict_t::get_field(const quake::string_view& field);
+	const eval_t& edict_t::get_field(const quake::string_view& field) const;
 
 	void Print();
+	//static void* operator new(size_t size);
+	//static void operator delete(void* ptr);
 
 // other fields from progs come immediately after
 } ;
+
+
+
 namespace quake {
 	class PR_ValueString : public stream_output {
 		idType type;
@@ -123,77 +135,154 @@ namespace quake {
 class idValue {
 public:
 	idValue() : _type() {}
-	idValue(const eval_t& value, idType type) : _value(value), _type(type) {}
-	const eval_t& value() const { return _value; }
+	idValue(eval_t* value, idType type) : _value(value), _type(type) {}
+	const eval_t& value() const { return *_value; }
+	eval_t& value()  { return *_value; }
 	const idType& type() const { return _type; }
 private:
 	idType _type;
-	eval_t _value;
+	eval_t* _value;
 };
 #define	EDICT_FROM_AREA(l) STRUCT_FROM_LINK(l,edict_t,area)
 
+
+struct pr_system_t {
+	using edict_list_t = tailq::head<edict_t, &edict_t::alloc_list>;
+	dprograms_t		*progs;
+	dfunction_t		*pr_functions;
+	dfunction_t		*pr_xfunction;
+	int				pr_xstatement;
+	char			*pr_strings;
+
+	ddef_t			*pr_globaldefs;
+	ddef_t			*pr_fielddefs;
+	dstatement_t	*pr_statements;
+	globalvars_t	*pr_global_struct;
+	float			*pr_globals;			// same as pr_global_struct
+
+	int				pr_edict_size;	// in bytes
+	//edict_t *		pr_edicts;		// makes sence to put the edicts here 
+	std::vector<edict_t*> pr_edicts;
+	size_t		pr_max_edicts;
+
+	edict_list_t free_pool;
+	edict_list_t used_pool;
+	edict_list_t reserved_pool; // edicts for clients and world 0->svs.maxclients + 1
+	size_t pr_num_edicts;
+
+
+	auto begin() { return used_pool.end(); }
+	auto end() { return used_pool.end(); }
+	inline edict_t *EDICT_NUM(size_t n)
+	{
+		if (n < 0 || n >= pr_max_edicts)
+			Sys_Error("EDICT_NUM: bad number %i", n);
+		return pr_edicts[n]; // (edict_t *)((byte *)pr_edicts + (n)*pr_edict_size);
+	}
+	inline const edict_t *EDICT_NUM(size_t n) const
+	{
+		if (n < 0 || n >= pr_max_edicts)
+			Sys_Error("EDICT_NUM: bad number %i", n);
+		return  pr_edicts[n]; // (const edict_t *)((const byte *)pr_edicts + (n)*pr_edict_size);
+	}
+	inline size_t NUM_FOR_EDICT(const edict_t* e) const {
+		return e->num;
+#if 0
+		int b = (byte *)e - (byte *)pr_edicts;
+		b = b / pr_edict_size;
+
+		if (b < 0 || b >= pr_num_edicts)
+			Sys_Error("NUM_FOR_EDICT: bad pointer");
+		return b;
+#endif
+	}
+	ddef_t *ED_GlobalAtOfs(int ofs);
+	ddef_t *ED_FieldAtOfs(int ofs);
+	ddef_t *ED_FindField(const quake::string_view& name);
+	ddef_t *ED_FindGlobal(const quake::string_view& name);
+	dfunction_t *ED_FindFunction(const quake::string_view& name);
+	void ED_HulkAllocEdicts(size_t size);
+	edict_t *ED_Alloc(bool reserve = false);
+	void ED_Free(edict_t *e);
+	// string system
+	//string_t pr_strings_last_offset; // last valid offset for new strings in lookup
+	using string_lookup_t = std::unordered_map<quake::string_view, string_t>;
+	string_lookup_t pr_strings_lookup;
+	const string_lookup_t::value_type& ED_NewString(const quake::string_view& string);
+
+	int		 EDICT_TO_PROG(edict_t* e) const { return ((byte *)e - (byte *)pr_edicts[0]); }
+	edict_t* PROG_TO_EDICT(int e) const { assert((e % pr_edict_size) == 0); return (edict_t *)((byte *)pr_edicts[0] + e); }
+	// remove this one
+	edict_t* NEXT_EDICT(edict_t* e) const {  return ((edict_t *)((byte *)e + pr_edict_size)); }
+	bool is_edict_free(edict_t* e) const {
+		return e->free;
+#if 0
+			block_header_t* eb = reinterpret_cast<block_header_t*>(reinterpret_cast<byte*>(e) - sizeof(block_header_t));
+
+			return eb->free;
+#endif
+	}
+	// for the vm system.  have to be careful as the vm uses offsets of the memory space
+	template<typename T> T* globals(size_t o) { return reinterpret_cast<T*>(&pr_globals[o]); }
+
+	float&G_FLOAT(ptrdiff_t o) { return pr_globals[o]; }
+	const float&G_FLOAT(ptrdiff_t o) const { return pr_globals[o]; }
+	int&G_INT(ptrdiff_t o) { return reinterpret_cast<int&>(pr_globals[o]); }
+	const int&G_INT(ptrdiff_t o) const { return reinterpret_cast<const int&>(pr_globals[o]); }
+	edict_t*G_EDICT(ptrdiff_t o) { return reinterpret_cast<edict_t *>(reinterpret_cast<byte *>(pr_edicts[0]) +G_INT(o)); }
+	const edict_t*G_EDICT(ptrdiff_t o) const { return reinterpret_cast<const edict_t *>(reinterpret_cast<const byte *>(pr_edicts[0]) + G_INT(o)); }
+	int G_EDICTNUM(ptrdiff_t o) const { return NUM_FOR_EDICT(G_EDICT(o)); }
+	vec3_t&G_VECTOR(ptrdiff_t o) { return reinterpret_cast<vec3_t&>(pr_globals[o]); }
+	const vec3_t&G_VECTOR(ptrdiff_t o) const { return reinterpret_cast<const vec3_t&>(pr_globals[o]); }
+	const char*G_STRING(ptrdiff_t o) const{ return pr_strings+ G_INT(o); }
+	func_t&G_FUNCTION(ptrdiff_t o)  { return reinterpret_cast<func_t&>(pr_globals[o]);}
+	const func_t&G_FUNCTION(ptrdiff_t o) const { return reinterpret_cast<const func_t&>(pr_globals[o]); }
+	void RETURN_EDICT(edict_t* e) { reinterpret_cast<int*>(pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e); }
+	// returns a copy of the string allocated from the server's string heap
+
+	pr_system_t();
+	void LoadProgs();
+	void Clear();
+	void Init();
+
+	unsigned short		pr_crc;
+};
+extern pr_system_t vm;
+
+const char* edict_t::E_STRING(ptrdiff_t o) const {
+	return vm.pr_strings + E_INT(o);
+}
+//void* edict_t::operator new(size_t size) { return vm.ED_Alloc(); }
+//void edict_t::operator delete(void* ptr) { vm.ED_Free((edict_t*)ptr); }
+
 //============================================================================
 
-extern	dprograms_t		*progs;
-extern	dfunction_t		*pr_functions;
-extern	char			*pr_strings;
-extern	ddef_t			*pr_globaldefs;
-extern	ddef_t			*pr_fielddefs;
-extern	dstatement_t	*pr_statements;
-extern	globalvars_t	*pr_global_struct;
-extern	float			*pr_globals;			// same as pr_global_struct
 
-extern	int				pr_edict_size;	// in bytes
 
 //============================================================================
 
-void PR_Init (void);
+//void PR_Init (void);
 
 void PR_ExecuteProgram (func_t fnum);
-void PR_LoadProgs (void);
+//void PR_LoadProgs (void);
 
 void PR_Profile_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
 
-edict_t *ED_Alloc (void);
-//void ED_Free (edict_t *ed);
 
- char	*ED_NewString (const char *string);
-// returns a copy of the string allocated from the server's string heap
 
 //void ED_Print (edict_t *ed);
 void ED_Write (std::ostream& f, edict_t *ed);
-void ED_ParseEdict (COM_Parser& data, edict_t *ent);
+bool ED_ParseEdict (COM_Parser& data, edict_t *ent);
 
 void ED_WriteGlobals (std::ostream& f);
 void ED_ParseGlobals (COM_Parser& data);
 
 void ED_LoadFromFile (const quake::string_view& data);
 
-//define EDICT_NUM(n) ((edict_t *)(sv.edicts+ (n)*pr_edict_size))
-//define NUM_FOR_EDICT(e) (((byte *)(e) - sv.edicts)/pr_edict_size)
 
-edict_t *EDICT_NUM(int n);
-int NUM_FOR_EDICT(edict_t *e);
-
-#define	NEXT_EDICT(e) ((edict_t *)( (byte *)e + pr_edict_size))
-#ifdef USE_OLD_EDICT_SYSTEM
-#define	EDICT_TO_PROG(e) ((byte *)e - (byte *)sv.edicts)
-#define PROG_TO_EDICT(e) ((edict_t *)((byte *)sv.edicts + e))
-#endif
 //============================================================================
 
-#define	G_FLOAT(o) (pr_globals[o])
-#define	G_INT(o) (*(int *)&pr_globals[o])
-#define	G_EDICT(o) ((edict_t *)((byte *)sv.edicts+ *(int *)&pr_globals[o]))
-#define G_EDICTNUM(o) NUM_FOR_EDICT(G_EDICT(o))
-#define	G_VECTOR(o) (&pr_globals[o])
-#define	G_STRING(o) (pr_strings + *(string_t *)&pr_globals[o])
-#define	G_FUNCTION(o) (*(func_t *)&pr_globals[o])
 
-#define	E_FLOAT(e,o) (((float*)&e->v)[o])
-#define	E_INT(e,o) (*(int *)&((float*)&e->v)[o])
-#define	E_VECTOR(e,o) (&((float*)&e->v)[o])
-#define	E_STRING(e,o) (pr_strings + *(string_t *)&((float*)&e->v)[o])
 
 
 typedef void (*builtin_t) (void);
@@ -203,15 +292,12 @@ extern int pr_numbuiltins;
 extern int		pr_argc;
 
 extern	qboolean	pr_trace;
-extern	dfunction_t	*pr_xfunction;
-extern	int			pr_xstatement;
 
-extern	unsigned short		pr_crc;
+
+
 
 void PR_RunError(const char* str);
 void ED_PrintEdicts (void);
 void ED_PrintNum (int ent);
-
-eval_t *GetEdictFieldValue(edict_t *ed, const quake::string_view& field);
 
 #endif

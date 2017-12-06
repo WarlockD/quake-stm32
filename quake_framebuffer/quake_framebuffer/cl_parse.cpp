@@ -328,8 +328,27 @@ If an entities model or origin changes from frame to frame, it must be
 relinked.  Other attributes can change without relinking.
 ==================
 */
+#include <iomanip>
 int	bitcounts[16];
-
+void PrintFastUpdate(int bits) {
+	bool comma = false;
+#define PRINT_BIT(BIT,TEXT) if (bits & (BIT)) { if(comma) quake::con << ","; else  comma= true; quake::con << TEXT; }
+	quake::con << "fastupdate(" << std::hex << std::setfill('0') << std::setw(4) << bits << ":";
+	PRINT_BIT(U_MOREBITS, "MOREBITS");
+	PRINT_BIT(U_LONGENTITY, "LONGENTITY");
+	PRINT_BIT(U_MODEL, "MODEL");
+	PRINT_BIT(U_FRAME, "FRAME");
+	PRINT_BIT(U_SKIN, "SKIN");
+	PRINT_BIT(U_EFFECTS, "EFFECTS");
+	PRINT_BIT(U_ORIGIN1, "ORIGIN1");
+	PRINT_BIT(U_ORIGIN2, "ORIGIN2");
+	PRINT_BIT(U_ORIGIN3, "ORIGIN3");
+	PRINT_BIT(U_ANGLE1, "ANGLE1");
+	PRINT_BIT(U_ANGLE2, "ANGLE2");
+	PRINT_BIT(U_ANGLE3, "ANGLE3"); 
+	PRINT_BIT(U_NOLERP, "U_NOLERP");
+	quake::con << ")" << std::endl;
+}
 void CL_ParseUpdate (int bits)
 {
 	int			i;
@@ -345,7 +364,7 @@ void CL_ParseUpdate (int bits)
 		quake::cls.signon = SIGNONS;
 		quake::cls.signon_reply();
 	}
-
+	if (cl_shownet.value == 2) PrintFastUpdate(bits);
 	if (bits & U_MOREBITS)
 	{
 		i = MSG_ReadByte ();
@@ -491,10 +510,11 @@ if (bits&(1<<i))
 CL_ParseBaseline
 ==================
 */
+
 void CL_ParseBaseline (entity_t *ent)
 {
 	int			i;
-	
+
 	ent->baseline.modelindex = MSG_ReadByte ();
 	ent->baseline.frame = MSG_ReadByte ();
 	ent->baseline.colormap = MSG_ReadByte();
