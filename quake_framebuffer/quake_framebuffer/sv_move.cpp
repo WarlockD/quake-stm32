@@ -126,10 +126,10 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 		for (i=0 ; i<2 ; i++)
 		{
 			VectorAdd (ent->v.origin, move, neworg);
-			enemy = vm.PROG_TO_EDICT(ent->v.enemy);
+			enemy = ent->v.enemy;
 			if (i == 0 && enemy != sv.worldedict)
 			{
-				dz = ent->v.origin[2] - vm.PROG_TO_EDICT(ent->v.enemy)->v.origin[2];
+				dz = ent->v.origin[2] - ent->v.enemy->v.origin[2];
 				if (dz > 40)
 					neworg[2] -= 8;
 				if (dz < 30)
@@ -148,7 +148,7 @@ qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink)
 				return true;
 			}
 			
-			if (enemy == sv.worldedict)
+			if (enemy == nullptr)
 				break;
 		}
 		
@@ -237,8 +237,8 @@ qboolean SV_StepDirection (edict_t *ent, float yaw, float dist)
 	
 	ent->v.ideal_yaw = yaw;
 	PF_changeyaw();
-	
-	yaw = yaw*static_cast<float>(M_PI*2.0 / 360.0);
+	static constexpr float yaw_constant= static_cast<float>(M_PI*2.0 / 360.0);
+	yaw = yaw* yaw_constant;
 	move[0] = cos(yaw)*dist;
 	move[1] = sin(yaw)*dist;
 	move[2] = 0;
@@ -247,7 +247,7 @@ qboolean SV_StepDirection (edict_t *ent, float yaw, float dist)
 	if (SV_movestep (ent, move, false))
 	{
 		delta = ent->v.angles[YAW] - ent->v.ideal_yaw;
-		if (delta > 45 && delta < 315)
+		if (delta > 45.0f && delta < 315.0f)
 		{		// not turned far enough, so don't take the step
 			VectorCopy (oldorigin, ent->v.origin);
 		}
@@ -392,15 +392,13 @@ SV_MoveToGoal
 */
 void SV_MoveToGoal (void)
 {
-	edict_t		*ent, *goal;
-	float		dist;
 #ifdef QUAKE2
 	edict_t		*enemy;
 #endif
 
-	ent = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
-	goal = vm.PROG_TO_EDICT(ent->v.goalentity);
-	dist = vm.G_FLOAT(OFS_PARM0);
+	auto ent = vm.pr_global_struct->self;
+	auto goal = ent->v.goalentity;
+	float dist = vm.G_FLOAT(OFS_PARM0);
 
 	if ( !( (int)ent->v.flags & (FL_ONGROUND|FL_FLY|FL_SWIM) ) )
 	{
@@ -413,7 +411,7 @@ void SV_MoveToGoal (void)
 	enemy = vm.PROG_TO_EDICT(ent->v.enemy);
 	if (enemy != sv.edicts &&  SV_CloseEnough (ent, enemy, dist) )
 #else
-	if (vm.PROG_TO_EDICT(ent->v.enemy) != sv.worldedict &&  SV_CloseEnough (ent, goal, dist) )
+	if (ent->v.enemy != nullptr &&  SV_CloseEnough (ent, goal, dist) )
 #endif
 		return;
 

@@ -384,12 +384,12 @@ void V_ParseDamage (void)
 V_cshift_f
 ==================
 */
-void V_cshift_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void V_cshift_f(cmd_source_t source, const StringArgs& args)
 {
-	cshift_empty.destcolor[0] = Q_atoi(argv[1]);
-	cshift_empty.destcolor[1] = Q_atoi(argv[2]);
-	cshift_empty.destcolor[2] = Q_atoi(argv[3]);
-	cshift_empty.percent = Q_atoi(argv[4]);
+	cshift_empty.destcolor[0] = Q_atoi(args[1]);
+	cshift_empty.destcolor[1] = Q_atoi(args[2]);
+	cshift_empty.destcolor[2] = Q_atoi(args[3]);
+	cshift_empty.percent = Q_atoi(args[4]);
 }
 
 
@@ -400,7 +400,7 @@ V_BonusFlash_f
 When you run over an item, the server sends this command
 ==================
 */
-void V_BonusFlash_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void V_BonusFlash_f(cmd_source_t source, const StringArgs& args)
 {
 	quake::cl.cshifts[CSHIFT_BONUS].destcolor[0] = 215;
 	quake::cl.cshifts[CSHIFT_BONUS].destcolor[1] = 186;

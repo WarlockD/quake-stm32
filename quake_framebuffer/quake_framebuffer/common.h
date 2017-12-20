@@ -28,9 +28,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <chrono>
 #include <iostream>
 #include <sstream>
-#include <string_view>
 #include <chrono>
 #include <array>
+#include <ostream>
+#include <istream>
 #include <string_view>
 #include <memory>
 #include <fstream>
@@ -45,6 +46,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // based of sys\queue.h  could always use that I suppose
 #include "list.hpp"
 #include "tailq.hpp"
+
+#include "macros.h"
 // cause I am having problems with list and tail I am putting a wrapper around it
 // we need the basic file functions
 #ifdef min
@@ -58,61 +61,59 @@ class idTime  {
 public:
 	
 	using time_t = std::chrono::milliseconds;
+	
 	using timef_t = std::chrono::duration<float, std::milli>;
 	constexpr idTime() :_time(time_t::zero()) {}
-	//constexpr idTime(int f) : _time(f*1000) {} 	// seconds are int
 	constexpr idTime(float f) : _time(std::chrono::duration_cast<time_t>(timef_t(f)*1000.0f)) {}
 	//constexpr idTime(double f) : _time(std::chrono::duration_cast<time_t>(timef_t(static_cast<float>(f))*1000.0f)) {}
+
+	inline static time_t cast_float(float f) { return time_t(time_t::rep(f * 1000.0)); }
+
 	template<typename T, typename R>
 	constexpr idTime(const std::chrono::duration<T, R>& f) : _time(std::chrono::duration_cast<time_t>(f)) {}
-	constexpr auto count() const { return _time.count(); }
+	constexpr time_t::rep  count() const { return _time.count(); }
 	constexpr int seconds() const { return (int)std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
 	
 //	explicit constexpr operator time_t&()  { return _time; }
 //	explicit constexpr operator const time_t&() const { return _time; }
-	constexpr operator float() const { return std::chrono::duration_cast<timef_t>(_time).count() / 1000.0f; }
+	explicit constexpr operator float() const { return std::chrono::duration_cast<timef_t>(_time).count() / 1000.0f; }
 	static constexpr idTime zero() { return idTime(); }
+
+	constexpr time_t::rep compare(time_t t) const { return _time.count() - t.count(); }
+	constexpr time_t::rep compare(const idTime& t) const { return _time.count() - t.count(); }
+	constexpr time_t::rep compare(float f) const { return compare(cast_float(f)); }
+
+
 	idTime& operator+=(const idTime& other) { _time += other._time; return *this; }
+	idTime& operator+=(time_t other) { _time += other; return *this; }
+	idTime& operator+=(float other) { _time += cast_float(other); return *this; }
+
 	idTime& operator-=(const idTime& other) { _time -= other._time; return *this; }
-	
-	//template<typename T, typename R>
-	//idTime& operator+=(const std::chrono::duration<T,R>& other) { _time += std::chrono::duration_cast<time_t>(other); return *this; }
-	//template<typename T, typename R>
-	//idTime& operator-=(const std::chrono::duration<T, R>& other) { _time -= std::chrono::duration_cast<time_t>(other); return *this; }
+	idTime& operator-=(time_t other) { _time -= other; return *this; }
+	idTime& operator-=(float other) { _time -= cast_float(other); return *this; }
+
 private:
 	time_t _time;
 };
-constexpr static inline idTime operator+(const idTime& s1, const idTime& s2) { return idTime(idTime::time_t(s1.count() + s2.count())); }
-constexpr static inline idTime operator+(float s1, const idTime& s2) { return idTime(idTime::time_t(idTime::time_t::rep(s1 * 1000.0f) + s2.count())); }
-constexpr static inline idTime operator+(const idTime& s1, float s2) { return idTime(idTime::time_t(s1.count() + idTime::time_t::rep(s2 * 1000.0f))); }
+constexpr static inline bool operator==(const idTime& s1, const idTime&  s2) { return s1.compare(s2) == 0; }
+constexpr static inline bool operator!=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) != 0; }
+constexpr static inline bool operator<(const idTime& s1, const idTime&  s2) { return s1.compare(s2) < 0; }
+constexpr static inline bool operator>(const idTime& s1, const idTime&  s2) { return s1.compare(s2) > 0; }
+constexpr static inline bool operator<=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) <= 0; }
+constexpr static inline bool operator>=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) >= 0; }
 
-constexpr static inline idTime operator-(const idTime& s1, const idTime& s2) { return idTime(idTime::time_t(s1.count() - s2.count())); }
-constexpr static inline idTime operator-(float s1, const idTime& s2) { return idTime(idTime::time_t(idTime::time_t::rep(s1 * 1000.0f) - s2.count())); }
-constexpr static inline idTime operator-(const idTime& s1, float s2) { return idTime(idTime::time_t(s1.count() - idTime::time_t::rep(s2 * 1000.0f))); }
-#if 0
-#define TIME_MATH_OPS(op) \
-constexpr static inline idTime operator##op (const idTime& s1, const idTime& s2) {	return idTime( static_cast<idTime::time_t>(s1) op static_cast<idTime::time_t>(s2) ); } \
-template<typename T> constexpr static inline idTime operator##op (const idTime& s1, const T& s2) {  return s1 op idTime(s2); } \
-template<typename T> constexpr static inline idTime operator##op (const T& s1, const idTime& s2) { return idTime(s1) op s2; } 
+constexpr static inline idTime operator+(const idTime& s1, const idTime& s2) { return idTime(s1.count() + s2.count());  }
+constexpr static inline idTime operator+(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) + s2.count()); }
+constexpr static inline idTime operator+(const idTime& s1, float s2) { return idTime(s1.count() + idTime::cast_float(s2)); }
 
-TIME_MATH_OPS(+)
-TIME_MATH_OPS(-)
-//TIME_MATH_OPS(*)
-//TIME_MATH_OPS(/)
-#undef TIME_MATH_OPS
-#endif
+constexpr static inline idTime operator-(const idTime& s1, const idTime& s2) { return idTime(s1.count() - s2.count()); }
+constexpr static inline idTime operator-(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) - s2.count()); }
+constexpr static inline idTime operator-(const idTime& s1, float s2) { return idTime(s1.count() - idTime::cast_float(s2)); }
 
-#define TIME_CMP_OPS(op)	\
-constexpr static inline bool operator##op (const idTime& s1, const idTime& s2) { return s1.count() op s2.count(); } \
-constexpr static inline bool operator##op(float s1, const idTime& s2) { return idTime::time_t::rep(s1 * 1000.0f) op s2.count(); } \
-constexpr static inline bool operator##op(const idTime& s1, float s2) { return s1.count() op idTime::time_t::rep(s2 * 1000.0f); } 
-TIME_CMP_OPS(==)
-TIME_CMP_OPS(!= )
-TIME_CMP_OPS(>= )
-TIME_CMP_OPS(<= )
-TIME_CMP_OPS(> )
-TIME_CMP_OPS(<)
-#undef TIME_CMP_OPS
+constexpr static inline idTime operator*(const idTime& s1, const idTime& s2) { return idTime(s1.count() * s2.count()); }
+constexpr static inline idTime operator*(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) * s2.count()); }
+constexpr static inline idTime operator*(const idTime& s1, float s2) { return idTime(s1.count() * idTime::cast_float(s2)); }
+
 
 
 #ifndef BYTE_DEFINED
@@ -120,11 +121,685 @@ typedef uint8_t 		byte;
 #define BYTE_DEFINED 1
 #endif
 
-
-typedef bool qboolean;
-
+using qboolean = bool;
 
 
+namespace util {
+
+
+	// functions that have all the stuff that a string_view has but we can give to anyuone
+	//https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
+	// base class to make something into an array
+	template<typename BASE, typename T>
+	class data_helper {
+	public:
+		using base_type = BASE;
+		using value_type = T;
+		using pointer = value_type*;
+		using reference = value_type&;
+		using const_pointer = const value_type*;
+		using const_reference = const value_type&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+		using reverse_iterator = ::std::reverse_iterator<iterator>;
+		using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
+		using difference_type = ptrdiff_t;
+		using size_type = size_t;
+
+		constexpr inline const_pointer data() const { return static_cast<const base_type*>(this)->data(); }
+		constexpr inline size_t size() const { return static_cast<const base_type*>(this)->size(); }
+		constexpr inline const_iterator begin() const noexcept { return data(); }
+		constexpr inline const_iterator end() const noexcept { return data() + size(); }
+		constexpr inline const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
+		constexpr inline const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
+
+		constexpr inline const_reference back() const noexcept { return *begin(); }
+		constexpr inline const_reference front() const noexcept { return *(end() - 1); }
+		constexpr inline bool empty() const noexcept { return size() == 0; }
+		inline operator bool() const noexcept { return !empty(); }
+		constexpr inline const_reference operator[](size_t i) const { return data()[i]; }
+		constexpr inline const_reference at(size_t i) const { return data()[i]; }
+		constexpr inline const_iterator	iat(size_type i) const { return begin() + i; }
+		constexpr data_helper() {}
+	};
+
+	template<typename BASE, typename T>
+	class data_builder : public data_helper<BASE, T> {
+	public:
+		using base_type = BASE;
+		using value_type = T;
+		using pointer = value_type*;
+		using reference = value_type&;
+		using const_pointer = const value_type*;
+		using const_reference = const value_type&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+		using reverse_iterator = ::std::reverse_iterator<iterator>;
+		using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
+		using difference_type = ptrdiff_t;
+		using size_type = size_t;
+		using helper = data_helper<BASE, T>;
+		// const interface
+		constexpr inline const_pointer data() const { return  helper::data(); }
+		constexpr inline size_t size() const { return helper::size(); }
+
+		constexpr inline const_iterator begin() const noexcept { return helper::data(); }
+		constexpr inline const_iterator end() const noexcept { return helper::end(); }
+		constexpr inline const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
+		constexpr inline const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
+
+		constexpr inline const_reference back() const noexcept { return *begin(); }
+		constexpr inline const_reference front() const noexcept { return *(end() - 1); }
+		constexpr inline bool empty() const noexcept { return size() == 0; }
+		inline operator bool() const noexcept { return !empty(); }
+		constexpr inline const_reference operator[](size_t i) const { return data()[i]; }
+		constexpr inline const_reference at(size_t i) const { return data()[i]; }
+		constexpr inline const_iterator	iat(size_type i) const { return begin() + i; }
+
+		// non const interface
+		constexpr inline size_t capacity() const { return static_cast<const base_type*>(this)->capacity(); }
+		constexpr inline size_t max_size() const { return static_cast<const base_type*>(this)->max_size(); }
+
+		constexpr inline void reserve(size_t s) { static_cast<base_type*>(this)->reserve(s); }
+		constexpr inline void resize(size_t s) {
+			if (capacity() < s) reserve(s);
+			static_cast<base_type*>(this)->resize(s);
+		}
+
+		constexpr inline pointer data() { return static_cast<base_type*>(this)->data(); }
+		constexpr inline iterator begin() { return data(); }
+		constexpr inline iterator end() { return data() + length(); }
+		constexpr inline reverse_iterator rbegin()  noexcept { return reverse_iterator(begin()); }
+		constexpr inline reverse_iterator rend()  noexcept { return reverse_iterator(end()); }
+
+		constexpr inline reference back() noexcept { return *begin(); }
+		constexpr inline reference front() noexcept { return *(end() - 1); }
+		constexpr inline reference operator[](size_type i) { return data()[i]; }
+		constexpr inline reference at(size_type i) { return data()[i]; }
+		constexpr inline iterator iat(size_type i) { return begin() + i; } // helper, index of iterator
+	private:
+		// makes space for insert and erases
+		inline void insert_space(const_iterator cstart, size_type n)
+		{
+			assert(data() || !n);
+			assert(cmemlink::begin() || !n);
+			assert(cstart >= begin() && cstart + n <= end());
+			iterator start = const_cast<iterator>(cstart);
+			std::rotate(start, end() - n, end());
+		}
+
+		/// Shifts the data in the linked block from \p start + \p n to \p start.
+		/// The contents of the uncovered bytes is undefined.
+		inline void erase_hole(const_iterator cstart, size_type n)
+		{
+			assert(data() || !n);
+			assert(cmemlink::begin() || !n);
+			assert(cstart >= begin() && cstart + n <= end());
+			iterator start = const_cast<iterator>(cstart);
+			std::rotate(start, start + n, end());
+		}
+
+		iterator append_hole(size_type n) { resize(_data.size() + n); return end() - n; }
+		void clear(std::true_type) { resize(0); }
+		void clear(std::false_type) {
+			for (auto a : *this) std::destroy_at(&a);
+			resize(0);
+		}
+		/// Shifts the data in the linked block from \p start to \p start + \p n.
+		iterator insert_hole(const_iterator start, size_type n) {
+			const difference_type ip = start - begin();
+			assert(ip <= size());
+			resize(size() + n);
+			_insert_hole(iat(ip), n);
+			return iat(ip);
+		}
+		/// Shifts the data in the linked block from \p start to \p start + \p n.
+		iterator erase_hole(const_iterator start, size_type n) {
+			const difference_type ep = start - begin();
+			assert(ep + n <= size());
+			reserve(size() - n);
+			iterator iep = iat(ep);
+			_erase_hole(iep, n);
+			resize(size() - n);
+			return iep;
+		}
+	public:
+		// interface it self
+		void clear() { clear(std::is_trivially_destrutable_t<value_type>{}); }
+
+		void assign(const_iterator i1, const_iterator i2) { assert(i1 <= i2); resize(std::distance(i1, i2)); std::copy(i1, i2, begin()); }
+		void assign(size_type n, const_reference v) { resize(n);   std::fill(begin(), end(), v); }
+		void fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount) noexcept
+		{
+			assert(data() || !elCount || !elSize);
+			assert(cstart >= begin() && cstart + elSize * elCount <= end());
+			iterator start = const_cast<iterator>(cstart);
+			if (elSize == 1)
+				std::fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
+			else while (elCount--)
+				start = std::copy_n(const_iterator(p), elSize, start);
+		}
+
+	};
+	namespace util {
+		enum class Endian { Little, Big };
+		constexpr Endian native_byte_order = Endian::Little;
+		/// Returns the number of bits in the given type
+		template<typename T> static constexpr size_t  BitsInType() { return	sizeof(T) * CHAR_BIT; }
+		template<typename T> static constexpr size_t  BitsInType(T v) { return BitsInType<T>(); }
+
+		/// Indexes into a static array with bounds limit
+		template <typename T, size_t N>
+		inline constexpr T& VectorElement(T(&v)[N], size_t i) { return v[min(i, N - 1)]; }
+
+		/// The alignment performed by default.
+		constexpr static  size_t c_DefaultAlignment = sizeof(void*);
+
+		/// \brief Rounds \p n up to be divisible by \p grain
+		template <typename T> inline constexpr T AlignDown(T n, size_t grain = c_DefaultAlignment) { return n - n % grain; }
+		template <typename T> inline constexpr T Align(T n, size_t grain = c_DefaultAlignment) { return AlignDown(n + grain - 1, grain); }
+
+
+		template <typename T, bool IsSigned> struct __is_negative { inline constexpr bool operator()(const T& v) const { return v < 0; } };
+		template <typename T> struct __is_negative<T, false> { inline constexpr bool operator()(const T&) const { return false; } };
+		template <typename T> inline constexpr bool is_negative(const T& v) { return __is_negative<T, std::numeric_limits<T>::is_signed()>()(v); }
+		template <typename T> inline constexpr T absv(T v) { return is_negative(v) ? -v : v; }
+		template <typename T> inline constexpr T sign(T v) { return (0 < v) - is_negative(v); }
+		template <typename T1, typename T2> inline constexpr size_t abs_distance(const T1& i1, const T2& i2) { return absv(std::distance(i1, i2)); }
+		template <typename T> inline constexpr size_t size_of_elements(size_t n, const T*) { return n * sizeof(T); }
+
+		template <typename T> constexpr T gcd(T a, T b) { return b ? gcd(b, a%b) : absv(a); }
+		template <typename T> constexpr T lcm(T a, T b) { return a / gcd(a, b)*b; }
+		constexpr inline uint16_t bswap_16(uint16_t v) { return v << 8 | v >> 8; }
+		constexpr inline uint32_t bswap_32(uint32_t v) { return v << 24 | (v & 0xFF00) << 8 | ((v >> 8) & 0xFF00) | v >> 24; }
+		constexpr inline uint64_t bswap_32(uint64_t v) { return (uint64_t(bswap_32(v)) << 32) | bswap_32(v >> 32); }
+		/// \brief Swaps the byteorder of \p v.
+		template <typename T>
+		inline   T bswap(const T& v)
+		{
+			return T(BitsInType<T>() == 16 ?
+				bswap_16(uint16_t(v)) : BitsInType<T>() == 32 ?
+				bswap_32(uint32_t(v)) : BitsInType<T>() == 64 ?
+				bswap_64(uint64_t(v)) : throw std::invalid_argument(), v); // not sure how this happened
+		}
+		template <typename T> constexpr inline T le_to_native(const T& v) { return native_byte_order == Endian::Little ? v : bswap(v); }
+		template <typename T> constexpr inline T be_to_native(const T& v) { return native_byte_order == Endian::Big ? v : bswap(v); }
+		template <typename T> constexpr inline T native_to_le(const T& v) { return native_byte_order == Endian::Little ? v : bswap(v); }
+		template <typename T>constexpr  inline T native_to_be(const T& v) { return native_byte_order == Endian::Big ? v : bswap(v); }
+
+		template <typename T, size_t N> static constexpr size_t  VectorSize(const T(&v)[N]) { return sizeof(v) / size_of_elements(1, v); }
+		/// Packs \p s multiple times into \p b. Useful for loop unrolling.
+		template <typename TSmall, typename TBig>
+		inline void pack_type(TSmall s, TBig& b)
+		{
+			b = s;
+			for (unsigned h = BitsInType(TSmall); h < BitsInType(TBig); h *= 2)
+				b = (b << h) | b;
+		}
+		/// \brief Divides \p n1 by \p n2 and rounds the result up.
+		/// This is in contrast to regular division, which rounds down.
+		template <typename T1, typename T2>
+		inline T1 DivRU(T1 n1, T2 n2)
+		{
+			T2 adj = n2 - 1;
+			if (is_negative(n1))
+				adj = -adj;
+			return (n1 + adj) / n2;
+		}
+	}
+		template<typename BASE>
+		class string_helper : public data_helper<BASE, char> {
+			static constexpr size_t hasher_seed = 5381;
+			//https ://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
+			static constexpr size_t _hasher(const char* s, size_t hash) {
+				return *s == '\0' ? hash : _hasher(s + 1, ((hash << 5) + hash) + *s); /* hash * 33 + c */
+			}
+			static constexpr size_t _hasher(const char* s, size_t len, size_t hash) {
+				return len == 0 ? hash : _hasher(s + 1, len - 1, ((hash << 5) + hash) + *s); /* hash * 33 + c */
+			}
+		public:
+			using uvalue_type = unsigned char;
+			using pos_type = size_t;
+			static constexpr const char* empty_c_string = "";
+			constexpr string_helper() {}
+
+			static constexpr bool is_empty_string(const char* s) { return s == nullptr || s == empty_c_string; }
+			constexpr static size_type npos = size_type(-1);
+			constexpr const char* c_str() const { return data(); }
+			size_t length() const { return size(); }
+			// some constexpr functions
+			static constexpr bool is_char_number(int c) { return c >= '0' && c <= '9'; }
+			template<size_t N>
+			static constexpr size_t strlen(const char(&s)[N]) { return N - 1; }
+			static constexpr size_t strlen(const char* s) { return *s == '\0' ? 0 : 1 + strlen(s + 1); }
+
+			/// Returns the number of bits in the given type
+			template<typename T> static constexpr size_t  BitsInType() { return	sizeof(T) * CHAR_BIT; }
+			template<typename T> static constexpr size_t  BitsInType(T v) { return BitsInType<T>(); }
+
+
+
+			static constexpr size_t hasher(const char* s) { return _hasher(s, hasher_seed); }
+			static constexpr size_t hasher(const char* s, size_t len) { return _hasher(s, len, hasher_seed); }
+			static constexpr int str_cmp(const char* begin1, const char* end1, const char* begin2, const char* end2) {
+				while (begin1 != end1 && begin2 != end2) {
+					if (*begin1 != *begin2)
+						return static_cast<uint8_t>(*begin1) - static_cast<uint8_t>(*begin2);
+					++begin1; ++begin2;
+				}
+				return 0;
+			}
+			static constexpr int str_casecmp(const char* begin1, const char* end1, const char* begin2, const char* end2) {
+				while (begin1 != end1 && begin2 != end2) {
+					if (::to_lower(*begin1) != ::to_lower(*begin2))
+						return static_cast<uint8_t>(::to_lower(*begin1)) - static_cast<uint8_t>(::to_lower(*begin2));
+					++begin1; ++begin2;
+				}
+				return 0;
+			}
+			static constexpr size_t str_find(const char* begin, const char* end, const char* dbegin, const char* dend) {
+				if (begin < end) {
+					auto  p = std::search(begin, end, dbegin, dend);
+					if (p != end) return std::distance(begin, p);
+				}
+				return npos;
+			}
+
+			static constexpr size_t str_rfind(const char* begin, const char* end, const char* dbegin, const char*dend) {
+				if (begin < end) {
+					auto  p = std::find_end(begin, end, dbegin, dend);
+					if (p != end) return std::distance(begin, p);
+				}
+				return npos;
+			}
+			constexpr size_t hash() const { return hasher(c_str(), size()); }
+			constexpr operator std::string_view() const { return std::string_view(c_str(), size()); }
+
+			constexpr int compare(const char* s, size_t size) const noexcept { return str_cmp(begin(), end(), s, s + size); }
+			constexpr int compare(const char* s) const noexcept { return str_cmp(begin(), end(), s, s + ::strlen(s)); }
+			template<size_t N>
+			constexpr int compare(const char(&s)[N]) const noexcept { return str_cmp(begin(), end(), s, s + N - 1); }
+			template<typename U>
+			constexpr int compare(const string_helper<U>& s) const noexcept { return str_cmp(begin(), end(), s.begin(), s.end()); }
+
+			// search
+
+			inline constexpr size_type find(const std::string_view& what, size_type offset = 0) const { return str_find(begin() + offset, end(), what.begin(), what.end()); }
+			inline constexpr size_type find(char what, size_type offset = 0)  const { return str_find(begin() + offset, end(), &what, &what + 1); }
+			inline constexpr size_type find(const char* what, size_type offset, size_type count) const { return str_find(begin() + offset, end(), what, what + count); }
+			inline constexpr size_type find(const char* what, size_type offset = 0)  const { return find(what, offset, strlen(what)); }
+
+			template<typename U>
+			inline constexpr size_type find(const string_helper<U>& what, size_type offset = 0) const { return str_find(begin() + offset, end(), what.begin(), what.end()); }
+
+			inline constexpr size_type rfind(const std::string_view& what, size_type offset = 0) const { return str_rfind(begin() + offset, end(), what.begin(), what.end()); }
+			inline constexpr size_type rfind(char what, size_type offset = 0)  const { return str_rfind(begin() + offset, end(), &what, &what + 1); }
+			inline constexpr size_type rfind(const char* what, size_type offset = 0)  const { return str_rfind(begin() + offset, end(), what, what + strlen(what)); }
+			inline constexpr size_type rfind(const char* what, size_type offset, size_type count) const { return str_rfind(begin() + offset, end(), what, what + count); }
+			template<typename U>
+			inline constexpr size_type rfind(const string_helper<U>& what, size_type offset = 0) const { return str_rfind(begin() + offset, end(), what.begin(), what.end()); }
+
+			inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const {
+				auto it = std::find_first_of(begin() + pos, end(), p, p + count);
+				return it == end() ? npos : std::distance(begin(), it);
+			}
+			inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const {
+				auto it = std::find_first_of(begin() + pos, end(), p, p + count, [](const char a, const char b) { return a != b; });
+				return it == end() ? npos : std::distance(begin(), it);
+			}
+
+			inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const {
+				auto it = std::find_end(begin() + pos, end(), p, p + count);
+				return it == end() ? npos : std::distance(begin(), it);
+			}
+			inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const {
+				auto it = std::find_end(begin() + pos, end(), p, p + count, [](const char a, const char b) { return a != b; });
+				return it == end() ? npos : std::distance(begin(), it);
+			}
+
+			// just filler, some of these are not very effecent:P
+			inline pos_type		find_first_of(value_type c, pos_type pos = 0) const { return find_first_of(&c, pos, 1); }
+			inline pos_type		find_first_of(uvalue_type c, pos_type pos = 0) const { return find_first_of(value_type(c), pos); }
+			inline pos_type		find_first_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
+
+			inline pos_type		find_first_not_of(value_type c, pos_type pos = 0) const { return find_first_not_of(&c, pos, 1); }
+			inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = 0) const { return find_first_not_of(value_type(c), pos); }
+			inline pos_type		find_first_not_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
+
+			inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { return find_last_of(&c, pos, 1); }
+			inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
+			inline pos_type		find_last_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
+
+			inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { return find_last_not_of(&c, pos, 1); }
+			inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
+			inline pos_type		find_last_not_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
+
+			constexpr std::string_view substr(size_type pos = 0, size_type count = npos) const {
+				return (pos > size())
+					? (throw std::out_of_range("data_helpers::split"), std::string_view())
+					: std::string_view(data() + pos, std::min(count, size() - pos));
+			}
+			constexpr bool is_number() const { return !empty() && (is_char_number(at(0)) || ((at(0) == '+' || at(0) == '-') && is_char_number(at(1)))); }
+
+			const_iterator to_number(float& v) const {
+				char* str;
+				v = strtof(data(), &str);
+				return str <= end() ? const_iterator(str) : begin();
+			}
+			const_iterator to_number(int32_t& f, int base = 0) const {
+				char* str;
+				v = strtol(data(), &str, base);
+				return str <= end() ? const_iterator(str) : begin();
+			}
+			const_iterator to_number(int64_t& f, int base = 0) const {
+				char* str;
+				v = strtoll(data(), &str, base);
+				return str <= end() ? const_iterator(str) : begin();
+			}
+			constexpr std::string_view remove_prefix(size_type n) const {
+				return (n > size())
+					? (throw std::out_of_range("data_helpers::remove_prefix"), std::string_view())
+					: std::string_view(data() + n, size() - n);
+			}
+			constexpr std::string_view remove_suffix(size_type n) const {
+				return (n > size())
+					? (throw std::out_of_range("data_helpers::remove_suffix"), std::string_view())
+					: std::string_view(data(), size() - n);
+			}
+
+		};
+
+		template<typename T1> constexpr static inline bool operator==(const string_helper<T1>& l, const char* r) { return l.compare(r) == 0; }
+		template<typename T1> constexpr static inline bool operator==(const char* r, const string_helper<T1>& l) { return l.compare(r) == 0; }
+		template<typename T1> constexpr static inline bool operator!=(const string_helper<T1>& l, const char* r) { return l.compare(r) != 0; }
+		template<typename T1> constexpr static inline bool operator!=(const char* r, const string_helper<T1>& l) { return l.compare(r) != 0; }
+
+
+		template<typename T1, typename T2> constexpr static inline bool operator==(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) == 0; }
+		template<typename T1, typename T2> constexpr static inline bool operator!=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) != 0; }
+		template<typename T1, typename T2> constexpr static inline bool operator<(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) < 0; }
+		template<typename T1, typename T2> constexpr static inline bool operator>(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) > 0; }
+		template<typename T1, typename T2> constexpr static inline bool operator<=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) <= 0; }
+		template<typename T1, typename T2> constexpr static inline bool operator>=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) >= 0; }
+
+		template<typename T>
+		static inline std::ostream& operator<<(std::ostream& os, const string_helper<T>& sv) { os.write(sv.data(), sv.size());  return os; }
+
+		template<typename BASE>
+		class string_builder : public string_helper<BASE> {
+		public:
+			using base_type = BASE;
+			using value_type = typename string_helper::value_type;
+			using pointer = typename string_helper::pointer;
+			using reference = typename string_helper::reference;
+			using const_pointer = typename string_helper::const_pointer;
+			using const_reference = typename string_helper::const_reference;
+			using iterator = typename string_helper::iterator;
+			using const_iterator = typename string_helper::const_iterator;
+			using reverse_iterator = typename string_helper::reverse_iterator;
+			using const_reverse_iterator = typename string_helper::const_reverse_iterator;
+			using difference_type = typename string_helper::difference_type;
+			using size_type = typename string_helper::size_type;
+			using helper = string_helper<BASE>;
+			constexpr string_builder() : helper() {}
+			// from type
+			constexpr inline const_pointer data() const { return static_cast<const base_type*>(this)->data(); }
+			constexpr inline size_t size() const { return static_cast<const base_type*>(this)->size(); }
+			// return what the current real size that data() is
+			constexpr inline size_t capacity() const { return static_cast<const base_type*>(this)->capacity(); }
+			// resizes data() for size()
+			// returns the max capacity that data() can ever be
+			constexpr inline size_t max_size() const { return static_cast<const base_type*>(this)->max_size(); }
+			constexpr inline void reserve(size_t s) { static_cast<base_type*>(this)->reserve(s); }
+			constexpr inline void resize(size_t s) {
+				if (capacity() < s) reserve(s);
+				static_cast<base_type*>(this)->resize(s);
+			}
+			// non const interface
+			constexpr inline pointer data() { return static_cast<base_type*>(this)->data(); }
+			constexpr inline iterator begin() { return data(); }
+			constexpr inline iterator end() { return data() + size(); }
+			constexpr inline reverse_iterator rbegin()  noexcept { return reverse_iterator(begin()); }
+			constexpr inline reverse_iterator rend()  noexcept { return reverse_iterator(end()); }
+
+			constexpr inline reference back() noexcept { return *begin(); }
+			constexpr inline reference front() noexcept { return *(end() - 1); }
+			constexpr inline reference operator[](size_type i) { return data()[i]; }
+			constexpr inline reference at(size_type i) { return data()[i]; }
+			constexpr inline iterator iat(size_type i) { return begin() + i; }
+
+
+			iterator append_hole(size_type n) { resize(_data.size() + n); return end() - n; }
+			void clear() { resize(0); if (!is_empty_string(data())) *end() = '\0'; }
+			/// Shifts the data in the linked block from \p start to \p start + \p n.
+			iterator insert_hole(const_iterator cstart, size_type n) {
+				const difference_type ip = cstart - begin();
+				assert(ip <= size());
+				resize(size() + n);
+				iterator start = const_cast<iterator>(iat(ip));
+				std::rotate(start, end() - n, end());
+				*end() = '\0';
+				return iat(ip);
+			}
+			/// Shifts the data in the linked block from \p start to \p start + \p n.
+			iterator erase_hole(const_iterator cstart, size_type n) {
+				const difference_type ep = cstart - begin();
+				assert(ep + n <= size());
+				reserve(size() - n);
+				iterator iep = iat(ep);
+				iterator start = const_cast<iterator>(cstart);
+				std::rotate(start, start + n, end());
+				resize(size() - n);
+				*end() = '\0';
+				return iep;
+			}
+			template<typename ITR1, typename ITR2>
+			void assign(const ITR1 i1, const ITR2 i2) {
+				assert(i1 <= i2);
+				resize(std::distance(i1, i2));
+				std::uninitialized_copy(i1, i2, begin());
+				*end() = '\0';
+			}
+			void assign(size_type n, const_reference v) { resize(n);   std::fill(begin(), end(), v); }
+
+			void assign(const std::string_view& str) { assign(str.begin(), str.end()); *end() = '\0'; }
+			inline void assign(const char* str) { assign(std::string_view(str)); }
+			inline void assign(const char* str, size_type len) { assign(std::string_view(str, len)); }
+
+
+
+			iterator insert(const_iterator ip, char c) {
+				iterator d = insert_hole(ip, 1);
+				*d = c;
+				*end() = '\0';
+				return d;
+			}
+
+			iterator erase(const_iterator ep, size_type n) {
+				return erase_hole(const_cast<iterator>(ep), n);
+			}
+			iterator erase(const_iterator ep1, const_iterator ep2) {
+				assert(ep1 <= ep2);
+				const size_type len = sstd::distance(ep1, ep2);
+				if (ep1 > begin())
+					return erase_hole(ep1, len);
+				resize(len);  // simple optimiztion on resize
+				return end();
+			}
+			iterator erase(size_type pos = 0, size_type len = npos) {
+				len = std::min(size() - pos, len);
+				if (pos > 0)
+					return erase(begin() + pos, len);
+				resize(len);  // simple optimiztion on resize
+				return end();
+			}
+
+
+			template<typename ITR1, typename ITR2>
+			iterator insert(const_iterator ip, const ITR1& i1, const ITR2& i2) {
+				assert(i1 <= i2);
+				iterator d = insert_hole(ip, std::distance(i1, i2));
+				std::uninitialized_copy(i1, i2, d);
+				return d;
+			}
+			void push_back(char c) {
+				assert((size() + 1) < max_size());
+				iterator d = insert_hole(end(), 1);
+				*d = c;
+			}
+			void pop_back() { if (size() > 0) { resize(size() - 1); *end() = '\0'; } }
+
+			template<typename ITR1, typename ITR2>
+			base_type& append(const ITR1& i1, const ITR2& i2) {
+				assert(i1 <= i2);
+				iterator d = insert_hole(end(), std::distance(i1, i2));
+				std::uninitialized_copy(i1, i2, d);
+				return *static_cast<base_type*>(this);
+			}
+			base_type& append(const_pointer p, size_type s) {
+				iterator d = insert_hole(end(), s);
+				std::uninitialized_copy(p, p + s, d);
+				return *static_cast<base_type*>(this);
+			}
+			base_type& append(const_pointer p) {
+				return append(p, strlen(p));
+			}
+			base_type& append(const std::string_view&  str) {
+				return append(str.begin(), str.end());
+			}
+			template<typename B>
+			base_type& append(const string_helper<B>& str) {
+				return append(str.begin(), str.end());
+			}
+			base_type& append(char c, size_t count = 1U) {
+				reserve(size() + count + 1);
+				std::fill(end(), end() + count, c);
+				resize(size() + count + 1);
+				*end() = '\0';
+				return *static_cast<base_type*>(this);
+			}
+
+			base_type&			replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n) {
+				assert(first <= last);
+				assert(n || distance(first, last));
+				assert(first >= begin() && first <= end() && last >= first && last <= end());
+				assert((i1 < begin() || i1 >= end() || abs_distance(i1, i2) * n + size() < capacity()) && "Replacement by self can not autoresize");
+				const size_type bte = std::distance(first, last), bti = std::distance(i1, i2) * n;
+				const_iterator rp = static_cast<const_iterator>(first);
+				if (bti < bte)
+					rp = erase(rp, bte - bti);
+				else if (bte < bti)
+					rp = insert(rp, bti - bte);
+				fill(rp, i1, std::distance(i1, i2), n);
+				*end() = 0;
+				return *static_cast<base_type*>(this);
+			}
+
+			template <typename InputIt>
+			base_type&			replace(const_iterator first, const_iterator last, InputIt first2, InputIt last2) { return replace(first, last, first2, last2, 1); }
+			inline base_type&		replace(const_iterator first, const_iterator last, const string& s) { return replace(first, last, s.begin(), s.end()); }
+			base_type&			replace(const_iterator first, const_iterator last, const_pointer s)
+			{
+				if (!s) s = "";
+				replace(first, last, s, s + strlen(s));
+				return *static_cast<base_type*>(this);
+			}
+			inline base_type&		replace(const_iterator first, const_iterator last, const_pointer s, size_type slen) { return replace(first, last, s, s + slen); }
+			inline base_type&		replace(const_iterator first, const_iterator last, size_type n, value_type c) { return replace(first, last, &c, &c + 1, n); }
+			inline base_type&		replace(pos_type rp, size_type n, const string& s) { return replace(iat(rp), iat(rp + n), s); }
+			inline string&		replace(pos_type rp, size_type n, const string& s, uoff_t sp, size_type slen) { return replace(iat(rp), iat(rp + n), s.iat(sp), s.iat(sp + slen)); }
+			inline base_type&		replace(pos_type rp, size_type n, const_pointer s, size_type slen) { return replace(iat(rp), iat(rp + n), s, s + slen); }
+			inline base_type&		replace(pos_type rp, size_type n, const_pointer s) { return replace(iat(rp), iat(rp + n), string(s)); }
+			inline base_type&		replace(pos_type rp, size_type n, size_type count, value_type c) { return replace(iat(rp), iat(rp + n), count, c); }
+
+			template<typename B>
+			base_type& operator+=(const string_helper<B>& str) { return append(str); }
+			base_type& operator+=(char c) { return append(c); }
+			base_type& operator+=(const std::string_view& str) { return append(str); }
+
+
+
+		};
+
+		template<typename T1, typename T2> static inline  string_builder<T1>& operator+(string_builder<T1>& l, const T2& r) { l += r; return l; }
+
+
+	}
+
+
+struct string_t;
+
+struct cstring_t : public util::string_helper<cstring_t> {
+private:
+	const char*  _str;
+public:
+	void swap(cstring_t& r) { if (std::addressof(r) != this) std::swap(_str, r._str); }
+	constexpr inline cstring_t() : _str("") {}
+	template<typename T>
+	constexpr inline cstring_t(const util::string_helper<T>& s) : _str(s.c_str()) {}
+	constexpr inline cstring_t(const char* s) : _str(s == nullptr ? "" : s) {}
+
+	constexpr inline const char* data() const { return _str; }
+	constexpr inline size_t size() const { return strlen(_str); }
+};
+
+struct string_t : public util::string_helper<string_t> {
+private:
+	const char*  _str;
+public:
+	static  const char* intern(const char* str);
+	static  const char* intern(const char* str,size_t size);
+	static  const char* intern(const std::string_view&  str);
+	constexpr inline const char* data() const { return _str; }
+	constexpr inline size_t size() const { return *reinterpret_cast<const uint16_t*>(_str - sizeof(uint16_t)); }
+	void swap(string_t& r) { if (std::addressof(r) != this) std::swap(_str, r._str); }
+	constexpr inline string_t() : _str("") {}
+	template<typename T>
+	inline string_t(const util::string_helper<T>& s) : _str(intern(s.data(),s.size())) {}
+	inline string_t(const std::string_view&  str) : _str(intern(str)) { }
+	inline string_t(const char*  str) : _str(intern(str)) { }
+ 	friend class pr_system_t;
+};
+
+// a symbol is a string that is case insentive.  Its still a string_view, but the equal functions are diffrent
+// warning though, this does NOT override the compare functions.  I could make  the main comapre virtual, but 
+// I am trying to hold off on that
+// mabye rewrite this with static inhertenice? humm
+class symbol_t : public util::string_helper<symbol_t> {
+	std::string_view _view;
+public:
+	constexpr inline const char* data() const { return _view.data(); }
+	constexpr inline size_t size() const { return _view.size(); }
+	constexpr inline symbol_t() : _view("",0) {}
+	template<typename T>
+	constexpr inline symbol_t(const util::string_helper<T>& s) : _view(s.c_str(),s.length()) {}
+	constexpr inline symbol_t(const char* s) : _view(s == nullptr ? "" : s) {}
+};
+template<typename T>
+constexpr static bool operator==(const symbol_t& l, const util::string_helper<T>& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) == 0; }
+template<typename T>
+constexpr static bool operator!=(const symbol_t& l, const  util::string_helper<T>& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) != 0; }
+template<typename T>
+constexpr static bool operator==(const util::string_helper<T>& l, const symbol_t&r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) == 0; }
+template<typename T>
+constexpr static bool operator!=(const util::string_helper<T>&l, const symbol_t& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) != 0; }
+
+static inline std::ostream& operator<<(std::ostream& os, const symbol_t& sv) { for (char c : sv) os << ::tolower(c); return os; }
+
+namespace std {
+	template<>
+	struct hash<cstring_t> {
+		inline constexpr size_t operator()(const cstring_t& s) const { return s.hash(); }
+	};
+	template<>
+	struct hash<string_t> {
+		inline constexpr size_t operator()(const string_t& s) const { return s.hash(); }
+	};
+	template<>
+	struct hash<symbol_t> {
+		inline constexpr  size_t  operator()(const symbol_t& s) const { return s.hash(); }
+	};
+}
 
 // https://stackoverflow.com/questions/41936763/type-traits-to-check-if-class-has-member-function
 namespace priv {
@@ -182,18 +857,8 @@ using is_data_class = std::conditional_t<
 template<class T>
 using cstr_member_t = decltype(std::declval<const T&>().c_str());
 template<class T>
-using is_cstr_class = std::conditional_t<
-	priv::is_detected<cstr_member_t, std::remove_cv_t<T>>::value,
-	std::true_type, std::false_type>;
+using is_cstr_class = std::conditional_t<priv::is_detected<cstr_member_t, std::remove_cv_t<T>>::value,std::true_type, std::false_type>;
 
-#if 0
-template<typename C = char, typename CT = std::char_traits<C>, typename T>
-inline typename std::enable_if_t<!std::is_pointer<T>::value && is_data_class<T>::value, std::basic_ostream<C, CT>&>
-operator<<(std::basic_ostream<C, CT>& os, const T& s) {
-	os.write(s.data(), s.size());
-	return os;
-}
-#endif
 #include "sys.h"
 // don't mind this, just me trying to reinvent the god damn wheel again
 
@@ -203,166 +868,26 @@ template<typename T> using link_t = list::entry<T>;
 template<typename T, typename list::field<T> FIELD>
 using link_list_t = list::head<T, FIELD>;
 
-#if 0
-template<typename E>
-struct link_t {
-	using field_t = E **E::*;
-
-	link_t(E* ptr) : next(ptr),
-		E* next;
-	field_t prev;
-};
-// this is a bit of a round about way.  It also adds a refrence humm
-// trust the compiler?
-
-// https://stackoverflow.com/questions/4936987/c-class-member-variable-knowing-its-own-offset
-namespace priv {
-	template< class C, class T >
-	ptrdiff_t offset_of(T C::*q) {
-		return (ptrdiff_t)&((*(C*)0).*q);
-	}
-	template<typename T, typename U> constexpr size_t offsetOf(U T::*member)
-	{
-		return (char*)&((T*)nullptr->*member) - (char*)nullptr;
-	}
-}
-// say this is some existing structure. And we want to use
-// a list. We can tell it that the next pointer
-// is apple::next.
-struct apple {
-	int data;
-	apple * next;
-};
-
-// simple example of a minimal intrusive list. Could specify the
-// member pointer as template argument too, if we wanted:
-// template<typename E, E *E::*next_ptr>
-template<typename E>
-struct List {
-	List(E *E::*next_ptr) :head(0), next_ptr(next_ptr) { }
-
-	void add(E &e) {
-		// access its next pointer by the member pointer
-		e.*next_ptr = head;
-		head = &e;
-	}
-
-	E * head;
-	E *E::*next_ptr;
-};
-
-
-
-
-
-
-template<typename T, link_t<T>::* Member> 
-class link_list_t {
-public:
-	static constexpr ptrdiff_t member_offset = offsetof(T, Member);
-	using value_type = T;
-	using linke_type = link_t<T>;
-	link_list_t() : _head(nullptr) {}
-	template<typename T, typename U> constexpr size_t next(T& ptr) { // U T::*member)
-	{
-			(ptr.*Member)->_next
-		return (char*)(ptr).*Member->_next - (char*)nullptr;
-	}
-private:
-	linke_type* _head;
-};
-
-template<typename T,
-	 template<typename T, typename U> constexpr T* next(U T::*member)
-	 {
-		 return (char*)&((T*)nullptr->*member) - (char*)nullptr;
-	 }
-	constexpr link_t() : _prev(this), _next(this) {}
-	// ClearLink is used for new headnodes
-	void ClearLink() { _prev = _next = this; }
-	void RemoveLink() { _next->_prev = _prev; _prev->_next = _next; }
-
-
-	void InsertLinkBefore(link_t *before)
-	{
-		_next = before;
-		_prev = before->_prev;
-		_prev->_next = this;
-		_next->_prev = this;
-	}
-	void InsertLinkAfter(link_t *after)
-	{
-		_next = after->_next;
-		_prev = after;
-		_prev->_next = this;
-		_next->_prev = this;
-	}
-	bool IsLinked() const { return _priv &&  _priv != this; }
-};
-
-template<typename Owner, link_t Owner::*Member>
-class link_functions_t{
-	//static constexpr
-	static constexpr Owner *get_owner(link_t* ptr) { return ptr ? reinterpret_cast<Owner *>(reinterpret_cast<char *>(ptr) - Tag::offset()) : nullptr; }
-	static constexpr const Owner *get_owner(const void* ptr) { return ptr ? reinterpret_cast<const Owner *>(reinterpret_cast<const char *>(ptr) - offsetof(Owner,Member)) : nullptr; }
-	constexpr Owner *owner() { return get_owner(this); }
-	constexpr const Owner *owner() const { return get_owner(this); }
-	constexpr link_t* self() { return reinterpret_cast<const Owner *>(reinterpret_cast<const char *>(this) - sizeof(link_t)); /// so god damn hacky 
-	} 
-public:
-	//using self_type = link_functions_t<Owner, Member>;
-
-
-	operator Owner*() { return get_owner(this); }
-	operator const Owner*() const { return get_owner(this); }
-	Owner* next() { return get_owner(_next); }
-	Owner* prev() { return get_owner(_prev); }
-	const Owner* next() const { return get_owner(_next); }
-	const Owner* prev() const { return get_owner(_prev); }
-	void InsertLinkBefore(link_t *before) { self()->InsertLinkBefore(before); }
-	void InsertLinkAfter(link_t *after) { self()->InsertLinkAfter(after); }
-	void ClearLink() { self()->ClearLink(); }
-	void RemoveLink() { self()->RemoveLink(); }
-
-private:
-
-};
-struct link_test {
-	link_t nhuh_tag;
-
-	link_functions_t<link_test, &link_test::nhuh_tag> nhuh;
-
-};
-#define QUAKE_LINK(Owner, name) \
-	link_t name
-
-#if 0
-	link_t name ## _tag; \
-	link_functions_t<Owner,  & ## Owner ## ::##name ## _tag> name
-#endif
-
-#if 0
-void ClearLink(link_t *l);
-void RemoveLink(link_t *l);
-void InsertLinkBefore(link_t *l, link_t *before);
-void InsertLinkAfter(link_t *l, link_t *after);
-#endif
-// (type *)STRUCT_FROM_LINK(link_t *link, type, member)
-// ent = STRUCT_FROM_LINK(link,entity_t,order)
-// FIXME: remove this mess!
-#define	STRUCT_FROM_LINK(l,t,m) ((t *)((byte *)l - (int)&(((t *)0)->m)))
-
-
-// does a varargs printf into a temp buffer
-
-#endif
 //============================================================================
 
 //http://videocortex.io/2017/custom-stream-buffers/
+int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2);
 
 namespace quake {
 	static constexpr size_t DEFAULT_STREAM_BUFFER_SIZE = 1024;
 	static constexpr size_t DEFAULT_SIMPLE_BUFFER_SIZE = 64;
+
+	// ran range
+	//template<uint16_t MIN=0, uint16_t MAX = RAND_MAX>
+	//static inline uint16_t rand() { return ::rand() % (MAX + 1 - MIN) + MIN; }
+	// issue with this is that we don't have the accurcy with rand for this to work well
+	template<typename RET = int16_t>
+	static inline RET rand(const RET min, const RET max) {
+		static constexpr RET one = static_cast<RET>(1);
+		static constexpr RET rand_max = static_cast<RET>(RAND_MAX);
+		return max + (static_cast<RET>(::rand()) / (rand_max / (max - min + one) + one));
+	}
+
 	using hashvalue_t = size_t;
 	using ssize_t = typename std::conditional<sizeof(size_t) == sizeof(int32_t), int32_t, int64_t>::type;
 	using char_type = char;
@@ -370,6 +895,7 @@ namespace quake {
 
 	struct stream_output {
 		virtual void text_output(std::ostream& os) const = 0;
+		virtual std::string to_string() const { std::stringstream ss; text_output(ss); return ss.str(); }
 		virtual ~stream_output() {}
 	};
 	template<typename T>
@@ -380,12 +906,12 @@ namespace quake {
 	class debug_value_t {
 	public:
 		using value_type = T;
-		void set(const T& v) { 
+		void set(const T& v) {
 			if (v != _value) {
 				_value = v; // value changed
 			}
 		}
-		T& get() {  return _value; }
+		T& get() { return _value; }
 		const T& get() const { return _value; }
 		debug_value_t() : _value{} {}
 		debug_value_t(const T& value) : _value{ } { set(value); }
@@ -421,7 +947,7 @@ namespace quake {
 #define DEBUG_OP(op)	\
 template<typename T,typename E> static inline bool operator##op (const T& s1, const debug_t<T,E>& s2) { return s1 op static_cast<T>(s2); } \
 template<typename T,typename E> static inline bool operator##op (const debug_t<T,E>& s1, const T& s2) { return static_cast<T>(s2) op s2; } 
-	DEBUG_OP(==)
+	DEBUG_OP(== )
 		DEBUG_OP(!= )
 		DEBUG_OP(> )
 		DEBUG_OP(< )
@@ -431,68 +957,68 @@ template<typename T,typename E> static inline bool operator##op (const debug_t<T
 #define DEBUG_MATH(op)	\
 template<typename T,typename E> static inline T operator##op (const T& s1, const debug_t<T,E>& s2) { return s1 op static_cast<T>(s2); } \
 template<typename T,typename E> static inline T operator##op (const debug_t<T,E>& s1, const T& s2) { return static_cast<T>(s2) op s2; } 
-		DEBUG_MATH(& )
-		DEBUG_MATH(|)
+		DEBUG_MATH(&)
+		DEBUG_MATH(| )
 		DEBUG_MATH(+)
 		DEBUG_MATH(-)
-		DEBUG_MATH(* )
+		DEBUG_MATH(*)
 		DEBUG_MATH(/ )
 #undef DEBUG_MATH
 
-	class file {
+		class file {
 		size_t _length;
 		size_t _offset;
 		sys_file _file;
-	public:
-		using ios_base = std::ios_base;
-		void set_offset(size_t offset, size_t length) {
-			if (_offset != offset && _length != length) {
-				_offset = offset;
-				_length = length;
-				if (is_open())  _file.seek(_offset);
+		public:
+			using ios_base = std::ios_base;
+			void set_offset(size_t offset, size_t length) {
+				if (_offset != offset && _length != length) {
+					_offset = offset;
+					_length = length;
+					if (is_open())  _file.seek(_offset);
+				}
 			}
-		}
-		void swap(file& other) {
-			if (std::addressof(other) != this) {
-				_file.swap(other._file);
-				std::swap(_length, other._length);
-				std::swap(_offset, other._offset);
+			void swap(file& other) {
+				if (std::addressof(other) != this) {
+					_file.swap(other._file);
+					std::swap(_length, other._length);
+					std::swap(_offset, other._offset);
+				}
 			}
-		}
-		file()  : _file(), _offset(0U), _length(0) { }
-		explicit operator sys_file&() { return _file; }
-		explicit operator const sys_file&() const { return _file; }
-		
-		file(const char* filename, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(0U), _offset(0U), _file(filename, mode) {
-			if (_file.is_open())  _length = _file.file_size(); 
-		}
-		file(const char* filename, size_t offset, size_t length, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(length), _offset(offset), _file(filename, mode) {
-			if (_file.is_open())  _file.seek(offset);
-		}
-		file(const file&) = delete; // no copy
-		file& operator=(const file&) = delete; // no copy
-		file(file&& move) { swap(move); }
-		file& operator=(file&& move) { swap(move); return *this; }
-		bool open(const char* filename, std::ios_base::openmode mode = ios_base::in | ios_base::binary) {
-			if (_file.open(filename, mode)) {
-				if(_length == 0)
-					_length = _file.file_size();
-				else
-					_file.seek(_offset);
-				return true;
+			file() : _file(), _offset(0U), _length(0) { }
+			explicit operator sys_file&() { return _file; }
+			explicit operator const sys_file&() const { return _file; }
+
+			file(const char* filename, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(0U), _offset(0U), _file(filename, mode) {
+				if (_file.is_open())  _length = _file.file_size();
 			}
-			return false;
-		}
-		size_t read(void* dest, size_t count) { return _file.read(dest, count); }
-		size_t write(const void* src, size_t count) { return _file.write(src, count); }
-		size_t seek(int32_t offset) {
-			assert(offset < (int32_t)_length);
-			return _file.seek(_offset + offset);
-		}
-		void close() { _file.close(); }
-		bool is_open() const { return _file.is_open(); }
-		size_t file_size() const { return _length; }
-		size_t offset() const { return _offset; }
+			file(const char* filename, size_t offset, size_t length, ios_base::openmode mode = ios_base::in | ios_base::binary) :_length(length), _offset(offset), _file(filename, mode) {
+				if (_file.is_open())  _file.seek(offset);
+			}
+			file(const file&) = delete; // no copy
+			file& operator=(const file&) = delete; // no copy
+			file(file&& move) { swap(move); }
+			file& operator=(file&& move) { swap(move); return *this; }
+			bool open(const char* filename, std::ios_base::openmode mode = ios_base::in | ios_base::binary) {
+				if (_file.open(filename, mode)) {
+					if (_length == 0)
+						_length = _file.file_size();
+					else
+						_file.seek(_offset);
+					return true;
+				}
+				return false;
+			}
+			size_t read(void* dest, size_t count) { return _file.read(dest, count); }
+			size_t write(const void* src, size_t count) { return _file.write(src, count); }
+			size_t seek(int32_t offset) {
+				assert(offset < (int32_t)_length);
+				return _file.seek(_offset + offset);
+			}
+			void close() { _file.close(); }
+			bool is_open() const { return _file.is_open(); }
+			size_t file_size() const { return _length; }
+			size_t offset() const { return _offset; }
 	};
 	class stream_buffer : public std::basic_streambuf<char_type, char_traits> {
 	private:
@@ -520,16 +1046,16 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		bool open(const char* filename, std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary) {
 			return _file.open(filename, mode);
 		}
-		void set_offset(off_type offset, off_type length) { _file.set_offset(offset, length); }
+		void set_offset(off_type offset, off_type length) { _file.set_offset((size_t)offset, (size_t)length); }
 		size_t file_length() const { return _file.file_size(); }
 	protected:
 		pos_type seekpos(pos_type pos, std::ios_base::openmode which
 			= std::ios_base::in | std::ios_base::out) override final {
-			return _file.seek(pos);
+			return _file.seek((size_t)pos);
 		}
 		std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way,
 			std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final {
-			return static_cast<sys_file&>(_file).seek(off, way);
+			return static_cast<sys_file&>(_file).seek((size_t)off, way);
 		}
 		int_type overflow(int_type c) override final { assert(0); return EOF; }
 		int_type underflow() override final {
@@ -548,7 +1074,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		}
 		int sync() override final { assert(0); return char_traits::eof(); }
 		std::streamsize showmanyc()override final { return _file.file_size(); }
-		std::streamsize xsgetn(char* s, std::streamsize n) override final { 
+		std::streamsize xsgetn(char* s, std::streamsize n) override final {
 			assert(n > 0 && s);
 			std::streamsize ret = 0;
 			if (_putback >= 0) {
@@ -557,10 +1083,10 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 				_putback = -1;
 				ret = 1;
 			}
-			ret+= _file.read(s, n);
+			ret += _file.read(s, (size_t)n);
 			return ret;
 		}
-		std::streamsize xsputn(const char* s, std::streamsize n) override final { return _file.write(s, n); }
+		std::streamsize xsputn(const char* s, std::streamsize n) override final { return _file.write(s, (size_t)n); }
 	};
 
 	class ifstream : public std::basic_istream<char_type, char_traits> {
@@ -568,7 +1094,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		using stream_t = std::basic_istream<char_type, char_traits>;
 
 		ifstream() : stream_t(&_buffer) {}
-		ifstream(const char* str) : stream_t(&_buffer) { _buffer.open(str,std::ios_base::in | std::ios_base::binary); }
+		ifstream(const char* str) : stream_t(&_buffer) { _buffer.open(str, std::ios_base::in | std::ios_base::binary); }
 		ifstream(ifstream&& move) : _buffer(std::move(move._buffer)), stream_t(&_buffer) { this->set_rdbuf(&_buffer); }
 		ifstream& operator=(ifstream&& move) {
 			_buffer = std::move(move._buffer);
@@ -601,7 +1127,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 			}
 		}
 		iofstream() : stream_t(&_buffer) {}
-		iofstream(const char* str, int mode= std::ios_base::in | std::ios_base::binary) : stream_t(&_buffer) { _buffer.open(str, mode); }
+		iofstream(const char* str, int mode = std::ios_base::in | std::ios_base::binary) : stream_t(&_buffer) { _buffer.open(str, mode); }
 		iofstream(const iofstream&) = delete; // no copy
 		iofstream& operator=(const iofstream&) = delete; // no copy
 		iofstream(iofstream&& move) : stream_t(&_buffer) { swap(move); }
@@ -652,980 +1178,101 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 	/// Returns the size of the given object. Overloads for standard types are available.
 	template <typename T>
 	inline std::streamsize stream_size_of(const T& v) {
-		using stream_sizer_t = typename std::conditional_t<numeric_limits<T>::is_integral,integral_object_stream_size<T>, object_stream_size<T>>; ;
+		using stream_sizer_t = typename std::conditional_t<numeric_limits<T>::is_integral, integral_object_stream_size<T>, object_stream_size<T>>; ;
 		return stream_sizer_t()(v);
 	}
 
-	/// \brief Returns the recommended stream alignment for type \p T. Override with ALIGNOF.
-	/// Because this is occasionally called with a null value, do not access the argument!
-	template <typename T>
-	inline size_t stream_align_of(const T&)
-	{
-		if (std::numeric_limits<T>::is_integral)
-			return __alignof(T);
-		return 4;
-	}
-
-#define ALIGNOF(type,grain)	\
-	namespace quake {		\
-		template <> inline size_t stream_align_of (const type&) { return grain; } }
-
-	class cmemlink {
-	public:
-		typedef char		value_type;
-		typedef const value_type*	pointer;
-		typedef const value_type*	const_pointer;
-		typedef value_type		reference;
-		typedef value_type		const_reference;
-		typedef size_t		size_type;
-		typedef uint32_t		written_size_type;
-		typedef ptrdiff_t		difference_type;
-		typedef const_pointer	const_iterator;
-		typedef const_iterator	iterator;
-		typedef const cmemlink&	rcself_t;
-	public:
-		constexpr inline		cmemlink(nullptr_t p, size_type n) : _data(nullptr), _size(0) { assert(n == 0); }
-		constexpr inline		cmemlink(void) : _data(nullptr), _size(0) { }
-		constexpr inline		cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
-		constexpr inline		cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
-		inline virtual     ~cmemlink(void) noexcept {}
-		void				link(const void* p, size_type n);
-		inline void			link(const cmemlink& l) { link(l.begin(), l.size()); }
-		inline void			link(const void* first, const void* last) { link(first, std::distance((char*)first, (char*)last)); }
-		inline void			relink(const void* p, size_type n);
-		virtual void		unlink(void) noexcept { _data = nullptr; _size = 0; }
-		inline rcself_t		operator= (const cmemlink& l) { link(l); return *this; }
-		constexpr bool				operator== (const cmemlink& l) const noexcept;
-		inline void			swap(cmemlink& l) { std::swap(_data, l._data); std::swap(_size, l._size); }
-		constexpr inline size_type	size(void) const { return _size; }
-		constexpr inline size_type	max_size(void) const { return size(); }
-		constexpr inline size_type	readable_size(void) const { return size(); }
-		constexpr inline bool			empty(void) const { return !size(); }
-		constexpr inline const_pointer	data(void) const { return _data; }
-		constexpr inline const_pointer	cdata(void) const { return _data; }
-		constexpr inline iterator		begin(void) const { return iterator(cdata()); }
-		constexpr inline iterator		iat(size_type i) const {  return begin() + i; }
-		constexpr inline iterator		end(void) const { return iat(size()); }
-		constexpr inline void			resize(size_type n) { _size = n; }
-		inline void			read(std::istream&) { assert(!"ustl::cmemlink is a read-only object."); }
-	private:
-		const_pointer	_data;		///< Pointer to the data block (const)
-		size_type		_size;		///< size of the data block
-	};
-	/// \class memlink memlink.h ustl.h
-	/// \ingroup MemoryManagement
-	///
-	/// \brief Wrapper for pointer to block with size.
-	///
-	/// Use this class the way you would a pointer to an allocated unstructured block.
-	/// The pointer and block size are available through member functions and cast operator.
-	///
-	/// Example usage:
-	/// \code
-	///     void* p = malloc (46721);
-	///     memlink a, b;
-	///     a.link (p, 46721);
-	///     assert (a.size() == 46721));
-	///     b = a;
-	///     assert (b.size() == 46721));
-	///     assert (b.begin() + 34 == a.begin + 34);
-	///     assert (0 == memcmp (a, b, 12));
-	///     a.fill (673, b, 42, 67);
-	///     b.erase (87, 12);
-	/// \endcode
-	///
-	class memlink : public cmemlink {
-	public:
-		typedef value_type*			pointer;
-		typedef cmemlink::pointer		const_pointer;
-		typedef cmemlink::const_iterator	const_iterator;
-		typedef pointer			iterator;
-		typedef const memlink&		rcself_t;
-	public:
-		constexpr inline		memlink(void) : cmemlink() {}
-		constexpr inline		memlink(void* p, size_type n) : cmemlink(p, n) {}
-		constexpr inline		memlink(const void* p, size_type n) : cmemlink(p, n) {}
-		constexpr inline		memlink(nullptr_t p, size_type n) : cmemlink(p, n) {}
-		constexpr inline		memlink(rcself_t l) : cmemlink(l) {}
-		constexpr inline explicit	memlink(const cmemlink& l) : cmemlink(l) {}
-		inline pointer	data(void) { return const_cast<pointer>(cmemlink::data()); }
-		constexpr inline const_pointer	data(void) const { return cmemlink::data(); }
-		inline iterator	begin(void) { return iterator(data()); }
-		inline iterator	iat(size_type i) { assert(i <= size()); return begin() + i; }
-		inline iterator	end(void) { return iat(size()); }
-		constexpr inline const_iterator	begin(void) const { return cmemlink::begin(); }
-		constexpr inline const_iterator	end(void) const { return cmemlink::end(); }
-		constexpr inline const_iterator	iat(size_type i) const { return cmemlink::iat(i); }
-		constexpr size_type		writable_size(void) const { return size(); }
-		inline rcself_t	operator= (const cmemlink& l) { cmemlink::operator= (l); return *this; }
-		inline rcself_t	operator= (rcself_t l) { cmemlink::operator= (l); return *this; }
-		inline void		link(const void* p, size_type n) { cmemlink::link(p, n); }
-		inline void		link(void* p, size_type n) { cmemlink::link(p, n); }
-		inline void		link(const cmemlink& l) { cmemlink::link(l); }
-		inline void		link(memlink& l) { cmemlink::link(l); }
-		inline void		link(const void* first, const void* last) { link(first, std::distance((char*)first, (char*)last)); }
-		inline void		link(void* first, void* last) { link(first, std::distance((char*)first, (char*)last)); }
-		inline void		relink(const void* p, size_type n) { cmemlink::relink(p, n); }
-		inline void		relink(void* p, size_type n) { cmemlink::relink(p, n); }
-		inline void		swap(memlink& l) { cmemlink::swap(l); }
-		void			fill(const_iterator start, const void* p, size_type elsize, size_type elCount = 1) noexcept;
-		inline void		insert(const_iterator start, size_type size);
-		inline void		erase(const_iterator start, size_type size);
-	};
-
-	/// Shifts the data in the linked block from \p start to \p start + \p n.
-	/// The contents of the uncovered bytes is undefined.
-	inline void memlink::insert(const_iterator cstart, size_type n)
-	{
-		assert(data() || !n);
-		assert(cmemlink::begin() || !n);
-		assert(cstart >= begin() && cstart + n <= end());
-		iterator start = const_cast<iterator>(cstart);
-		std::rotate(start, end() - n, end());
-	}
-
-	/// Shifts the data in the linked block from \p start + \p n to \p start.
-	/// The contents of the uncovered bytes is undefined.
-	inline void memlink::erase(const_iterator cstart, size_type n)
-	{
-		assert(data() || !n);
-		assert(cmemlink::begin() || !n);
-		assert(cstart >= begin() && cstart + n <= end());
-		iterator start = const_cast<iterator>(cstart);
-		std::rotate(start, start + n, end());
-	}
-
-	/// Use with memlink-derived classes to allocate and link to stack space.
-#define alloca_link(m,n)	(m).link (alloca (n), (n))
-	//----------------------------------------------------------------------
-
-	/// A fast alternative to link which can be used when relinking to the same block (i.e. when it is resized)
-	inline void cmemlink::relink(const void* p, size_type n)
-	{
-		_data = reinterpret_cast<const_pointer>(p);
-		_size = n;
-	}
-
-
-	/// Use with cmemlink-derived classes to link to a static array
-#define static_link(v)	link (VectorBlock(v))
-	/// \class memblock memblock.h ustl.h
-	/// \ingroup MemoryManagement
-	///
-	/// \brief Allocated memory block.
-	///
-	/// Adds memory management capabilities to memlink. Uses malloc and realloc to
-	/// maintain the internal pointer, but only if allocated using members of this class,
-	/// or if linked to using the Manage() member function. Managed memory is automatically
-	/// freed in the destructor.
-	///
-	class memblock : public memlink {
-	public:
-		memblock(void) noexcept;
-		memblock(const void* p, size_type n);
-		explicit			memblock(size_type n);
-		explicit			memblock(const cmemlink& b);
-		explicit			memblock(const memlink& b);
-		memblock(const memblock& b);
-		virtual			~memblock(void) noexcept;
-		virtual void		unlink(void) noexcept override;
-		inline void			assign(const cmemlink& l) { assign(l.cdata(), l.readable_size()); }
-		inline const memblock&	operator= (const cmemlink& l) { assign(l); return *this; }
-		inline const memblock&	operator= (const memlink& l) { assign(l); return *this; }
-		inline const memblock&	operator= (const memblock& l) { assign(l); return *this; }
-		inline void			swap(memblock& l) noexcept { memlink::swap(l); std::swap(_capacity, l._capacity); }
-		void			assign(const void* p, size_type n);
-		void			reserve(size_type newSize, bool bExact = false);
-		void			resize(size_type newSize, bool bExact = true);
-		iterator			insert(const_iterator start, size_type size);
-		iterator			erase(const_iterator start, size_type size);
-		inline void			clear(void) noexcept { resize(0); }
-		inline size_type		capacity(void) const { return _capacity; }
-		inline bool			is_linked(void) const { return !capacity(); }
-		inline size_type		max_size(void) const { return is_linked() ? memlink::max_size() : SIZE_MAX; }
-		inline void			manage(memlink& l) { manage(l.begin(), l.size()); }
-		void			deallocate(void) noexcept;
-		void			shrink_to_fit(void);
-		void			manage(void* p, size_type n) noexcept;
-		void			copy_link(void);
-		void			read(std::istream& is);
-		void			read_file(const char* filename);
-		inline			memblock(memblock&& b) : memlink(), _capacity(0) { swap(b); }
-		inline memblock&		operator= (memblock&& b) { swap(b); return *this; }
-	protected:
-		virtual size_type		minimumFreeCapacity(void) const noexcept;
-	private:
-		size_type			_capacity;	///< Number of bytes allocated by Resize.
-	};
-
-	//----------------------------------------------------------------------
-
-	// base class for all arrays that are refrenced and passed around
-	// Its basicly a pointer and the count of elements
-	// soo..  While I LOVE quake::string_view, I hate std::string as it allocates on the heap
-	// when constructing with nothing.  Because of this I have to build my own string 
-	// that uses ZMalloc or HeapAlloc
-	template<typename T>
-	class data_view {
-	public:
-		// types
-		using value_type = T;
-		using const_pointer = const T*;
-		using const_reference = const T&;
-		//using reference = const_reference;
-		//using pointer = const_pointer;
-		using const_iterator = const_pointer;
-		//using iterator = const_pointer;
-		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-	//	using reverse_iterator = std::reverse_iterator<iterator>;
-		using size_type = size_t;
-		using difference_type = ptrdiff_t;
-		static constexpr size_type npos = -1;
-
-		constexpr data_view(const_pointer data, size_type size) noexcept : _data(data), _size(size) {}
-		constexpr data_view() noexcept : _data(nullptr), _size(0) {}
-		constexpr data_view(const data_view& copy) noexcept : _data(copy.data()), _size(copy.size()) {}
-		constexpr data_view(data_view&& move) noexcept : _data(move.data()), _size(move.size()) { move._data = nullptr; move._size = 0; }
-		inline constexpr const_pointer data() const noexcept { return _data; }
-		inline constexpr size_t size() const noexcept { return _size; }
-
-		constexpr const_iterator begin() const noexcept { return data(); }
-		constexpr const_iterator end() const noexcept { return data() + size(); }
-		constexpr const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
-		constexpr const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
-
-		constexpr const_reference operator[](size_type pos) const noexcept { return data()[pos]; }
-		const_reference at(size_type pos) const {
-			if (pos >= size()) throw std::out_of_range("data_helpers::at");
-			return data()[pos];
-		}
-		constexpr bool empty() const { return size() == 0; }
-		const_reference front() const { assert(!empty()); return  *data(); }
-		const_reference back() const { assert(!empty()); return  *(data() + size() - 1); }
-		size_type copy(T* dist, size_type count, size_type offset = 0) const
-		{
-			if (offset > size())
-				throw std::out_of_range("data_helpers::at");
-			size_type rlen = std::min(count, size() - offset);
-			Q_memcpy(dist, data() + offset, rlen * sizeof(T));
-			return rlen;
-		}
-		inline constexpr void remove_prefix(size_type count) noexcept { assert(count <= size()); _data += count; _size -= count; }
-		inline constexpr void remove_suffix(size_type count) noexcept { assert(count <= size()); _size -= count; }
-
-		void swap(data_view& r)
-		{	// swap with _Right
-			if (this != std::addressof(r)) {
-				std::swap(_data, r._data);
-				std::swap(_size, r._size);
-			}
-		}
-		constexpr data_view split(size_type pos = 0, size_type count = npos) const {
-			return (pos > size())
-				? (throw std::out_of_range("data_helpers::split"), data_view())
-				: data_view(data() + pos, std::min(count, size() - pos));
-		}
-	protected:
-		const_pointer _data;
-		size_t _size;
-	};
-	using char_view = data_view<char>;
-	namespace priv {
-		constexpr char_view::size_type find(const char* data, char_view::size_type count, char_view::value_type what) {
-			if (count > 0) {
-				const char* end_data = data + count;
-				auto p = std::find(data, end_data, what);
-				if (p != end_data) return  p - data;
-			}
-			return char_view::npos;
-		}
-		constexpr char_view::size_type find(const char_view& data, char_view::size_type data_offset, char_view::value_type what) {
-			return (data_offset < data.size()) ?  find(data.data() + data_offset, data.size(),what) : char_view::npos;
-		}
-		constexpr char_view::size_type rfind(const char* data, char_view::size_type count, char_view::value_type what) {
-			if (count > 0) {
-				const char* end_data = data + count;
-				auto p = std::find(data, end_data, what);
-				if (p != end_data) return  p - data;
-			}
-			return char_view::npos;
-		}
-		// general routines that work with finding junk
-		constexpr char_view::size_type find(const char_view& data, char_view::size_type data_offset, const char_view& what) {
-			const auto begin_data = data.begin() + data_offset;
-			if (begin_data < data.end()) {
-				auto p = std::search(data.begin() + data_offset, data.end(), what.begin(), what.end());
-				if (p != data.end()) return p - data.begin();
-			}
-			return char_view::npos;
-		}
-		// general routines that work with finding junk
-		constexpr char_view::size_type rfind(const char_view& data, char_view::size_type data_offset, const char_view& what) {
-			const auto begin_data = data.begin() + data_offset;
-			if (begin_data < data.end()) {
-				auto p = std::find_end(data.begin() + data_offset, data.end(), what.begin(), what.end());
-				if (p != data.end()) return p - data.begin();
-			}
-			return char_view::npos;
-		}
-	}
-	// just used for printf stuff
-	class printf_buffer : public memlink {
-	public:
-		printf_buffer(char* str, size_t size) : memlink(str, size) { str[0] = '\0'; }
-		const char* operator()(const char* fmt, ...);
-		const char* c_str() const { return data(); }
-		operator const char*() const { return data(); }
-	};
-
-	template<size_t SIZE = DEFAULT_SIMPLE_BUFFER_SIZE>
-	class fixed_printf_buffer : public printf_buffer {
-		std::array<char, SIZE> _buff;
-	public:
-		fixed_printf_buffer() : printf_buffer(_buff.data(), _buff.size() - 1) {}
-		fixed_printf_buffer(const char* str, size_t size) : printf_buffer(_buff.data(), _buff.size() - 1) {
-			assert(size < _buff.size());
-			char_traits::copy(_buff.data(), str, size);
-			_buff[size] = '\0';
-		}
-		fixed_printf_buffer(const char* str) : fixed_printf_buffer(str, std::strlen(str)) {}
-	};
-	using string_view = std::string_view;
-
-	static inline size_t string_hasher(const char* str, size_t size) {
-		size_t h = 5381;
-		while (size--) h = (h * 33) ^ (uint8_t)*str++;
-		return h;
-	}
-#if 0
-	// so I don't have to keep recompiling headers, alot of this is going to be in commom
-	class string_view : public data_view<char> {
-		void relink(const_pointer p, size_t len) { _data = p; _size = len; }
-	public:
-		using char_traits = std::char_traits<char>;
-		static inline size_type hasher(const char* str, size_type size) {
-			size_type h = 5381;
-			while (size--) h = (h * 33) ^ (uint8_t)*str++;
-			return h;
-		}
-		inline const_iterator begin() const { return data_view<char>::begin(); }
-		inline const_iterator end() const { return data_view<char>::end(); }
-
-		constexpr string_view() : data_view<char>("",0) {}
-		constexpr string_view(const_pointer str, size_t size) : data_view<char>(str==nullptr || size == 0 ? "" : str, str == nullptr || size == 0 ? 0 : size) {}
-		constexpr string_view(const_pointer str) : string_view(str, char_traits::length(str)) {}
-		constexpr string_view(const string_view& copy) noexcept : string_view(copy.data(),copy.size()) {}
-		constexpr string_view(string_view&& move) noexcept : string_view(move.data(), move.size()) { move._data = ""; move._size = 0; }
-		string_view& operator=(const string_view& copy) noexcept {  relink(copy.data(), copy.size());  return *this; }
-		string_view& operator=(string_view&& move) noexcept { relink(move.data(), move.size()); move.relink("", 0); return *this; }
-
-		constexpr string_view substr(size_type pos = 0, size_type count = npos) const {
-			return (pos > size())
-				? (throw std::out_of_range("data_helpers::split"), string_view())
-				: string_view(data() + pos, std::min(count, size() - pos));
-		}
-		int compare(string_view sv) const noexcept {
-			size_type rlen = std::min(size(), sv.size());
-			int ret = char_traits::compare(data(), sv.data(), rlen);
-			if (ret == 0) // first __rlen chars matched
-				ret = size() == sv.size() ? 0 : (size() < sv.size() ? -1 : 1);
-			return ret;
-		}
-		inline const char& operator[](size_t i) const { return i < size() ? data()[i] : data()[size()-1]; } // so we can return a 0 termated string
-
-		inline int compare(size_type pos1, size_type count1, string_view sv) const { return substr(pos1, count1).compare(sv); }
-		inline int compare(size_type pos1, size_type count1, string_view sv, size_type pos2, size_type count2) const { return substr(pos1, count1).compare(sv.substr(pos2, count2)); }
-		inline int compare(const char*s) const noexcept { return compare(string_view(s)); }
-		inline int compare(size_type pos1, size_type count1, const char* s) const { return substr(pos1, count1).compare(string_view(s)); }
-		inline int compare(size_type pos1, size_type count1, const char* s, size_type count2) const { return substr(pos1, count1).compare(string_view(s, count2)); }
-
-		void swap(string_view& r)
-		{	// swap with _Right
-			data_view<char>::swap(static_cast<data_view<char>&>(r));
-		}
-		inline constexpr size_type find(const string_view& what, size_type offset=0) const { return priv::find(*this, offset, what); }
-		inline constexpr size_type find(char c, size_type offset=0)  const { return priv::find(*this, offset, c); }
-		inline constexpr size_type find(const char* what, size_type offset = 0)  const { return priv::find(*this, offset, string_view(what)); }
-		inline constexpr size_type find(const char* what, size_type offset, size_type count) const { return priv::find(*this, offset, string_view(what, count)); }
-		inline constexpr size_type rfind(const string_view& what, size_type offset = 0)  const { return priv::find(*this, offset, what); }
-		inline constexpr size_type rfind(char c, size_type offset = 0) const { return priv::find(*this, offset, c); }
-		inline constexpr size_type rfind(const char* what, size_type offset = 0) const { return priv::find(*this, offset, string_view(what)); }
-		inline constexpr size_type rfind(const char* what, size_type offset, size_type count)  const { return priv::find(*this, offset, string_view(what, count)); }
-
-		size_type to_number(float& value, size_type offset=0) const;
-		size_type to_number(int& value, size_type offset = 0) const;
-
-		template<size_t SIZE = DEFAULT_SIMPLE_BUFFER_SIZE>
-		fixed_printf_buffer<SIZE> make_cstr() const {
-			return fixed_printf_buffer<SIZE>(_data,size());
-		}
-		inline const_iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
-	};
-#endif
-	// dumb string, must be c terminated
-
-	/// \class string ustring.h ustl.h
-	/// \ingroup Sequences
-	///
-	/// \brief STL basic_string&lt;char&gt; equivalent.
-	///
-	/// An STL container for text string manipulation.
-	/// Differences from C++ standard:
-	///	- string is a class, not a template. Wide characters are assumed to be
-	///		encoded with utf8 at all times except when rendering or editing,
-	///		where you would use a utf8 iterator.
-	/// 	- format member function - you can, of course use an \ref ostringstream,
-	///		which also have format functions, but most of the time this way
-	///		is more convenient. Because uSTL does not implement locales,
-	///		format is the only way to create localized strings.
-	/// 	- const char* cast operator. It is much clearer to use this than having
-	/// 		to type .c_str() every time.
-	/// 	- length returns the number of _characters_, not bytes.
-	///		This function is O(N), so use wisely.
-	///
-	/// An additional note is in order regarding the use of indexes. All indexes
-	/// passed in as arguments or returned by find are byte offsets, not character
-	/// offsets. Likewise, sizes are specified in bytes, not characters. The
-	/// rationale is that there is no way for you to know what is in the string.
-	/// There is no way for you to know how many characters are needed to express
-	/// one thing or another. The only thing you can do to a localized string is
-	/// search for delimiters and modify text between them as opaque blocks. If you
-	/// do anything else, you are hardcoding yourself into a locale! So stop it!
-	///
-	class string : public memblock {
-	public:
-		typedef char		value_type;
-		typedef unsigned char	uvalue_type;
-		typedef value_type*		pointer;
-		typedef const value_type*	const_pointer;
-		//typedef wchar_t		wvalue_type;
-		//typedef wvalue_type*	wpointer;
-		//typedef const wvalue_type*	const_wpointer;
-		typedef pointer		iterator;
-		typedef const_pointer	const_iterator;
-		typedef value_type&		reference;
-		typedef value_type		const_reference;
-		typedef std::reverse_iterator<iterator>		reverse_iterator;
-		typedef std::reverse_iterator<const_iterator>	const_reverse_iterator;
-	//	typedef utf8in_iterator<const_iterator>		utf8_iterator;
-		typedef size_type		pos_type;
-		static constexpr const pos_type npos = INT_MAX;	///< Value that means the end of string.
-		// https://stackoverflow.com/questions/2041355/c-constructor-accepting-only-a-string-literal
-		// nice idea to detect string literals
-		struct Dummy {};
-		template<typename T> struct IsCharPtr {};
-		template<> struct IsCharPtr<const char *> { typedef Dummy* Type; };
-		template<> struct IsCharPtr<char *> { typedef Dummy* Type; };
-	public:
-		// 
-		inline			string(void) noexcept : memblock() { relink("", 0); }
-		template<int N> string(const char(&v)[N]) { relink(v, std::strlen(v)); }
-		template<int N> string(char(&)[N]) { relink(v, std::strlen(v)); }
-		template<typename T> string(T v, typename IsCharPtr<T>::Type = 0) { assign((T)v); }
-		string(const string& s);
-		inline			string(const string& s, pos_type o, size_type n = npos);
-		inline explicit		string(const cmemlink& l);
-		string(const_pointer s) noexcept;
-		inline			string(const_pointer s, size_type len);
-		inline			string(const_pointer s1, const_pointer s2);
-		string(size_type n, value_type c);
-		inline			~string(void) noexcept { }
-		inline pointer		data(void) { return string::pointer(memblock::data()); }
-		inline const_pointer	data(void) const { return string::const_pointer(memblock::data()); }
-		inline const_pointer	c_str(void) const { return string::const_pointer(memblock::cdata()); }
-		inline size_type		max_size(void) const { size_type s(memblock::max_size()); return s - !!s; }
-		inline size_type		capacity(void) const { size_type c(memblock::capacity()); return c - !!c; }
-		void			resize(size_type n);
-		inline void			resize(size_type n, value_type c);
-		inline void			clear(void) { resize(0); }
-		inline iterator		begin(void) { return iterator(memblock::begin()); }
-		inline const_iterator	begin(void) const { return const_iterator(memblock::begin()); }
-		inline const_iterator	cbegin(void) const { return begin(); }
-		inline iterator		end(void) { return iterator(memblock::end()); }
-		inline const_iterator	end(void) const { return const_iterator(memblock::end()); }
-		inline const_iterator	cend(void) const { return end(); }
-		inline reverse_iterator	rbegin(void) { return reverse_iterator(end()); }
-		inline const_reverse_iterator	rbegin(void) const { return const_reverse_iterator(end()); }
-		inline const_reverse_iterator	crbegin(void) const { return rbegin(); }
-		inline reverse_iterator	rend(void) { return reverse_iterator(begin()); }
-		inline const_reverse_iterator	rend(void) const { return const_reverse_iterator(begin()); }
-		inline const_reverse_iterator	crend(void) const { return rend(); }
-		//inline utf8_iterator	utf8_begin(void) const { return utf8_iterator(begin()); }
-		//inline utf8_iterator	utf8_end(void) const { return utf8_iterator(end()); }
-		inline const_reference	at(pos_type pos) const { assert(pos <= size() && begin()); return begin()[pos]; }
-		inline reference		at(pos_type pos) { assert(pos <= size() && begin()); return begin()[pos]; }
-		constexpr inline const_iterator	iat(pos_type pos) const { return cdata() + ((pos) && pos >= npos ? size() : std::min(size_type(pos), size())); }
-		inline iterator		iat(pos_type pos) { return const_cast<iterator>(const_cast<const string*>(this)->iat(pos)); }
-		const_iterator		wiat(pos_type i) const noexcept;
-		inline iterator		wiat(pos_type i) { return const_cast<iterator>(const_cast<const string*>(this)->wiat(i)); }
-		inline const_reference	front(void) const { return at(0); }
-		inline reference		front(void) { return at(0); }
-		inline const_reference	back(void) const { return at(size() - 1); }
-		inline reference		back(void) { return at(size() - 1); }
-	//	inline size_type		length(void) const { return distance(utf8_begin(), utf8_end()); }
-		inline size_type		length(void) const { return size(); }
-		inline string&		append(const_iterator i1, const_iterator i2) { return append(i1, std::distance(i1, i2)); }
-		string&	   		append(const_pointer s, size_type len);
-		string&	   		append(const_pointer s);
-		string&			append(size_type n, value_type c);
-		//inline string&		append(size_type n, wvalue_type c) { insert(size(), n, c); return *this; }
-	//	inline string&		append(const_wpointer s1, const_wpointer s2) { insert(size(), s1, s2); return *this; }
-		//inline string&		append(const_wpointer s) { const_wpointer se(s); for (; se&&*se; ++se) {} return append(s, se); }
-		inline string&		append(const string& s) { return append(s.begin(), s.end()); }
-		inline string&		append(const string_view& s) { return append(s.data(), s.data()+s.size()); }
-		inline string&		append(const string& s, pos_type o, size_type n) { return append(s.iat(o), s.iat(o + n)); }
-		inline void			push_back(value_type c) { resize(size() + 1); end()[-1] = c; }
-	//	inline void			push_back(wvalue_type c) { append(1, c); }
-		inline void			pop_back(void) { resize(size() - 1); }
-		inline string&		assign(const_iterator i1, const_iterator i2) { return assign(i1, std::distance(i1, i2)); }
-		string&	    		assign(const_pointer s, size_type len);
-		string&	    		assign(const_pointer s);
-		//inline string&		assign(const_wpointer s1, const_wpointer s2) { clear(); return append(s1, s2); }
-		//inline string&		assign(const_wpointer s1) { clear(); return append(s1); }
-		inline string&		assign(const string& s) { return assign(s.begin(), s.end()); }
-		inline string&		assign(const string& s, pos_type o, size_type n) { return assign(s.iat(o), s.iat(o + n)); }
-		inline string&		assign(size_type n, value_type c) { clear(); return append(n, c); }
-		//inline string&		assign(size_type n, wvalue_type c) { clear(); return append(n, c); }
-		size_type			copy(pointer p, size_type n, pos_type pos = 0) const noexcept;
-		inline size_type		copyto(pointer p, size_type n, pos_type pos = 0) const noexcept { size_type bc = copy(p, n - 1, pos); p[bc] = 0; return bc; }
-		inline int			compare(const string& s) const { return compare(begin(), end(), s.begin(), s.end()); }
-		inline int			compare(pos_type start, size_type len, const string& s) const { return compare(iat(start), iat(start + len), s.begin(), s.end()); }
-		inline int			compare(pos_type s1, size_type l1, const string& s, pos_type s2, size_type l2) const { return compare(iat(s1), iat(s1 + l1), s.iat(s2), s.iat(s2 + l2)); }
-		inline int			compare(const_pointer s) const { return compare(begin(), end(), s, s + strlen(s)); }
-		inline int			compare(pos_type s1, size_type l1, const_pointer s, size_type l2) const { return compare(iat(s1), iat(s1 + l1), s, s + l2); }
-		inline int			compare(pos_type s1, size_type l1, const_pointer s) const { return compare(s1, l1, s, strlen(s)); }
-		static int			compare(const_iterator first1, const_iterator last1, const_iterator first2, const_iterator last2) noexcept;
-		inline			operator const value_type* (void) const;
-		inline			operator value_type* (void);
-		inline const string&	operator= (const string& s) { return assign(s.begin(), s.end()); }
-		inline const string&	operator= (const_reference c) { return assign(&c, 1); }
-		inline const string&	operator= (const_pointer s) { return assign(s); }
-		//inline const string&	operator= (const_wpointer s) { return assign(s); }
-		inline const string&	operator+= (const string& s) { return append(s.begin(), s.size()); }
-		inline const string&	operator+= (value_type c) { push_back(c); return *this; }
-		inline const string&	operator+= (const_pointer s) { return append(s); }
-		//inline const string&	operator+= (wvalue_type c) { return append(1, c); }
-		inline const string&	operator+= (uvalue_type c) { return operator+= (value_type(c)); }
-	//	inline const string&	operator+= (const_wpointer s) { return append(s); }
-		inline string		operator+ (const string& s) const;
-		inline bool			operator== (const string& s) const {
-			return s.size() == size() &&
-				(s.data() == data() || 0 == std::memcmp(s.data(), data(), size()));
-		}
-		bool			operator== (const_pointer s) const noexcept;
-		inline bool			operator== (value_type c) const { return size() == 1 && c == at(0); }
-		inline bool			operator== (uvalue_type c) const { return operator== (value_type(c)); }
-		inline bool			operator!= (const string& s) const { return !operator== (s); }
-		inline bool			operator!= (const_pointer s) const { return !operator== (s); }
-		inline bool			operator!= (value_type c) const { return !operator== (c); }
-		inline bool			operator!= (uvalue_type c) const { return !operator== (c); }
-		inline bool			operator< (const string& s) const { return 0 > compare(s); }
-		inline bool			operator< (const_pointer s) const { return 0 > compare(s); }
-		inline bool			operator< (value_type c) const { return 0 > compare(begin(), end(), &c, &c + 1); }
-		inline bool			operator< (uvalue_type c) const { return operator< (value_type(c)); }
-		inline bool			operator> (const_pointer s) const { return 0 < compare(s); }
-		inline string&		insert(pos_type ip, size_type n, value_type c) { insert(iat(ip), n, c); return *this; }
-		inline string&		insert(pos_type ip, const_pointer s) { insert(iat(ip), s, s + strlen(s)); return *this; }
-		inline string&		insert(pos_type ip, const_pointer s, size_type nlen) { insert(iat(ip), s, s + nlen); return *this; }
-		inline string&		insert(pos_type ip, const string& s) { insert(iat(ip), s.c_str(), s.size()); return *this; }
-		inline string&		insert(pos_type ip, const string& s, size_type sp, size_type slen) { insert(iat(ip), s.iat(sp), s.iat(sp + slen)); return *this; }
-		//string&			insert(pos_type ip, size_type n, wvalue_type c);
-		//string&			insert(pos_type ip, const_wpointer first, const_wpointer last, size_type n = 1);
-		inline string&		insert(int ip, size_type n, value_type c) { insert(pos_type(ip), n, c); return *this; }
-		inline string&		insert(int ip, const_pointer s, size_type nlen) { insert(pos_type(ip), s, nlen); return *this; }
-		iterator			insert(const_iterator start, size_type n, value_type c);
-		inline iterator		insert(const_iterator start, value_type c) { return insert(start, 1u, c); }
-		iterator			insert(const_iterator start, const_pointer s, size_type n);
-		iterator			insert(const_iterator start, const_pointer first, const_iterator last, size_type n = 1);
-		iterator			erase(const_iterator epo, size_type n = 1);
-		string&			erase(pos_type epo = 0, size_type n = npos);
-		inline string&		erase(int epo, size_type n = npos) { return erase(pos_type(epo), n); }
-		inline iterator		erase(const_iterator first, const_iterator last) { return erase(first, size_type(std::distance(first, last))); }
-		inline iterator		eraser(pos_type first, pos_type last) { return erase(iat(first), iat(last)); }
-		string&			replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n);
-		template <typename InputIt>
-		string&			replace(const_iterator first, const_iterator last, InputIt first2, InputIt last2) { return replace(first, last, first2, last2, 1); }
-		inline string&		replace(const_iterator first, const_iterator last, const string& s) { return replace(first, last, s.begin(), s.end()); }
-		string&			replace(const_iterator first, const_iterator last, const_pointer s);
-		inline string&		replace(const_iterator first, const_iterator last, const_pointer s, size_type slen) { return replace(first, last, s, s + slen); }
-		inline string&		replace(const_iterator first, const_iterator last, size_type n, value_type c) { return replace(first, last, &c, &c + 1, n); }
-		inline string&		replace(pos_type rp, size_type n, const string& s) { return replace(iat(rp), iat(rp + n), s); }
-		inline string&		replace(pos_type rp, size_type n, const string& s, size_type sp, size_type slen) { return replace(iat(rp), iat(rp + n), s.iat(sp), s.iat(sp + slen)); }
-		inline string&		replace(pos_type rp, size_type n, const_pointer s, size_type slen) { return replace(iat(rp), iat(rp + n), s, s + slen); }
-		inline string&		replace(pos_type rp, size_type n, const_pointer s) { return replace(iat(rp), iat(rp + n), string(s)); }
-		inline string&		replace(pos_type rp, size_type n, size_type count, value_type c) { return replace(iat(rp), iat(rp + n), count, c); }
-		inline string		substr(pos_type o = 0, size_type n = npos) const { return string(*this, o, n); }
-		inline void			swap(string& v) { memblock::swap(v); }
-		pos_type			find(value_type c, pos_type pos = 0) const noexcept;
-		pos_type			find(const string& s, pos_type pos = 0) const noexcept;
-		inline pos_type		find(uvalue_type c, pos_type pos = 0) const noexcept { return find(value_type(c), pos); }
-		inline pos_type		find(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find(sp, pos); }
-		pos_type			rfind(value_type c, pos_type pos = npos) const noexcept;
-		pos_type			rfind(const string& s, pos_type pos = npos) const noexcept;
-		inline pos_type		rfind(uvalue_type c, pos_type pos = npos) const noexcept { return rfind(value_type(c), pos); }
-		inline pos_type		rfind(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return rfind(sp, pos); }
-		pos_type			find_first_of(const string& s, pos_type pos = 0) const noexcept;
-		inline pos_type		find_first_of(value_type c, pos_type pos = 0) const { string sp(1, c); return find_first_of(sp, pos); }
-		inline pos_type		find_first_of(uvalue_type c, pos_type pos = 0) const { return find_first_of(value_type(c), pos); }
-		inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_first_of(sp, pos); }
-		pos_type			find_first_not_of(const string& s, pos_type pos = 0) const noexcept;
-		inline pos_type		find_first_not_of(value_type c, pos_type pos = 0) const { string sp(1, c); return find_first_not_of(sp, pos); }
-		inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = 0) const { return find_first_not_of(value_type(c), pos); }
-		inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_first_not_of(sp, pos); }
-		pos_type			find_last_of(const string& s, pos_type pos = npos) const noexcept;
-		inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { string sp(1, c); return find_last_of(sp, pos); }
-		inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
-		inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_last_of(sp, pos); }
-		pos_type			find_last_not_of(const string& s, pos_type pos = npos) const noexcept;
-		inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { string sp(1, c); return find_last_not_of(sp, pos); }
-		inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
-		inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const { string sp; sp.link(p, count); return find_last_not_of(sp, pos); }
-		int				vformat(const char* fmt, va_list args);
-		int				format(const char* fmt, ...);// __attribute__((__format__(__printf__, 2, 3)));
-		void			read(std::istream&);
-		void			write(std::ostream& os) const;
-		size_t			stream_size(void) const noexcept;
-		static hashvalue_t		hash(const char* f1, const char* l1) noexcept;
-
-		using initlist_t = std::initializer_list<value_type>;
-		inline			string(string&& v) : memblock(std::move(v)) {}
-		inline			string(initlist_t v) : memblock() { assign(v.begin(), v.size()); }
-		inline string&		assign(string&& v) { swap(v); return *this; }
-		inline string&		assign(initlist_t v) { return assign(v.begin(), v.size()); }
-		inline string&		append(initlist_t v) { return append(v.begin(), v.size()); }
-		inline string&		operator+= (initlist_t v) { return append(v.begin(), v.size()); }
-		inline string&		operator= (string&& v) { return assign(std::move(v)); }
-		inline string&		operator= (initlist_t v) { return assign(v.begin(), v.size()); }
-		inline iterator		insert(const_iterator ip, initlist_t v) { return insert(ip, v.begin(), v.end()); }
-		inline string&		replace(const_iterator first, const_iterator last, initlist_t v) { return replace(first, last, v.begin(), v.end()); }
-
-	private:
-		virtual size_type		minimumFreeCapacity(void) const noexcept final override;
-	};
-
-	//----------------------------------------------------------------------
-
-	/// Assigns itself the value of string \p s
-	inline string::string(const cmemlink& s)
-		: memblock()
-	{
-		assign(const_iterator(s.begin()), s.size());
-	}
-
-	/// Assigns itself a [o,o+n) substring of \p s.
-	inline string::string(const string& s, pos_type o, size_type n)
-		: memblock()
-	{
-		assign(s, o, n);
-	}
-
-	/// Copies the value of \p s of length \p len into itself.
-	inline string::string(const_pointer s, size_type len)
-		: memblock()
-	{
-		assign(s, len);
-	}
-
-	/// Copies into itself the string data between \p s1 and \p s2
-	inline string::string(const_pointer s1, const_pointer s2)
-		: memblock()
-	{
-		assert(s1 <= s2 && "Negative ranges result in memory allocation errors.");
-		assign(s1, s2);
-	}
-
-	/// Returns the pointer to the first character.
-	inline string::operator const string::value_type* (void) const
-	{
-		assert((!end() || !*end()) && "This string is linked to data that is not 0-terminated. This may cause serious security problems. Please assign the data instead of linking.");
-		return begin();
-	}
-
-	/// Returns the pointer to the first character.
-	inline string::operator string::value_type* (void)
-	{
-		assert((end() && !*end()) && "This string is linked to data that is not 0-terminated. This may cause serious security problems. Please assign the data instead of linking.");
-		return begin();
-	}
-
-	/// Concatenates itself with \p s
-	inline string string::operator+ (const string& s) const
-	{
-		string result(*this);
-		result += s;
-		return result;
-	}
-
-	/// Resize to \p n and fill new entries with \p c
-	inline void string::resize(size_type n, value_type c)
-	{
-		const size_type oldn = size();
-		resize(n);
-		const ssize_t m = std::max(ssize_t(n - oldn), ssize_t(0));
-		std::fill_n(iat(oldn), m, c);
-	}
-
-	//----------------------------------------------------------------------
-	// Operators needed to avoid comparing pointer to pointer
-
-#define PTR_STRING_CMP(op, impl)	\
-static inline bool op (const char* s1, const string& s2) { return impl; }
-	PTR_STRING_CMP(operator==, (s2 == s1))
-		PTR_STRING_CMP(operator!=, (s2 != s1))
-		PTR_STRING_CMP(operator<, (s2 >  s1))
-		PTR_STRING_CMP(operator<=, (s2 >= s1))
-		PTR_STRING_CMP(operator>, (s2 <  s1))
-		PTR_STRING_CMP(operator>=, (s2 <= s1))
-#undef PTR_STRING_CMP
-
-		inline string operator+ (const char* cs, const string& ss) { string r; r.reserve(strlen(cs) + ss.size()); r += cs; r += ss; return r; }
-
-	//----------------------------------------------------------------------
-
-	inline hashvalue_t hash_value(const char* first, const char* last)
-	{
-		return string::hash(first, last);
-	}
-	inline hashvalue_t hash_value(const char* v)
-	{
-		return hash_value(v, v + strlen(v));
-	}
-
-	//----------------------------------------------------------------------
-	// String-number conversions
-
-#define STRING_TO_INT_CONVERTER(name,type,func)	\
-inline type name (const string& str, size_t* idx = nullptr, int base = 10) \
-{					\
-    const char* sp = str.c_str();	\
-    char* endp = nullptr;		\
-    type r = func (sp, idx ? &endp : nullptr, base);\
-    if (idx)				\
-	*idx = endp - sp;		\
-    return r;				\
-}
-	STRING_TO_INT_CONVERTER(stoi, int, strtol)
-		STRING_TO_INT_CONVERTER(stol, long, strtol)
-		STRING_TO_INT_CONVERTER(stoul, unsigned long, strtoul)
-#if HAVE_LONG_LONG
-		STRING_TO_INT_CONVERTER(stoll, long long, strtoll)
-		STRING_TO_INT_CONVERTER(stoull, unsigned long long, strtoull)
-#endif
-#undef STRING_TO_INT_CONVERTER
-
-#define STRING_TO_FLOAT_CONVERTER(name,type,func) \
-inline type name (const string& str, size_t* idx = nullptr) \
-{					\
-    const char* sp = str.c_str();	\
-    char* endp = nullptr;		\
-    type r = func (sp, idx ? &endp : nullptr);\
-    if (idx)				\
-	*idx = endp - sp;		\
-    return r;				\
-}
-		STRING_TO_FLOAT_CONVERTER(stof, float, strtof)
-		STRING_TO_FLOAT_CONVERTER(stod, double, strtod)
-		STRING_TO_FLOAT_CONVERTER(stold, long double, strtold)
-#undef STRING_TO_FLOAT_CONVERTER
-
-#define NUMBER_TO_STRING_CONVERTER(type,fmts)\
-    inline string to_string (type v) { string r; r.format(fmts,v); return r; }
-		NUMBER_TO_STRING_CONVERTER(int, "%d")
-		NUMBER_TO_STRING_CONVERTER(long, "%ld")
-		NUMBER_TO_STRING_CONVERTER(unsigned long, "%lu")
-#if HAVE_LONG_LONG
-		NUMBER_TO_STRING_CONVERTER(long long, "%lld")
-		NUMBER_TO_STRING_CONVERTER(unsigned long long, "%llu")
-#endif
-		NUMBER_TO_STRING_CONVERTER(float, "%f")
-		NUMBER_TO_STRING_CONVERTER(double, "%lf")
-		NUMBER_TO_STRING_CONVERTER(long double, "%Lf")
-#undef NUMBER_TO_STRING_CONVERTER
 
 	template<typename FUNC, typename T>
-	inline size_t _to_number_int(FUNC f, const string_view& str, T& value, int base = 0) {
+	inline size_t _to_number_int(FUNC f, const std::string_view& str, T& value, int base = 0) {
 		const char* sp = str.data();
 		char* endp = nullptr;
 		value = f(sp, &endp, base);
 		return endp - sp;
 	}
 	template<typename FUNC, typename T>
-	inline size_t _to_number_float(FUNC f, const string_view& str, T& value) {
+	inline size_t _to_number_float(FUNC f, const std::string_view& str, T& value) {
 		const char* sp = str.data();
 		char* endp = nullptr;
 		value = f(sp, &endp);
 		return endp - sp;
 	}
-	inline size_t to_number(const string_view& str, float& value) { return _to_number_float(::strtof,str, value); }
-	inline size_t to_number(const string_view& str, double& value) { return _to_number_float(::strtod, str, value); }
-	inline size_t to_number(const string_view& str, long double& value) { return _to_number_float(::strtold, str, value); }
-	inline size_t to_number(const string_view& str, int& value, int base = 0) { return _to_number_int(::strtol, str, value,base); }
-	inline size_t to_number(const string_view& str, long& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
-	inline size_t to_number(const string_view& str, unsigned long& value, int base = 0) { return _to_number_int(::strtoul, str, value, base); }
+	inline size_t to_number(const std::string_view& str, float& value) { return _to_number_float(::strtof, str, value); }
+	inline size_t to_number(const std::string_view& str, double& value) { return _to_number_float(::strtod, str, value); }
+	inline size_t to_number(const std::string_view& str, long double& value) { return _to_number_float(::strtold, str, value); }
+	inline size_t to_number(const std::string_view& str, int& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
+	inline size_t to_number(const std::string_view& str, long& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
+	inline size_t to_number(const std::string_view& str, unsigned long& value, int base = 0) { return _to_number_int(::strtoul, str, value, base); }
 
 
-	// do we need all the comparison operations? humm
-	inline bool operator==(const string_view& l, const string_view& r) { return l.compare(r) == 0; }
-	inline bool operator==(const string_view& l, const string_view::const_pointer r) { return l.compare(r) == 0; }
-	inline bool operator==(const string_view::const_pointer  l, const string_view& r) { return r.compare(l) == 0; }
-	inline bool operator!=(const string_view& l, const string_view& r) { return l.compare(r) != 0; }
-	inline bool operator!=(const string_view& l, const string_view::const_pointer r) { return l.compare(r) != 0; }
-	inline bool operator!=(const string_view::const_pointer  l, const string_view& r) { return r.compare(l) != 0; }
 
-	std::ostream& operator<<(std::ostream& os, const string_view& sv);
-
-	// special cview that is 0 terminated
-
-	template<typename T>
-	class csimple_list {
-		const T* _data;
-		size_t _size;
-	public:
-		constexpr csimple_list(const T* list,size_t count) :_data(list), _size(size) {}
-		size_t size() const { return _size; }
-		const T* data() const { return _data; }
-		const T& operator[](size_t i) const { return _data[i]; }
-	};
-	// a symbol is a string that is case insentive.  Its still a string_view, but the equal functions are diffrent
-	// warning though, this does NOT override the compare functions.  I could make  the main comapre virtual, but 
-	// I am trying to hold off on that
-	// mabye rewrite this with static inhertenice? humm
-	class symbol  {
-		string_view _view;
-	public:
-		using char_traits = std::char_traits<char>;
-		constexpr symbol(const string_view& str) : _view(str) {}
-		constexpr symbol() : _view() {}
-		constexpr symbol(const char* str, size_t size) : symbol(string_view(str, size)) {}
-		constexpr symbol(const char* str) : symbol(string_view(str)) {}
-	
-		auto data() const { return _view.data(); }
-		auto size() const { return _view.size(); }
-		auto operator[](size_t i) const { return _view[i]; }
-		auto begin() const { return _view.begin(); }
-		auto end() const { return _view.end(); }
-		bool operator==(const string_view& r) const;
-		inline bool operator==(const symbol& r) const { return *this == r._view; }
-		inline bool operator==(string_view::const_pointer r) const { return *this == string_view(r); }
-		inline bool operator!=(const string_view& r) const { return !(*this == r); }
-		inline bool operator!=(const symbol& r) const { return *this != r._view; }
-		inline bool operator!=( string_view::const_pointer r)const { return !(*this == r); }
-	};
-
-
-	std::ostream& operator<<(std::ostream& os, const symbol& sv);
-
-	template<size_t SIZE> class fixed_string_stream;
 	// fixed buffer string
-	class string_buffer {
-	public:
-		using value_type = typename string_view::value_type;
-		using size_type = typename string_view::size_type;
-		using reference = typename string_view::reference;
-		using pointer = typename string_view::pointer;
-		using iterator = pointer;
-		using const_reference = typename string_view::const_reference;
-		using const_pointer = typename string_view::const_pointer;
-		using const_iterator = const_pointer;
-		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-		using reverse_iterator = std::reverse_iterator<iterator>;
-		constexpr size_type capacity() const { return _capacity; }
-		static constexpr size_t npos = size_t(-1);
-		const_pointer data() const { return _buffer; }
-		const_pointer c_str() const { return _buffer; }
-		pointer data() { return _buffer; }
-		size_type size() const { return _size; }
-		void clear() { _size = 0; _buffer[0] = '\0'; }
-		void assign(const string_view&  str) {
-			assert(str.size() < (capacity() - 1));
-			_size = str.size();
-			char_traits::copy(_buffer, str.data(), _size);
-			_buffer[_size] = '\0';
-		}
-		inline string_buffer& assign(const char* str) { assign(string_view(str)); return *this; }
-		inline string_buffer& assign(const char* str, size_type len) { assign(string_view(str, len)); return *this;}
+	template<size_t SIZE> class fixed_string_stream;
 
-		string_buffer&  assign(size_t n, char c) {
-			assert(size() < (capacity() - 1));
-			_size = n;
-			std::fill_n(_buffer, n, c);
-			_buffer[_size] = '\0';
-			return *this;
-		}
-
-
-		constexpr string_buffer() : _size(0), _capacity(0),_buffer(nullptr) {  }
-		string_buffer(pointer buffer, size_type size) : _size(0), _capacity(size), _buffer(buffer) { _buffer[0] = 0; }
-		string_buffer(pointer buffer, size_type capacity, size_type size) : _size(size), _capacity(capacity), _buffer(buffer) { _buffer[size] = 0; }
-		operator string_view() const { return string_view(_buffer, _size); }
-		// backwards compatablity with all the va around.  fix this or not?  change to streams?
-
-		void push_back(char c) { assert((_size + 1) < (capacity() - 1)); _buffer[_size++] = c; _buffer[_size] = '\0'; }
-		void pop_back() { if (_size > 0) --_size; }
-
-		string_buffer& append(const string_view&  str) {
-			assert(str.size() < (capacity() - _size - 1));
-			char_traits::copy(_buffer + _size, str.data(), str.size());
-			_size += str.size();
-			_buffer[_size] = '\0';
-			return *this;
-		}
-		string_buffer& fill(size_t count, char c = ' ') {
-			size_t n = std::min(count, (capacity() - _size - 1));
-			std::fill_n(_buffer + _size, n, c);
-			_size += n;
-			_buffer[_size] = '\0';
-			return *this;
-		}
-		string_buffer& erase(size_type pos = 0, size_type len = npos) {
-			assert(pos < capacity());
-			if (len == npos || (len+pos) >= capacity()) _buffer[_size=pos] = 0;
-			else {
-				assert(0);
-				// not implmented..meh, I really wish i could use std::string here
-			}
-			return *this;
-		}
-		bool empty() const { return _size == 0; }
-		inline void append(const char* str) { assign(string_view(str)); }
-		inline void append(const char* str, size_type len) { assign(string_view(str, len)); }
-		string_buffer& operator+=(const char* str) { append(str); return *this; }
-		string_buffer& operator+=(char c) { push_back(c); return *this; }
-		string_buffer& operator+=(const string_view& str) { append(str); return *this; }
-		reference operator[](size_type i) { return _buffer[i]; }
-		reference at(size_type i) { return _buffer[i]; }
-		const_reference operator[](size_type i) const{ return _buffer[i]; }
-		const_reference at(size_type i) const { return _buffer[i]; }
-		iterator begin() { return _buffer; }
-		iterator end() { return _buffer + _size; }
-		reverse_iterator rbegin() { return reverse_iterator(begin()); }
-		reverse_iterator rend() { return reverse_iterator(end()); }
-		const_iterator begin()const { return _buffer; }
-		const_iterator end()const { return _buffer + _size; }
-		const_reverse_iterator rbegin()const { return const_reverse_iterator(begin()); }
-		const_reverse_iterator rend() const { return const_reverse_iterator(end()); }
-		reference front() { return _buffer[0]; }
-		reference back() { return _buffer[_size - 1]; }
-		const_reference front() const { return _buffer[0]; }
-		const_reference back() const { return _buffer[_size-1]; }
-		void swap(string_buffer& r)
-		{	// swap with _Right
-			if (this != std::addressof(r)) {
-				std::swap(_size, r._size);
-				std::swap(_buffer, r._buffer);
-				std::swap(_capacity, r._capacity);
-			}
-		}
-		inline bool operator==(const char* s) const { return string_view(_buffer, _size).compare(s) == 0; }
-		inline bool operator!=(const  char* s) const { return string_view(_buffer, _size).compare(s) != 0; }
-		inline bool operator==(const string_view& s) const { return string_view(_buffer,_size).compare(s) == 0; }
-		inline bool operator!=(const string_view& s) const { return string_view(_buffer, _size).compare(s) != 0; }
-		inline bool operator==(const string_buffer& s) const { return string_view(_buffer, _size).compare(s) == 0; }
-		inline bool operator!=(const string_buffer& s) const { return string_view(_buffer, _size).compare(s) != 0; }
+	class string_buffer : public util::string_builder<string_buffer> {
 	protected:
 		pointer _buffer;
 		size_t _capacity;
 		size_t _size;
+	public:
+		using builder = util::string_builder<string_buffer>;
+		constexpr size_type capacity() const { return _capacity; }
+		const_pointer data() const { return _buffer; }
+		pointer data() { return _buffer; }
+		size_type size() const { return _size; }
+		const_pointer c_str() const { return _buffer; }
+		size_t max_size() const { return _capacity-1; } // we cannot expand this, needed for builder
+		void resize(size_type n) { 
+			assert(n <= max_size());
+			if(_buffer && _buffer != "") _buffer[_size] = '\0';
+			else _size = 0U; // empty buffer
+			 _size = n; 
+		}
+		void reserve(size_type n) { (void)n; assert(n < _capacity); } // don't have to do anything
+
+		constexpr string_buffer() : _size(0), _capacity(0), _buffer(nullptr) {  }
+		constexpr string_buffer(pointer buffer, size_type capacity) : _size(0), _capacity(capacity), _buffer(buffer) { _buffer[0] = 0; }
+		constexpr string_buffer(pointer buffer, size_type capacity, size_type size) : _size(size), _capacity(capacity), _buffer(buffer) { _buffer[size] = 0; }
+	};
+
+	class zstring : public util::string_builder<string_buffer> {
+	protected:
+		pointer _buffer;
+		size_t _capacity;
+		size_t _size;
+		using builder = util::string_builder<zstring>;
+		void release();
+	public:
+		constexpr size_type capacity() const { return _capacity-1; }
+		const_pointer data() const { return _buffer; }
+		pointer data() { return _buffer; }
+		size_type size() const { return _size; }
+		const_pointer c_str() const { return _buffer; }
+		size_t max_size() const { return 0xFFFFF; } // we cannot expand this, needed for builder
+		void swap(zstring& other) {
+			if (std::addressof(other) != this) {
+				std::swap(_buffer, other._buffer);
+				std::swap(_size, other._size);
+				std::swap(_capacity, other._capacity);
+			}
+		}
+		void reserve(size_type n);
+		void resize(size_type n) { if (_size < (_capacity - 1)) zstring::reserve(n + 16); _size = n; }
+		zstring() : _buffer(""), _capacity(0), _size(0) {}
+		zstring(const char* str, size_t size) : _buffer(nullptr), _capacity(0), _size(0) {}
+		zstring(const std::string_view& str) : zstring(str.data(), str.size()) {
+			if (str.data()[str.size()] == 0) { _buffer = const_cast<char*>(str.data()); _size = str.size(); }
+			else assign(str);
+		}
+		template<typename T>
+		zstring(const util::string_helper<T>& s) : _buffer(s.c_str()), _capacity(0U), _size(s.size()) {}
+		// have to handle assigments because of pointer
+		zstring(const zstring& v) : _buffer(v._buffer), _capacity(0U), _size(v.size()) {}
+		zstring(zstring&& v) : _buffer(v._buffer), _capacity(v._capacity), _size(v._size) { v._capacity = 0U; }
+		zstring& operator=(const zstring& v) { release();  _buffer = v._buffer;  _size = v._size;  return *this; }
+		zstring& operator= (zstring&& v) { swap(v); return *this; }
+		~zstring() { release(); }
+
 	};
 	// fixed buffer string
 	template<size_t _SIZE>
@@ -1634,8 +1281,10 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	public:
 		fixed_string() : string_buffer(_fbuffer.data(), _fbuffer.size()) {}
 		fixed_string(const_pointer str) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str); }
+		template<typename T>
+		fixed_string(const util::string_helper<T>& str) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str.c_str(), str.length()); }
 		fixed_string(const_pointer str,size_t len) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str,len); }
-		fixed_string(const string_view& s) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(s); }
+		fixed_string(const std::string_view& s) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(s); }
 		operator string_buffer&() { return *this; }
 		operator const string_buffer&() const{ return *this; }
 		template<size_t SIZE>
@@ -1747,6 +1396,15 @@ inline type name (const string& str, size_t* idx = nullptr) \
 			_capacity = size_t(size);
 			clear();
 			return std::streambuf::setbuf(buffer, size);
+		}
+		// ugh set underflow for get
+		// we are using the p buffer for it
+		// be careful with this as there isn't any checking on it
+		int_type underflow() override final {
+			if (pbase() == nullptr) return EOF;
+			setg(_str, _str + 1, _str + size());
+			setp(nullptr,nullptr);  // clear the output as we are reading
+			return _str[0];
 		}
 		// good suggestion
 		// https://stackoverflow.com/questions/5642063/inheriting-ostream-and-streambuf-problem-with-xsputn-and-overflow
@@ -1993,7 +1651,7 @@ inline type name (const string& str, size_t* idx = nullptr) \
 		static constexpr size_t inital_buckets = 16;
 		struct string_bucket {
 			link_t<string_bucket> chain;
-			quake::string_view str;
+			std::string_view str;
 			string_bucket* next;
 		};
 	public:
@@ -2030,7 +1688,7 @@ inline type name (const string& str, size_t* idx = nullptr) \
 	///
 	/// \brief A sorted associative container of pair<K,V>
 	///
-	template <typename K, typename V, typename Comp = less<K> >
+	template <typename K, typename V, typename Comp = std::less<K> >
 	class map : public FixedVector<std::pair<K, V> > {
 	public:
 		typedef K						key_type;
@@ -2206,13 +1864,13 @@ inline type name (const string& str, size_t* idx = nullptr) \
 		};
 	
 		static value_type* AllocHulk(size_t count) { return (value_type*)Hunk_Alloc(count * sizeof(value_type)); }
-		static value_type* AllocHulk(size_t count, const quake::string_view& v) { return (value_type*)Hunk_AllocName(count * sizeof(value_type), v); }
+		static value_type* AllocHulk(size_t count, cstring_t v) { return (value_type*)Hunk_AllocName(count * sizeof(value_type), v); }
 		FixedMap() : _map(nullptr), _size(0) {}
 		FixedMap(value_type* ptr, size_t size) : _map(ptr), _size(0) {}
 		FixedMap(size_t count) : _map(AllocHulk(count)), _size(size) {}
-		FixedMap(size_t count, const quake::string_view& v) : _map(AllocHulk(count, v)), _size(size) {}
+		FixedMap(size_t count, cstring_t v) : _map(AllocHulk(count, v)), _size(size) {}
 		void alloc_hulk(size_t count) { _map = AllocHulk(count); _size = count; }
-		void alloc_hulk(size_t count, const quake::string_view& v) { _map = AllocHulk(count, v); _size = count; }
+		void alloc_hulk(size_t count, cstring_t v) { _map = AllocHulk(count, v); _size = count; }
 		iterator begin() { return _map; }
 		iterator eend() { return _map + _size; }
 		const_iterator begin() const { return _map; }
@@ -2297,6 +1955,8 @@ inline type name (const string& str, size_t* idx = nullptr) \
 			using container_type::empty;
 			using container_type::size;
 			using container_type::max_size;
+			using container_type::reserve;
+			using container_type::clear;
 
 			template <typename... Args>
 			std::pair<iterator, bool> emplace(Args&&... args) {
@@ -2345,27 +2005,13 @@ inline type name (const string& str, size_t* idx = nullptr) \
 #if 0
 // it could be data_view<char> but mabye data could be binary data so lets not
 template<typename T>
-inline typename  std::enable_if<std::is_base_of<quake::string_view, T>::value, std::ostream&>::type
-operator<<(std::ostream& os, const quake::string_view& s) {
+inline typename  std::enable_if<std::is_base_of<std::string_view, T>::value, std::ostream&>::type
+operator<<(std::ostream& os, cstring_t s) {
 	os.write(s.data(), s.size());
 	return os;
 }
 #endif
-namespace std {
 
-	template<>
-	struct hash<quake::string_view> {
-		size_t  operator()(const quake::string_view& s) const {
-			return quake::string_hasher(s.data(), s.size());
-		}
-	};
-	template<>
-	struct hash<quake::symbol> {
-		size_t  operator()(const quake::symbol& s) const {
-			return quake::string_hasher(s.data(), s.size());
-		}
-	};
-}
 // any dynamicly defined stuff needs to be created after this
 
 #include "zone.h"
@@ -2382,6 +2028,16 @@ class sizebuf_t { //: public quake::memblock {
 	size_t		_capacity;
 	size_t		_read_count;
 	byte*		_data;
+protected:
+	sizebuf_t(const sizebuf_t& copy) :
+		_allowoverflow(copy._allowoverflow),
+		_overflowed(copy._overflowed),
+		_hunk_low_used(copy._hunk_low_used),
+		_data(copy._data),
+		_capacity(copy._capacity),
+		_cursize(copy._cursize),
+		_read_count(copy._read_count) { }
+	// copy is only used for static_size_buf
 public:
 	using refrence = byte&;
 	using const_refrence = const byte&;
@@ -2390,11 +2046,49 @@ public:
 	using size_type = size_t;
 	sizebuf_t() : _allowoverflow(false), _overflowed(false), _hunk_low_used(0U), _data(nullptr), _capacity(0U), _cursize(0U) , _read_count(0U) {}
 	sizebuf_t(byte* data, size_t size, bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data(data), _capacity(size), _cursize(0U), _read_count(0U) {}
+	template<size_t N>
+	sizebuf_t(byte (&data)[N], bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data(data), _capacity(N), _cursize(0U), _read_count(0U) {}
+	template<size_t N>
+	sizebuf_t(char(&data)[N], bool allowoverflow = true) : _allowoverflow(allowoverflow), _overflowed(false), _hunk_low_used(0U), _data((byte*)data), _capacity(N), _cursize(0U), _read_count(0U) {}
+
 	void* GetSpace(size_t length);
-	sizebuf_t(sizebuf_t&& move) = default;
-	sizebuf_t(const sizebuf_t& copy) = default;
-	sizebuf_t& operator=(sizebuf_t&& move) = default;
-	sizebuf_t& operator=(const sizebuf_t& copy) = default;
+	
+
+	void swap(sizebuf_t& other) {
+		if (std::addressof(other) != this) {
+			std::swap(_allowoverflow, other._allowoverflow);
+			std::swap(_overflowed, other._overflowed);
+			std::swap(_hunk_low_used, other._hunk_low_used);
+			std::swap(_data, other._data);
+			std::swap(_capacity, other._capacity);
+			std::swap(_cursize, other._cursize);
+			std::swap(_read_count, other._read_count);
+		}
+	}
+	sizebuf_t& operator=(sizebuf_t&& move) {
+		if (std::addressof(move) != this) {
+			swap(move);
+			move.Free(); // clear
+		}
+		return *this;
+	}
+	sizebuf_t(sizebuf_t&& move) { swap(move);  move.Free(); }
+	sizebuf_t& operator=(const sizebuf_t& copy) {
+		if (std::addressof(copy) != this && copy._data != _data) {
+			assert(_data); // we got to have some kind of pointer
+			if (copy._data == nullptr) Free(); // full clear and release
+			else if (copy._cursize == 0) Clear(); // just clear the data
+			else {
+				assert(_capacity > copy._capacity);
+				std::copy(copy.begin(), copy.end(), begin()); // copy it over
+			}
+			_cursize = copy._cursize;
+			_read_count = copy._read_count;
+			_allowoverflow = copy._allowoverflow;
+			_overflowed = copy._overflowed;
+		}
+		return *this;
+	}
 	refrence operator[](size_t i) { return _data[i]; }
 	const_refrence operator[](size_t i) const { return _data[i]; }
 	const_refrence front() const { return _data[0]; }
@@ -2407,6 +2101,7 @@ public:
 	inline const byte* data() const { return _data; }
 	inline byte* data() { return _data; }
 	inline bool overflowed() const { return _overflowed; }
+	inline bool allow_overflow() const { return _allowoverflow;  }
 	inline void overflowed(bool value) { _overflowed = value; }
 	inline iterator begin() { return data(); }
 	inline const_iterator begin() const { return data(); }
@@ -2426,14 +2121,14 @@ public:
 	void Alloc(size_t startsize);
 	void Insert(const void* data, size_t length, size_t pos=0);
 	void Write(const void* data, size_t length);
-	void Print(const quake::string_view& data);
+	void Print(const std::string_view& data);
 	void Print(char c);
 	void WriteByte(int c);
 	void WriteChar(int c);
 	void WriteShort(int c);
 	void WriteLong(int c);
 	void WriteFloat(float f);
-	void WriteString(const quake::string_view& data);
+	void WriteString(cstring_t data);
 	void WriteCoord(float f);
 	void WriteAngle(float f);
 	//void WriteAngle16(float f);
@@ -2464,8 +2159,35 @@ public:
 	int		ReadShort() { return Read<int16_t>(); }
 	int		ReadLong() { return Read<int32_t>(); }
 	float	ReadFloat();
-	void	ReadString(quake::string& str);
-	void	ReadStringLine(quake::string& str);
+	void    ReadString(char* data, size_t size);
+	void    ReadStringLine(char* data, size_t size);
+
+	template<typename B>
+	void ReadString(util::string_builder<B>& str) {
+		str.clear();
+		str.reserve(_read_count - _cursize);
+		while (_cursize < _read_count) {
+			int c = _data[_read_count++];
+			if (c == 0 || c == -1) break;
+			if (str.size() + 1 >= str.capacity()) {
+				str.reserve(str.capacity() + 256);
+			}
+			str.push_back(c);
+		}
+	}
+	template<typename B>
+	void ReadStringLine(util::string_builder<B>& str) {
+		str.clear();
+		str.reserve(_read_count - _cursize);
+		while (_cursize < _read_count) {
+			int c = _data[_read_count++];
+			if (c == 0 || c == -1 || c == '\n') break;
+			if (str.size() + 1 >= str.capacity()) {
+				str.reserve(str.capacity() + 256);
+			}
+			str.push_back(c);
+		}
+	}
 
 	inline float	ReadCoord() { return ReadShort() * (1.0f / 8.0f); }
 	void ReadPos(vec3_t& pos) { 
@@ -2482,13 +2204,48 @@ public:
 
 
 } ;
+template<size_t BYTE_SIZE>
+class static_sizebuf_t : public sizebuf_t {
+private:
+	uint8_t _buffer[BYTE_SIZE];
+public:
+	using self_t = static_sizebuf_t<BYTE_SIZE>;
+	static constexpr size_t byte_size = BYTE_SIZE;
+	static_sizebuf_t(bool allow_overflow = true) : sizebuf_t(_buffer, BYTE_SIZE, allow_overflow) {}
+	static_sizebuf_t& operator=(const sizebuf_t& copy) {
+		if (std::addressof(copy) != this) 
+			static_cast<sizebuf_t&>(*this) = static_cast<const sizebuf_t&>(copy);
+		return *this;
+	}
+	template<size_t N>
+	static_sizebuf_t& operator=(const static_sizebuf_t<N>& copy) {
+		if (std::addressof(copy) != this) *this = static_cast<const sizebuf_t&>(copy);
+		return *this;
+	}
+	template<size_t N>
+	static_sizebuf_t(const static_sizebuf_t<N>& copy) : sizebuf_t(_buffer, BYTE_SIZE, copy.allow_overflow()) { *this = copy; }
+	static_sizebuf_t(const sizebuf_t& copy) : sizebuf_t(_buffer, BYTE_SIZE, copy.allow_overflow()) { *this = copy; }
+	template<size_t N>
+	static_sizebuf_t(static_sizebuf_t<N>&& move) : sizebuf_t(_buffer, BYTE_SIZE, move.allow_overflow()) { *this = move; move.Free(); }
+	static_sizebuf_t(sizebuf_t&& move) : sizebuf_t(_buffer, BYTE_SIZE, move.allow_overflow()) { *this = move; move.Free(); }
+	void swap(sizebuf_t& other) {
+		// can't really swap, so we copy
+		if (std::addressof(other) != this) {
+			*this = other;
+		}
+	}
+
+
+
+};
+
 #if 0
 void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
 void SZ_Clear (sizebuf_t *buf);
 void *SZ_GetSpace (sizebuf_t *buf, int length);
 void SZ_Write (sizebuf_t *buf, const void *data, int length);
-void SZ_Print (sizebuf_t *buf, const quake::string_view& data);	// strcats onto the sizebuf
+void SZ_Print (sizebuf_t *buf, cstring_t data);	// strcats onto the sizebuf
 void SZ_Print(sizebuf_t *buf, char c);
 #endif
 //============================================================================
@@ -2604,21 +2361,20 @@ int Q_strcmp (const char * s1, const char * s2);
 int Q_strncmp (const char * s1, const char * s2, size_t count);
 
 int Q_strcasecmp (const char * s1, const char * s2);
-int Q_strcasecmp(const quake::string_view& s1, const char * s2);
-int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2);
-
-bool Q_strcmp(const quake::string_view& a, const quake::string_view& b);
+int Q_strcasecmp(const std::string_view& s1, const char * s2);
+int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2);
+inline int Q_strcmp(const std::string_view& a, const std::string_view& b) { return a.compare(b); }
 
 int Q_strncasecmp (const char * s1, const char * s2, size_t n);
 #if 0
-bool Q_strncasecmp(const quake::string_view& a, const quake::string_view& b);
+bool Q_strncasecmp(cstring_t a, cstring_t b);
 
 #endif
 
 int	Q_atoi (const char * str);
 float Q_atof (const char * str);
-int	Q_atoi(const quake::string_view& str);
-float Q_atof(const quake::string_view& str);
+int	Q_atoi(cstring_t str);
+float Q_atof(cstring_t str);
 
 int Q_vsprintf(char* buffer, const char* fmt, va_list va);
 int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...);
@@ -2644,6 +2400,87 @@ int Q_sprintf(char(&buffer)[N], const char* fmt, ...) {
 	va_end(va);
 	return ret;
 }
+namespace quake {
+
+
+	template<size_t N = 256>
+	class va_stack {
+		char _buffer[N + 1];
+		size_t _size;
+	public:
+		using char_traits = std::char_traits<char>;
+		constexpr size_t size() const { return _size; }
+		void clear() { _size = 0;  _buffer[0] = '\0'; }
+		constexpr const char* c_str() const { return _buffer; }
+		constexpr operator const char*() const { return c_str(); }
+		constexpr operator std::string_view() const { return std::string_view(c_str(),size()); }
+		constexpr size_t capacity() const { return N; }
+
+		void assign(const char* str) {
+			_size = 0;
+			while (*str) _buffer[_size++] = *str++;
+			_buffer[_size] = 0;
+		}
+		void assign(const char* str, size_t size) {
+			_size = size;
+			char_traits::copy(_buffer, str, size);
+			_buffer[_size] = 0;
+		}
+		void assign(cstring_t str) { assign(str.data(), str.size()); }
+		va_stack& append(const char* str) {
+			while (*str) _buffer[_size++] = *str++;
+			_buffer[_size] = 0;
+			return *this;
+		}
+		va_stack& append(const char* str, size_t size) {
+			char_traits::copy(_buffer + size, str, size);
+			_size += size;
+			_buffer[_size] = 0;
+			return *this;
+		}
+		va_stack& append(char c) {
+			_buffer[_size++] = c;
+			_buffer[_size] = 0;
+			return *this;
+		}
+		va_stack& append(char c, size_t count) {
+			while (count--) _buffer[_size++] = c;
+			_buffer[_size] = 0;
+			return *this;
+		}
+		va_stack& append(cstring_t str) { append(str.data(), str.size()); return *this; }
+		template<typename ... Args>
+		va_stack& print(const char* fmt, Args&&...args) {
+			int ret = Q_sprintf(_buffer, fmt, std::forward<Args>(args)...);
+			_size = static_cast<size_t>(ret);
+			return *this;
+		}
+		int printv(const char* fmt, va_list va) {
+			int ret = Q_vsnprintf(_buffer, va);
+			_size = static_cast<size_t>(ret);
+			return ret;
+		}
+		va_stack() : _size(0U) { _buffer[0] = '\0'; }
+		template<typename ... Args>
+		va_stack(const char* str, Args&&...args) { print(str, std::forward<Args>(args)...); }
+		template<typename ... Args>
+		va_stack& operator()(const char* str, Args&&...args) { return print(str, std::forward<Args>(args)...); }
+		//va_stack(const char* str) { assign(str); }
+		va_stack(cstring_t str) { assign(str); }
+
+		va_stack& operator+=(const char* str) { return append(str); }
+		va_stack& operator+=(cstring_t str) { return append(str); }
+
+		template<size_t NN>
+		va_stack(const va_stack<NN>& copy) : _size(copy._size) { char_traits::copy(_buffer, copy._buffer, copy._size); }
+	};
+
+	template<size_t N>
+	static inline std::ostream& operator<<(std::ostream& os, const va_stack<N>& v) {
+		os << v.c_str();
+		return os;
+	};
+};
 
 //============================================================================
 
@@ -2653,51 +2490,51 @@ void COM_Init (const char *path); // path not used?
 
 
 
-inline  std::pair<quake::string_view::size_type, quake::string_view::size_type> COM_FindFileBasePos(const quake::string_view& in) {
-	size_t slash =  in.size() - 1;
-	for (; slash > 0U && (in.data()[slash] != '/' || in.data()[slash] != '\\'); --slash);
-	size_t dot = slash;
-	for (; dot < in.size() && in.data()[dot] != '.'; ++dot);
-	return std::make_pair(slash, dot == in.size() ? quake::string_view::npos : dot);
+inline  std::pair<size_t, size_t> COM_FindFileBasePos(const std::string_view in) {
 #if 0
+	size_t slash =  in.size() - 1;
+	for (; slash > 0U && (in[slash] != '/' || in[slash] != '\\'); --slash);
+	size_t dot = slash;
+	for (; dot < in.size() && in[dot] != '.'; ++dot);
+	return std::make_pair(slash, dot == in.size() ? std::string_view::npos : dot);
+#else
 	auto slash = in.find_last_of("/\\");
-	if (slash == T::npos) slash = 0U;
+	if (slash == std::string_view::npos) slash = 0U;
 	auto dot = in.find_first_of('.', slash);
 	return std::make_pair(slash, dot);
 #endif
 }
-inline quake::string_view
- COM_SkipPath(const quake::string_view & in) {
+inline std::string_view COM_SkipPath(const std::string_view & in) {
 	auto pos = COM_FindFileBasePos(in);
-	return quake::string_view(in.data()+ pos.first, in.size()-pos.first);
+	return std::string_view(in.data() + pos.first, in.size()-pos.first);
 }
-inline  quake::string_view  COM_FileExtension(const quake::string_view& in) {
+inline  std::string_view  COM_FileExtension(const std::string_view in) {
 	auto pos = COM_FindFileBasePos(in);
-	if (pos.second != quake::string_view::npos)
-		return quake::string_view(in.data() + pos.second, in.size() - pos.second);
+	if (pos.second != std::string_view::npos)
+		return std::string_view(in.data() + pos.second, in.size() - pos.second);
 	else
-		return quake::string_view();
+		return std::string_view();
 }
 
-inline quake::string_view  COM_StripExtension(const quake::string_view & in)
+inline std::string_view  COM_StripExtension(const std::string_view & in)
 {
 	auto pos = COM_FindFileBasePos(in);
-	if (pos.second != quake::string_view::npos)
-		return quake::string_view(in.data() + pos.first, in.size() - pos.first - pos.second);
+	if (pos.second != std::string_view::npos)
+		return std::string_view(in.data() + pos.first, in.size() - pos.first - pos.second);
 	else
 		return in;
 }
-inline quake::string_view  COM_FileBase(const quake::string_view & in)
+inline std::string_view  COM_FileBase(const std::string_view & in)
 {
 	auto pos = COM_FindFileBasePos(in);
-	quake::string_view out(in.data()+ pos.first+1, in.size()-pos.first);
-	if (pos.second != quake::string_view::npos)
+	std::string_view out(in.data()+ pos.first+1, in.size()-pos.first);
+	if (pos.second != std::string_view::npos)
 		out.remove_suffix(out.size() - pos.second);
 	return out;
 }
 
 template<typename C, typename CT, typename CA>
-inline void COM_DefaultExtension(std::basic_string<C,CT,CA>& path, const quake::string_view&  extension) {
+inline void COM_DefaultExtension(std::basic_string<C,CT,CA>& path, cstring_t  extension) {
 	auto pos = COM_FindFileBasePos(path);
 	if (pos.second == priv::npos) {
 		path += '.';
@@ -2705,9 +2542,9 @@ inline void COM_DefaultExtension(std::basic_string<C,CT,CA>& path, const quake::
 	}
 }
 template<size_t SIZE>
-inline void COM_DefaultExtension(quake::fixed_string<SIZE>& path, const quake::string_view&  extension) {
+inline void COM_DefaultExtension(quake::fixed_string<SIZE>& path, cstring_t  extension) {
 	auto pos = COM_FindFileBasePos(path);
-	if (pos.second == quake::string_view::npos) {
+	if (pos.second == std::string_view::npos) {
 		if(extension[0] != '.')		path += '.';
 
 		path += extension;
@@ -2805,20 +2642,20 @@ public:
 	uint8_t* data()  { return _array; }
 };
 
-extern int com_filesize;
+
 struct cache_user_t;
 
 
 
-void COM_WriteFile (const quake::string_view& filename, const void * data, int len);
-//std::istream* COM_OpenFile (const quake::string_view& filename, size_t& length);
+void COM_WriteFile (const std::string_view& filename, const void * data, int len);
+//std::istream* COM_OpenFile (cstring_t filename, size_t& length);
 
 
-byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize);
-byte *COM_LoadTempFile (const quake::string_view& path);
-byte *COM_LoadHunkFile (const quake::string_view& path);
-void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu);
- size_t COM_FindFile(const quake::string_view& filename, std::fstream& file);
+byte *COM_LoadStackFile (const std::string_view& path, void *buffer, int bufsize);
+byte *COM_LoadTempFile (const std::string_view& path);
+byte *COM_LoadHunkFile (const std::string_view& path, size_t* file_size = nullptr);
+void COM_LoadCacheFile (const std::string_view& path, struct cache_user_t *cu);
+ size_t COM_FindFile(const std::string_view& filename, std::fstream& file);
 
 
 
@@ -2831,10 +2668,10 @@ public:
 		Eof = -1
 	};
 	COM_Value() : _type((int)Kind::Eof) {}
-	COM_Value(const quake::string_view& text, Kind token=Kind::Symbol) : _type((int)token), _text(text) {}
+	COM_Value(const std::string_view& text, Kind token=Kind::Symbol) : _type((int)token), _text(text) {}
 	bool operator==(const COM_Value& r) const { return _type == r._type; }
 	Kind type() const { return (Kind)_type; }
-	const quake::string_view& text() const {  return _text; }
+	const std::string_view& text() const {  return _text; }
 	bool operator==(int c) const { return _type == c; }
 	bool operator==(Kind c) const { return _type == (int)c; }
 	bool operator!=(const COM_Value& r) const { return !(*this == r); }
@@ -2842,45 +2679,28 @@ public:
 	bool operator!=(Kind r) const { return !(*this == r); }
 private:
 	int _type;
-	quake::string_view _text;
+	std::string_view _text;
 };
 
 // parser
 class COM_Parser {
 public:
 	COM_Parser() : _data(""), _state(0) {}
-	COM_Parser(const quake::string_view& data) : _data(data), _pos(0), _state(0) {}
-	bool Next(quake::string_view& token,bool test_eol=false);
-	operator const quake::string_view&() const { return _data; }
+	COM_Parser(const std::string_view & data) : _data(data), _pos(0), _state(0) {}
+	bool Next(std::string_view& token,bool test_eol=false);
+	operator const std::string_view&() const { return _data; }
 	size_t pos() const { return _pos; }
-	quake::string_view remaining() const { return _data.substr(_pos); }
+	std::string_view remaining() const { return _data.substr(_pos); }
 protected:
 	int _state;
 	size_t _pos;
-	quake::string_view _data;
+	std::string_view _data;
 };
 
 
 
-#if 0
-class COM_File_Parser : public COM_Parser {
-	COM_File_Parser() : _handle(idFileHandle()) , _size(0U) {}
-	COM_File_Parser(const char* filename) : _handle(idFileHandle()) { Open(filename);  }
-	~COM_File_Parser() { Close(); }
-	bool Next(quake::string_view& token);
-	bool Open(const char* filename);
-	void Close();
-	bool isOpen() const { return _handle != idFileHandle(); }
-private:
-	void fill_buffer();
-	
-	quake::ifstream _stream;
-	size_t _size;
-};
-#endif
 
-
-quake::string_view  COM_GameDir();
+std::string_view  COM_GameDir();
 
 template<typename TO, typename FROM> constexpr TO idCast(FROM f);
 

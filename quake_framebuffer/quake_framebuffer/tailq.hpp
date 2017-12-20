@@ -73,7 +73,7 @@ namespace tailq {
 	template<typename T> class entry;
 	template<typename T> using field = entry<T> T::*;
 	template<typename T, field<T> FIELD> class entry_internal;
-	template<typename T, field<T> FIELD> class head_impl;
+	template<typename T, field<T> FIELD> struct head_impl;
 	template<typename T, field<T> FIELD, bool _is_const> struct iterator;
 	template<typename T, field<T> FIELD> struct pcontainer;
 	constexpr static uintptr_t UNLINK_MAGIC_VALUE = 0x87654321;
@@ -513,6 +513,7 @@ namespace tailq {
 		const_iterator begin() const { return const_iterator(tqh_first); }
 		const_iterator end() const { return const_iterator(nullptr); }
 	protected:
+		inline void _clear_head() { tqh_first = nullptr;  tqh_last = &tqh_first; }
 		inline void _insert_after(pointer listelm, pointer elm) { traits::insert_after(*this, listelm, elm); }
 		inline void _insert_before(pointer listelm, pointer elm) { traits::insert_before(listelm, elm); }
 		inline void _insert_head(pointer elm) { traits::insert_head(*this, elm); }
@@ -532,47 +533,49 @@ namespace tailq {
 	template<typename T, field<T> FIELD>
 	class head : public head_impl<T, FIELD> {
 	public:
-		using traits = head_impl<T, FIELD>;
+		using traits = head_traits<T, FIELD>;
+		//using traits = head_impl<T, FIELD>;
 		using type = head<T, FIELD>;
-		using difference_type = typename traits::difference_type;
-		using iterator_category = typename traits::iterator_category;
-		using value_type = typename traits::value_type;
-		using pointer = typename traits::pointer;
-		using reference = typename traits::reference;;
-		using const_pointer = typename traits::const_pointer;
-		using const_reference = typename traits::const_reference;
-		using entry_type = typename traits::entry_type;
-		using head_type = typename traits::head_type;
-		using field_type = typename traits::field_type;
-		using iterator = typename traits::iterator;
-		using const_iterator = typename traits::const_iterator;
+		using base_type = head_impl<T, FIELD>;
+		using difference_type = typename base_type::difference_type;
+		using iterator_category = typename base_type::iterator_category;
+		using value_type = typename base_type::value_type;
+		using pointer = typename base_type::pointer;
+		using reference = typename base_type::reference;;
+		using const_pointer = typename base_type::const_pointer;
+		using const_reference = typename base_type::const_reference;
+		using entry_type = typename base_type::entry_type;
+		using head_type = typename base_type::head_type;
+		using field_type = typename base_type::field_type;
+		using iterator = typename base_type::iterator;
+		using const_iterator = typename base_type::const_iterator;
 
-		constexpr head() : traits::head_impl() {}
+		constexpr head() : base_type() {}
 		head(const head& copy) = delete;
 		head& operator==(const head& copy) = delete;
 		head(head&& move) { traits::swap(move); }
 		head& operator==(head&& move) {
-			traits::swap(move);
+			base_type::swap(move);
 			return *this;
 		}
 
-		inline pointer first_entry() { return traits::_first(); }
-		inline pointer last_entry() { return traits::_last(); }
-		inline const pointer first_entry()  const { return traits::_first(); }
-		inline const pointer last_entry()  const { return traits::_last(); }
+		inline pointer first_entry() { return base_type::_first(); }
+		inline pointer last_entry() { return base_type::_last(); }
+		inline const pointer first_entry()  const { return base_type::_first(); }
+		inline const pointer last_entry()  const { return base_type::_last(); }
 
 		reference front() { return *first_entry(); }
 		reference back() { return *last_entry(); }
 		const_reference front() const { return *first_entry(); }
 		const_reference back() const { return *last_entry(); }
-		inline void swap(head_type& head) { traits::swap(head); }
+		inline void swap(head_type& head) { base_type::swap(head); }
 
 
-		inline void insert_after(pointer listelm, pointer elm) { traits::_insert_after(listelm, elm); }
-		inline void insert_before(pointer listelm, pointer elm) { traits::_insert_before(listelm, elm); }
-		inline void push_back(pointer elm) { traits::_insert_tail(elm); }
-		inline void push_front(pointer elm) { traits::_insert_head(elm); }
-		void push(pointer elm) { traits::_insert_tail(elm); }
+		inline void insert_after(pointer listelm, pointer elm) { base_type::_insert_after(listelm, elm); }
+		inline void insert_before(pointer listelm, pointer elm) { base_type::_insert_before(listelm, elm); }
+		inline void push_back(pointer elm) { base_type::_insert_tail(elm); }
+		inline void push_front(pointer elm) { base_type::_insert_head(elm); }
+		void push(pointer elm) { base_type::_insert_tail(elm); }
 		pointer pop() { return pop_back(); }
 
 		// some list interface stuff, nothing to serious
@@ -615,9 +618,19 @@ namespace tailq {
 			}
 			return last;
 		}
-		inline void remove(pointer elm) { traits::_remove(elm); }
+		inline void clear() {
+			// bad clear, dosn't remove the individual links
+			pointer curelm = first_entry();
+			while (curelm != nullptr) {
+				auto next = traits::next(curelm);
+				traits::unlink(curelm);
+				curelm = next;
+			}
+			_clear_head();
+		}
+		inline void remove(pointer elm) { base_type::_remove(elm); }
 		void splice(iterator pos, head_type& other, iterator first, iterator last) {
-			traits::traits::splice(&(*pos), *this, other, &(*first), &(*last));
+			traits:::splice(&(*pos), *this, other, &(*first), &(*last));
 		}
 		void splice(iterator pos, head_type& other, iterator it) {
 			splice(pos, other, it, other.end());

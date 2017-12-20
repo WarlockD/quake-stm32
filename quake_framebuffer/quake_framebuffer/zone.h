@@ -109,9 +109,9 @@ char *Z_Strdup(const char *s);
 
 void Z_CheckHeap(void);
 void *Hunk_Alloc(size_t size);		// returns 0 filled memory
-void *Hunk_AllocName(int size, const quake::string_view& name);
+void *Hunk_AllocName(int size, const std::string_view& name);
 
-void *Hunk_HighAllocName(size_t size, const quake::string_view& name);
+void *Hunk_HighAllocName(size_t size, const std::string_view& name);
 
 int	Hunk_LowMark(void);
 void Hunk_FreeToLowMark(int mark);
@@ -136,18 +136,12 @@ void *Cache_Check(cache_user_t *c);
 
 void Cache_Free(cache_user_t *c);
 
-void *Cache_Alloc(cache_user_t *c, int size, const quake::string_view& name);
+void *Cache_Alloc(cache_user_t *c, int size, const std::string_view&  name);
 // Returns NULL if all purgable data was tossed and there still
 // wasn't enough room.
 
 void Cache_Report(void);
 
-
-void *umm_info(void *ptr, int force);
-void *umm_malloc(size_t size);
-void *umm_realloc(void *ptr, size_t size);
-void umm_free(void *ptr);
-size_t umm_maxsize();
 
 
 
@@ -668,6 +662,7 @@ using SStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator
 template<typename T>
 using ZVector = std::vector<T, UAllocator<T>>;
 
+using StringArgs = ZVector<string_t>;
 
 
 #endif

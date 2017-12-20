@@ -174,15 +174,15 @@ void NET_FreeQSocket(qsocket_t *sock)
 }
 
 
-static void NET_Listen_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+static void NET_Listen_f(cmd_source_t source, const StringArgs& args)
 {
-	if (argc != 2)
+	if (args.size() != 2)
 	{
 		Con_Printf ("\"listen\" is \"%u\"\n", listening ? 1 : 0);
 		return;
 	}
 
-	listening = Q_atoi(argv[1]) ? true : false;
+	listening = Q_atoi(args[1]) ? true : false;
 
 	for (net_driverlevel=0 ; net_driverlevel<net_numdrivers; net_driverlevel++)
 	{
@@ -193,11 +193,11 @@ static void NET_Listen_f(cmd_source_t source, size_t argc, const quake::string_v
 }
 
 
-static void MaxPlayers_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+static void MaxPlayers_f(cmd_source_t source, const StringArgs& args)
 {
 	int 	n;
 
-	if (argc != 2)
+	if (args.size() != 2)
 	{
 		Con_Printf ("\"maxplayers\" is \"%u\"\n", svs.maxclients);
 		return;
@@ -209,7 +209,7 @@ static void MaxPlayers_f(cmd_source_t source, size_t argc, const quake::string_v
 		return;
 	}
 
-	n = Q_atoi(argv[1]);
+	n = Q_atoi(args[1]);
 	if (n < 1)
 		n = 1;
 	if (n > svs.maxclientslimit)
@@ -232,17 +232,17 @@ static void MaxPlayers_f(cmd_source_t source, size_t argc, const quake::string_v
 }
 
 
-static void NET_Port_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+static void NET_Port_f(cmd_source_t source, const StringArgs& args)
 {
 	int 	n;
 
-	if (argc != 2)
+	if (args.size() != 2)
 	{
 		Con_Printf ("\"port\" is \"%u\"\n", net_hostport);
 		return;
 	}
 
-	n = Q_atoi(argv[1]);
+	n = Q_atoi(args[1]);
 	if (n < 1 || n > 65534)
 	{
 		Con_Printf ("Bad value, must be between 1 and 65534\n");
@@ -310,7 +310,7 @@ void NET_Slist() {
 
 	hostCacheCount = 0;
 }
-void NET_Slist_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void NET_Slist_f(cmd_source_t source, const StringArgs& args)
 {
 	NET_Slist();
 }
@@ -369,7 +369,7 @@ NET_Connect
 int hostCacheCount = 0;
 hostcache_t hostcache[HOSTCACHESIZE];
 
-qsocket_t *NET_Connect (quake::string_view host)
+qsocket_t *NET_Connect( std::string_view host)
 {
 	qsocket_t		*ret;
 	int				n;
@@ -391,7 +391,7 @@ qsocket_t *NET_Connect (quake::string_view host)
 			for (n = 0; n < hostCacheCount; n++)
 				if (Q_strcasecmp (host, hostcache[n].name) == 0)
 				{
-					host = hostcache[n].cname;
+					host = hostcache[n].cname.c_str();
 					break;
 				}
 			if (n < hostCacheCount)
@@ -409,7 +409,7 @@ qsocket_t *NET_Connect (quake::string_view host)
 	{
 		if (hostCacheCount != 1)
 			return NULL;
-		host = hostcache[0].cname;
+		host = std::string_view(hostcache[0].cname.c_str());
 		quake::con << "Connecting to... " << hostcache[0].name << " @ " << host << std::endl;
 	}
 
@@ -417,7 +417,7 @@ qsocket_t *NET_Connect (quake::string_view host)
 		for (n = 0; n < hostCacheCount; n++)
 			if (Q_strcasecmp (host, hostcache[n].name) == 0)
 			{
-				host = hostcache[n].cname;
+				host = std::string_view(hostcache[n].cname);
 				break;
 			}
 
@@ -828,8 +828,8 @@ void NET_Init (void)
 	if (i)
 	{
 		i++;
-		if (i < host_parms.argc)
-			DEFAULTnet_hostport = Q_atoi (host_parms.argv[i+1]);
+		if (i < host_parms.args.size())
+			DEFAULTnet_hostport = Q_atoi (host_parms.args[i+1]);
 		else
 			Sys_Error ("NET_Init: you must specify a number after -port");
 	}
@@ -942,7 +942,7 @@ void NET_Poll(void)
 			else
 				useModem = false;
 			SetComPortConfig (0, (int)config_com_port.value, (int)config_com_irq.value, (int)config_com_baud.value, useModem);
-			SetModemConfig (0, config_modem_dialtype.string, config_modem_clear.string, config_modem_init.string, config_modem_hangup.string);
+			SetModemConfig (0, config_modem_dialtype.string.c_str(), config_modem_clear.string.c_str(), config_modem_init.string.c_str(), config_modem_hangup.string.c_str());
 		}
 		configRestored = true;
 	}

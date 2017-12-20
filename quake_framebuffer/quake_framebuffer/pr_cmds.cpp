@@ -30,15 +30,13 @@ using namespace std::chrono;
 ===============================================================================
 */
 
-char *PF_VarString (int	first)
+const char *PF_VarString (int	first)
 {
 	int		i;
-	static char out[256];
-	
-	out[0] = 0;
+	quake::va_stack<256> out;
 	for (i=first ; i<pr_argc ; i++)
 	{
-		strcat (out, vm.G_STRING((OFS_PARM0+i*3)));
+		out+=vm.G_STRING(OFS_PARM0+i*3).c_str();
 	}
 	return out;
 }
@@ -57,12 +55,11 @@ error(value)
 void PF_error (void)
 {
 	const char	*s;
-	edict_t	*ed;
-	const char* fname = vm.pr_strings + vm.pr_xfunction->s_name;
+	auto fname =  vm.pr_xfunction->name();
 
 	s = PF_VarString(0);
 	Con_Printf ("======SERVER ERROR in %s:\n%s\n", fname,s);
-	ed = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+	edict_t	* ed = vm.pr_global_struct->self;
 	ed->Print ();
 
 	Host_Error ("Program error");
@@ -78,16 +75,13 @@ removed, but the level can continue.
 objerror(value)
 =================
 */
-void PF_objerror (void)
-{
-	edict_t	*ed;
-	const char* fname = vm.pr_strings + vm.pr_xfunction->s_name;
+void PF_objerror (void) {
+	auto fname = vm.pr_xfunction->name();
 	const char* s = PF_VarString(0);
 	Con_Printf ("======OBJECT ERROR in %s:\n%s\n",fname,s);
-	ed = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+	auto ed = vm.pr_global_struct->self;
 	ed->Print();
 	vm.ED_Free(ed);
-
 	Host_Error ("Program error");
 }
 
@@ -231,33 +225,28 @@ setmodel(entity, model)
 */
 void PF_setmodel (void)
 {
-	edict_t	*e;
-	const char	*m;
-	const char **check;
-	model_t	*mod;
-	int		i;
+	edict_t	*e = vm.G_EDICT(OFS_PARM0);
+	cstring_t m = vm.G_STRING(OFS_PARM1);
 
-	e = vm.G_EDICT(OFS_PARM0);
-	m = vm.G_STRING(OFS_PARM1);
-
+	int i = 0;
 // check to see if model was properly precached
-	for (i=0, check = sv.model_precache ; *check ; i++, check++)
-		if (!strcmp(*check, m))
-			break;
-			
-	if (!*check)
-		PR_RunError("no precache: "); // %s\n", m);
+	for (auto check : sv.model_precache) {
+		if (check == m) {
+			e->v.model = m;
+			e->v.modelindex = i;
+			model_t	*mod = sv.models[i];  // Mod_ForName (m, true);
+
+			if (mod)
+				SetMinMaxSize(e, mod->mins, mod->maxs, true);
+			else
+				SetMinMaxSize(e, vec3_origin, vec3_origin, true);
+			return;
+		}
+		i++;
+	}
+	PR_RunError("no precache: "); // %s\n", m);
 		
 
-	e->v.model = m - vm.pr_strings;
-	e->v.modelindex = i; //SV_ModelIndex (m);
-
-	mod = sv.models[ (int)e->v.modelindex];  // Mod_ForName (m, true);
-	
-	if (mod)
-		SetMinMaxSize (e, mod->mins, mod->maxs, true);
-	else
-		SetMinMaxSize (e, vec3_origin, vec3_origin, true);
 }
 
 /*
@@ -271,9 +260,7 @@ bprint(value)
 */
 void PF_bprint (void)
 {
-	char		*s;
-
-	s = PF_VarString(0);
+	auto s = PF_VarString(0);
 	SV_BroadcastPrintf ("%s", s);
 }
 
@@ -288,12 +275,10 @@ sprint(clientent, value)
 */
 void PF_sprint (void)
 {
-	char		*s;
 	client_t	*client;
-	int			entnum;
 	
-	entnum =vm.G_EDICTNUM(OFS_PARM0);
-	s = PF_VarString(1);
+	int entnum =vm.G_EDICTNUM(OFS_PARM0);
+	auto s = PF_VarString(1);
 	
 	if (entnum < 1 || entnum > svs.maxclients)
 	{
@@ -319,12 +304,12 @@ centerprint(clientent, value)
 */
 void PF_centerprint (void)
 {
-	char		*s;
+
 	client_t	*client;
 	int			entnum;
 	
 	entnum =vm.G_EDICTNUM(OFS_PARM0);
-	s = PF_VarString(1);
+	auto s = PF_VarString(1);
 	
 	if (entnum < 1 || entnum > svs.maxclients)
 	{
@@ -502,40 +487,31 @@ PF_ambientsound
 
 =================
 */
-void PF_ambientsound (void)
-{
-	const char		**check;
-	float		*pos;
-	float 		vol, attenuation;
-	int			i, soundnum;
-
-	pos = vm.G_VECTOR (OFS_PARM0);			
-	const char* samp = vm.G_STRING(OFS_PARM1);
-	vol = vm.G_FLOAT(OFS_PARM2);
-	attenuation = vm.G_FLOAT(OFS_PARM3);
+void PF_ambientsound (void){
+	const vec3_t& pos = vm.G_VECTOR (OFS_PARM0);
+	cstring_t samp = vm.G_STRING(OFS_PARM1);
+	float vol = vm.G_FLOAT(OFS_PARM2);
+	float attenuation = vm.G_FLOAT(OFS_PARM3);
 	
 // check to see if samp was properly precached
-	for (soundnum=0, check = sv.sound_precache ; *check ; check++, soundnum++)
-		if (!strcmp(*check,samp))
-			break;
-			
-	if (!*check)
-	{
-		Con_Printf ("no precache: %s\n", samp);
-		return;
-	}
+	int soundnum = 0;
+	for (auto check : sv.sound_precache) {
+		if (check == samp) {
+			// add an svc_spawnambient command to the level signon packet
 
-// add an svc_spawnambient command to the level signon packet
+			sv.signon.WriteByte(svc_spawnstaticsound);
+			for (int i = 0; i<3; i++)
+				sv.signon.WriteCoord(pos[i]);
 
-	sv.signon.WriteByte(svc_spawnstaticsound);
-	for (i=0 ; i<3 ; i++)
-		sv.signon.WriteCoord(pos[i]);
+			sv.signon.WriteByte(soundnum);
 
-	sv.signon.WriteByte(soundnum);
-
-	sv.signon.WriteByte(vol*255);
-	sv.signon.WriteByte(attenuation*64);
-
+			sv.signon.WriteByte(static_cast<int>(vol * 255.0f));
+			sv.signon.WriteByte(static_cast<int>(attenuation * 64.0f));
+			return;
+		}
+		soundnum++;
+	}	
+	Con_Printf ("no precache: %s\n", samp);
 }
 
 /*
@@ -553,19 +529,12 @@ Larger attenuations will drop off.
 
 =================
 */
-void PF_sound (void)
-{
-	const char		*sample;
-	int			channel;
-	edict_t		*entity;
-	int 		volume;
-	float attenuation;
-		
-	entity = vm.G_EDICT(OFS_PARM0);
-	channel = vm.G_FLOAT(OFS_PARM1);
-	sample = vm.G_STRING(OFS_PARM2);
-	volume = vm.G_FLOAT(OFS_PARM3) * 255;
-	attenuation = vm.G_FLOAT(OFS_PARM4);
+void PF_sound (void) {	
+	auto entity = vm.G_EDICT(OFS_PARM0);
+	auto channel = vm.G_FLOAT(OFS_PARM1);
+	auto sample = vm.G_STRING(OFS_PARM2);
+	auto volume = vm.G_FLOAT(OFS_PARM3) * 255;
+	auto attenuation = vm.G_FLOAT(OFS_PARM4);
 	
 	if (volume < 0 || volume > 255)
 		Sys_Error ("SV_StartSound: volume = %i", volume);
@@ -604,19 +573,13 @@ if the tryents flag is set.
 traceline (vector1, vector2, tryents)
 =================
 */
-void PF_traceline (void)
-{
-	float	*v1, *v2;
-	trace_t	trace;
-	int		nomonsters;
-	edict_t	*ent;
+void PF_traceline (void){
+	auto v1 = vm.G_VECTOR(OFS_PARM0);
+	auto v2 = vm.G_VECTOR(OFS_PARM1);
+	auto nomonsters = vm.G_FLOAT(OFS_PARM2);
+	auto ent = vm.G_EDICT(OFS_PARM3);
 
-	v1 = vm.G_VECTOR(OFS_PARM0);
-	v2 = vm.G_VECTOR(OFS_PARM1);
-	nomonsters = vm.G_FLOAT(OFS_PARM2);
-	ent = vm.G_EDICT(OFS_PARM3);
-
-	trace = SV_Move (v1, vec3_origin, vec3_origin, v2, nomonsters, ent);
+	trace_t trace = SV_Move (v1, vec3_origin, vec3_origin, v2, nomonsters, ent);
 
 	vm.pr_global_struct->trace_allsolid = trace.allsolid;
 	vm.pr_global_struct->trace_startsolid = trace.startsolid;
@@ -627,9 +590,9 @@ void PF_traceline (void)
 	VectorCopy (trace.plane.normal, vm.pr_global_struct->trace_plane_normal);
 	vm.pr_global_struct->trace_plane_dist =  trace.plane.dist;	
 	if (trace.ent)
-		vm.pr_global_struct->trace_ent = vm.EDICT_TO_PROG(trace.ent);
+		vm.pr_global_struct->trace_ent = trace.ent;
 	else
-		vm.pr_global_struct->trace_ent = vm.EDICT_TO_PROG(sv.worldedict);
+		vm.pr_global_struct->trace_ent = nullptr;
 }
 
 
@@ -726,7 +689,7 @@ int PF_newcheckclient (int check)
 	VectorAdd (ent->v.origin, ent->v.view_ofs, org);
 	leaf = Mod_PointInLeaf (org, sv.worldmodel);
 	pvs = Mod_LeafPVS (leaf, sv.worldmodel);
-	memcpy (checkpvs, pvs, (sv.worldmodel->numleafs+7)>>3 );
+	std::memcpy (checkpvs, pvs, (sv.worldmodel->numleafs+7)>>3 );
 
 	return i;
 }
@@ -750,7 +713,6 @@ name checkclient ()
 int c_invis, c_notvis;
 void PF_checkclient (void)
 {
-	edict_t	*ent, *self;
 	mleaf_t	*leaf;
 	int		l;
 	vec3_t	view;
@@ -763,7 +725,7 @@ void PF_checkclient (void)
 	}
 
 // return check if it might be visible	
-	ent = vm.EDICT_NUM(sv.lastcheck);
+	edict_t	*ent = vm.EDICT_NUM(sv.lastcheck);
 	if (vm.is_edict_free(ent) || ent->v.health <= 0)
 	{
 		vm.RETURN_EDICT(sv.worldedict);
@@ -771,7 +733,7 @@ void PF_checkclient (void)
 	}
 
 // if current entity can't possibly see the check entity, return 0
-	self = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+	edict_t	*self = vm.pr_global_struct->self;
 	VectorAdd (self->v.origin, self->v.view_ofs, view);
 	leaf = Mod_PointInLeaf (view, sv.worldmodel);
 	l = (leaf - sv.worldmodel->leafs) - 1;
@@ -802,15 +764,14 @@ stuffcmd (clientent, value)
 void PF_stuffcmd (void)
 {
 	int		entnum;
-	const char	*str;
-	client_t	*old;
+
 	
 	entnum =vm.G_EDICTNUM(OFS_PARM0);
 	if (entnum < 1 || entnum > svs.maxclients)
 		PR_RunError ("Parm 0 not a client");
-	str = vm.G_STRING(OFS_PARM1);	
+	cstring_t str = vm.G_STRING(OFS_PARM1);
 	
-	old = host_client;
+	client_t	*old = host_client;
 	host_client = &svs.clients[entnum-1];
 	Host_ClientCommands ("%s", str);
 	host_client = old;
@@ -827,7 +788,7 @@ localcmd (string)
 */
 void PF_localcmd (void)
 {
-	const char* str = vm.G_STRING(OFS_PARM0);	
+	cstring_t str = vm.G_STRING(OFS_PARM0);
 	Cbuf_AddText (str);
 }
 
@@ -840,7 +801,7 @@ float cvar (string)
 */
 void PF_cvar (void)
 {
-	const char* str = vm.G_STRING(OFS_PARM0);
+	cstring_t str = vm.G_STRING(OFS_PARM0);
 	
 	vm.G_FLOAT(OFS_RETURN) = Cvar_VariableValue (str);
 }
@@ -855,8 +816,8 @@ float cvar (string)
 void PF_cvar_set (void)
 {
 
-	const char*  var = vm.G_STRING(OFS_PARM0);
-	const char*  val = vm.G_STRING(OFS_PARM1);
+	cstring_t  var = vm.G_STRING(OFS_PARM0);
+	cstring_t  val = vm.G_STRING(OFS_PARM1);
 	
 	Cvar_Set (var, val);
 }
@@ -872,7 +833,7 @@ findradius (origin, radius)
 */
 void PF_findradius (void)
 {
-	edict_t	*chain;
+	edict_t	*chain, *ent;
 	float	rad;
 	float	*org;
 	vec3_t	eorg;
@@ -883,16 +844,17 @@ void PF_findradius (void)
 	org = vm.G_VECTOR(OFS_PARM0);
 	rad = vm.G_FLOAT(OFS_PARM1);
 
-	for(auto& ent : vm){
-		if (ent.v.solid == SOLID_NOT)
+	for(auto& ee : vm){
+		ent = ee;
+		if (ent->v.solid == SOLID_NOT)
 			continue;
 		for (j=0 ; j<3 ; j++)
-			eorg[j] = org[j] - (ent.v.origin[j] + (ent.v.mins[j] + ent.v.maxs[j])*0.5);			
+			eorg[j] = org[j] - (ent->v.origin[j] + (ent->v.mins[j] + ent->v.maxs[j])*0.5);
 		if (Length(eorg) > rad)
 			continue;
 			
-		ent.v.chain = vm.EDICT_TO_PROG(chain);
-		chain = &ent;
+		ent->v.chain = chain;
+		chain = ent;
 	}
 
 	vm.RETURN_EDICT(chain);
@@ -913,14 +875,13 @@ char	pr_string_temp[128];
 
 void PF_ftos (void)
 {
-	float	v;
-	v = vm.G_FLOAT(OFS_PARM0);
+	float v = vm.G_FLOAT(OFS_PARM0);
 	
 	if (v == (int)v)
 		Q_sprintf (pr_string_temp, "%d",(int)v);
 	else
 		Q_sprintf (pr_string_temp, "%5.1f",v);
-	vm.G_INT(OFS_RETURN) = pr_string_temp - vm.pr_strings;
+	vm.G_STRING(OFS_RETURN) = pr_string_temp;
 }
 
 void PF_fabs (void)
@@ -933,7 +894,7 @@ void PF_fabs (void)
 void PF_vtos (void)
 {
 	Q_sprintf (pr_string_temp, "'%5.1f %5.1f %5.1f'", vm.G_VECTOR(OFS_PARM0)[0], vm.G_VECTOR(OFS_PARM0)[1], vm.G_VECTOR(OFS_PARM0)[2]);
-	vm.G_INT(OFS_RETURN) = pr_string_temp - vm.pr_strings;
+	vm.G_STRING(OFS_RETURN) = pr_string_temp;
 }
 
 #ifdef QUAKE2
@@ -1018,19 +979,19 @@ void PF_Find (void)
 
 	e = vm.G_EDICTNUM(OFS_PARM0);
 	f = vm.G_INT(OFS_PARM1);
-	const char* s = vm.G_STRING(OFS_PARM2);
+	cstring_t s = vm.G_STRING(OFS_PARM2);
 	if (!s)
 		PR_RunError ("PF_Find: bad search string");
 		
-	for (e++ ; e < vm.pr_num_edicts ; e++)
+	for (e++ ; e < vm.used_edicts(); e++)
 	{
 		ed = vm.EDICT_NUM(e);
 		if (vm.is_edict_free(ed))
 			continue;
-		const char* t = ed->E_STRING(f);
+		cstring_t t = ed->E_STRING(f);
 		if (!t)
 			continue;
-		if (!strcmp(t,s))
+		if (t==s)
 		{
 			vm.RETURN_EDICT(ed);
 			return;
@@ -1059,9 +1020,9 @@ void PF_precache_sound (void)
 	if (sv.state != ss_loading)
 		PR_RunError ("PF_Precache_*: Precache can only be done in spawn functions");
 		
-	const char* s = vm.G_STRING(OFS_PARM0);
+	cstring_t s = vm.G_STRING(OFS_PARM0);
 	vm.G_INT(OFS_RETURN) = vm.G_INT(OFS_PARM0);
-	PR_CheckEmptyString (s);
+	PR_CheckEmptyString (s.c_str());
 	
 	for (i=0 ; i<MAX_SOUNDS ; i++)
 	{
@@ -1070,7 +1031,7 @@ void PF_precache_sound (void)
 			sv.sound_precache[i] = s;
 			return;
 		}
-		if (!strcmp(sv.sound_precache[i], s))
+		if (s == sv.sound_precache[i])
 			return;
 	}
 	PR_RunError ("PF_precache_sound: overflow");
@@ -1083,9 +1044,9 @@ void PF_precache_model (void)
 	if (sv.state != ss_loading)
 		PR_RunError ("PF_Precache_*: Precache can only be done in spawn functions");
 		
-	const char* s = vm.G_STRING(OFS_PARM0);
+	cstring_t s = vm.G_STRING(OFS_PARM0);
 	vm.G_INT(OFS_RETURN) = vm.G_INT(OFS_PARM0);
-	PR_CheckEmptyString (s);
+	PR_CheckEmptyString (s.c_str());
 
 	for (i=0 ; i<MAX_MODELS ; i++)
 	{
@@ -1095,7 +1056,7 @@ void PF_precache_model (void)
 			sv.models[i] = Mod_ForName (s, true);
 			return;
 		}
-		if (!strcmp(sv.model_precache[i], s))
+		if (sv.model_precache[i]== s)
 			return;
 	}
 	PR_RunError ("PF_precache_model: overflow");
@@ -1109,12 +1070,12 @@ void PF_coredump (void)
 
 void PF_traceon (void)
 {
-	pr_trace = true;
+	//pr_trace = true;
 }
 
 void PF_traceoff (void)
 {
-	pr_trace = false;
+	//pr_trace = false;
 }
 
 void PF_eprint (void)
@@ -1129,17 +1090,12 @@ PF_walkmove
 float(float yaw, float dist) walkmove
 ===============
 */
-void PF_walkmove (void)
-{
-	edict_t	*ent;
-	float	yaw, dist;
+void PF_walkmove (void) {
 	vec3_t	move;
-	dfunction_t	*oldf;
-	int 	oldself;
 	
-	ent = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
-	yaw = vm.G_FLOAT(OFS_PARM0);
-	dist = vm.G_FLOAT(OFS_PARM1);
+	edict_t	* ent = vm.pr_global_struct->self;
+	float yaw = vm.G_FLOAT(OFS_PARM0);
+	float dist = vm.G_FLOAT(OFS_PARM1);
 	
 	if ( !( (int)ent->v.flags & (FL_ONGROUND|FL_FLY|FL_SWIM) ) )
 	{
@@ -1154,12 +1110,11 @@ void PF_walkmove (void)
 	move[2] = 0;
 
 // save program state, because SV_movestep may call other progs
-	oldf = vm.pr_xfunction;
-	oldself = vm.pr_global_struct->self;
+	auto oldf = vm.pr_xfunction;
+	auto oldself = vm.pr_global_struct->self;
 	
 	vm.G_FLOAT(OFS_RETURN) = SV_movestep(ent, move, true);
-	
-	
+
 // restore program state
 	vm.pr_xfunction = oldf;
 	vm.pr_global_struct->self = oldself;
@@ -1174,16 +1129,14 @@ void() droptofloor
 */
 void PF_droptofloor (void)
 {
-	edict_t		*ent;
 	vec3_t		end;
-	trace_t		trace;
-	
-	ent = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+
+	auto ent = vm.pr_global_struct->self;
 
 	VectorCopy (ent->v.origin, end);
 	end[2] -= 256;
 	
-	trace = SV_Move (ent->v.origin, ent->v.mins, ent->v.maxs, end, false, ent);
+	trace_t trace = SV_Move (ent->v.origin, ent->v.mins, ent->v.maxs, end, false, ent);
 
 	if (trace.fraction == 1 || trace.allsolid)
 		vm.G_FLOAT(OFS_RETURN) = 0;
@@ -1206,13 +1159,10 @@ void(float style, string value) lightstyle
 */
 void PF_lightstyle (void)
 {
-	int		style;
-	const char	*val;
-	client_t	*client;
-	int			j;
+
 	
-	style = vm.G_FLOAT(OFS_PARM0);
-	val = vm.G_STRING(OFS_PARM1);
+	int style = static_cast<int>(vm.G_FLOAT(OFS_PARM0));
+	cstring_t val = vm.G_STRING(OFS_PARM1);
 
 // change the string in sv
 	sv.lightstyles[style] = val;
@@ -1220,7 +1170,9 @@ void PF_lightstyle (void)
 // send message to all clients on this server
 	if (sv.state != ss_active)
 		return;
-	
+
+	client_t	*client;
+	int			j;
 	for (j=0, client = svs.clients ; j<svs.maxclients ; j++, client++)
 		if (client->active || client->spawned)
 		{
@@ -1256,9 +1208,7 @@ PF_checkbottom
 */
 void PF_checkbottom (void)
 {
-	edict_t	*ent;
-	
-	ent = vm.G_EDICT(OFS_PARM0);
+	edict_t	*ent = vm.G_EDICT(OFS_PARM0);
 
 	vm.G_FLOAT(OFS_RETURN) = SV_CheckBottom (ent);
 }
@@ -1268,13 +1218,9 @@ void PF_checkbottom (void)
 PF_pointcontents
 =============
 */
-void PF_pointcontents (void)
-{
-	float	*v;
-	
-	v =vm.G_VECTOR(OFS_PARM0);
-
-vm.G_FLOAT(OFS_RETURN) = SV_PointContents (v);	
+void PF_pointcontents (void) {
+	float	*v =vm.G_VECTOR(OFS_PARM0);
+	vm.G_FLOAT(OFS_RETURN) = SV_PointContents (v);	
 }
 
 /*
@@ -1290,12 +1236,13 @@ void PF_nextent (void)
 	edict_t	*ent;
 	
 	i =vm.G_EDICTNUM(OFS_PARM0);
+	ent = vm.G_EDICT(OFS_PARM0);
 	while (1)
 	{
 		i++;
-		if (i == vm.pr_num_edicts)
+		if (i == vm.used_edicts())
 		{
-			vm.RETURN_EDICT(sv.worldedict);
+			vm.RETURN_EDICT(nullptr);
 			return;
 		}
 		ent = vm.EDICT_NUM(i);
@@ -1316,7 +1263,8 @@ vector aim(entity, missilespeed)
 cvar_t	sv_aim = {"sv_aim", "0.93"};
 void PF_aim (void)
 {
-	edict_t	*ent, *check, *bestent;
+	edict_t	*ent;
+	const edict_t *bestent;
 	vec3_t	start, dir, end, bestdir;
 	int		i, j;
 	trace_t	tr;
@@ -1347,7 +1295,7 @@ void PF_aim (void)
 	bestent = NULL;
 	for(auto& e : vm)
 	{
-		check = &e;
+		const edict_t* check = e;
 		if (check->v.takedamage != DAMAGE_AIM)
 			continue;
 		if (check == ent)
@@ -1394,10 +1342,10 @@ This was a major timewaster in progs, so it was converted to C
 */
 void PF_changeyaw (void)
 {
-	edict_t		*ent;
+
 	float		ideal, current, move, speed;
 	
-	ent = vm.PROG_TO_EDICT(vm.pr_global_struct->self);
+	edict_t		*ent = vm.pr_global_struct->self;
 	current = anglemod( ent->v.angles[1] );
 	ideal = ent->v.ideal_yaw;
 	speed = ent->v.yaw_speed;
@@ -1499,8 +1447,8 @@ sizebuf_t *WriteDest (void)
 		return &sv.datagram;
 	
 	case MSG_ONE:
-		ent = vm.PROG_TO_EDICT(vm.pr_global_struct->msg_entity);
-		entnum =vm.NUM_FOR_EDICT(ent);
+		ent = vm.pr_global_struct->msg_entity;
+		entnum = vm.NUM_FOR_EDICT(ent);
 		if (entnum < 1 || entnum > svs.maxclients)
 			PR_RunError ("WriteDest: not a client");
 		return &svs.clients[entnum-1].message;
@@ -1562,7 +1510,7 @@ void PF_WriteEntity (void)
 
 //=============================================================================
 
-int SV_ModelIndex (char *name);
+int SV_ModelIndex (cstring_t name);
 
 void PF_makestatic (void)
 {
@@ -1573,7 +1521,7 @@ void PF_makestatic (void)
 
 	sv.signon.WriteByte(svc_spawnstatic);
 
-	sv.signon.WriteByte(SV_ModelIndex(vm.pr_strings + ent->v.model));
+	sv.signon.WriteByte(SV_ModelIndex(ent->v.model));
 
 	sv.signon.WriteByte(ent->v.frame);
 	sv.signon.WriteByte(ent->v.colormap);
@@ -1636,13 +1584,13 @@ void PF_changelevel (void)
 		Cbuf_AddText (va("changelevel2 %s %s\n",s1, s2));
 #else
 
-	quake::fixed_printf_buffer<128> va;
+	quake::va_stack<128> va;
 // make sure we don't issue two changelevels
 	if (svs.changelevel_issued)
 		return;
 	svs.changelevel_issued = true;
 	
-	const char* s = vm.G_STRING(OFS_PARM0);
+	cstring_t s = vm.G_STRING(OFS_PARM0);
 	Cbuf_AddText (va("changelevel %s\n",s));
 #endif
 }

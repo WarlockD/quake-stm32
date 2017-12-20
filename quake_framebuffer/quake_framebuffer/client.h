@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "common.h"
 #include "mathlib.h"
-typedef struct
+struct usercmd_t
 {
 	vec3_t	viewangles;
 
@@ -31,10 +31,11 @@ typedef struct
 	float	forwardmove;
 	float	sidemove;
 	float	upmove;
+	usercmd_t() : viewangles{ 0.0f, 0.0f, 0.0f }, forwardmove(0.0f), sidemove(0.0f), upmove(0.0f) {}
 #ifdef QUAKE2
 	byte	lightlevel;
 #endif
-} usercmd_t;
+} ;
 
 typedef struct
 {
@@ -119,14 +120,14 @@ struct client_static_t
 	//quake::debug_t<cactive_t>	state;
 	cactive_t	state;
 // personalization data sent to server	
-	quake::string mapstring;
-	quake::string spawnparms;
+	quake::zstring mapstring;
+	quake::zstring spawnparms;
 	//char		mapstring[MAX_QPATH];
 	//char		spawnparms[MAX_MAPSTRING];	// to restart a level
 
 // demo loop control
 	int			demonum;		// -1 = don't play demos
-	UVector <ZUniquePtr<char>> demos; // when not playing
+	StringArgs demos; // when not playing
 
 // demo recording info must be here, because record is started before
 // entering a map (and clearing client_state_t)
@@ -148,7 +149,7 @@ struct client_static_t
 	void clear();		
 	void stop_playback();
 	void stop();
-	void establish_connection(const quake::string_view& host);
+	void establish_connection(const std::string_view& host);
 	void disconnect();
 	void signon_reply();
 	void next_demo();
@@ -317,14 +318,14 @@ void	CL_DecayLights (void);
 
 void CL_Init (void);
 
-//void CL_EstablishConnection (const quake::string_view& host, cmd_source_t source, size_t argc, const quake::string_view argv[]);
+//void CL_EstablishConnection (cstring_t host, cmd_source_t source, const StringArgs& args);
 void CL_Signon1 (void);
 void CL_Signon2 (void);
 void CL_Signon3 (void);
 void CL_Signon4 (void);
 
 //void CL_Disconnect (void);
-void CL_Disconnect_f (cmd_source_t source, size_t argc, const quake::string_view args[]);
+void CL_Disconnect_f(cmd_source_t source, const StringArgs& args);
 //void CL_NextDemo (void);
 
 #define			MAX_VISEDICTS	256
@@ -368,10 +369,10 @@ const char *Key_KeynumToString (int keynum);
 
 int CL_GetMessage (void);
 
-void CL_Stop_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
-void CL_Record_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
-void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
-void CL_TimeDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void CL_Stop_f(cmd_source_t source, const StringArgs&args);
+void CL_Record_f(cmd_source_t source, const StringArgs&args);
+void CL_PlayDemo_f(cmd_source_t source, const StringArgs&args);
+void CL_TimeDemo_f(cmd_source_t source, const StringArgs&args);
 
 //
 // cl_parse.c

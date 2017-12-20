@@ -94,6 +94,8 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PrecompiledHeaderFile>icommon.h</PrecompiledHeaderFile>
+      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+      <BrowseInformation>true</BrowseInformation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -201,6 +203,7 @@
     <ClCompile Include="pr_cmds.cpp" />
     <ClCompile Include="pr_edict.cpp" />
     <ClCompile Include="pr_exec.cpp" />
+    <ClCompile Include="pr_print.cpp" />
     <ClCompile Include="r_aclip.cpp" />
     <ClCompile Include="r_alias.cpp" />
     <ClCompile Include="r_bsp.cpp" />
@@ -249,6 +252,7 @@
     <ClInclude Include="console.h" />
     <ClInclude Include="crc.h" />
     <ClInclude Include="cvar.h" />
+    <ClInclude Include="cx_util.h" />
     <ClInclude Include="dosisms.h" />
     <ClInclude Include="draw.h" />
     <ClInclude Include="d_iface.h" />
@@ -260,6 +264,7 @@
     <ClInclude Include="iqueue.h" />
     <ClInclude Include="keys.h" />
     <ClInclude Include="list.hpp" />
+    <ClInclude Include="macros.h" />
     <ClInclude Include="mathlib.h" />
     <ClInclude Include="menu.h" />
     <ClInclude Include="model.h" />
@@ -280,6 +285,7 @@
     <ClInclude Include="progs.h" />
     <ClInclude Include="protocol.h" />
     <ClInclude Include="pr_comp.h" />
+    <ClInclude Include="pr_print.h" />
     <ClInclude Include="quakeasm.h" />
     <ClInclude Include="quakedef.h" />
     <ClInclude Include="render.h" />
@@ -294,6 +300,7 @@
     <ClInclude Include="spritegn.h" />
     <ClInclude Include="sys.h" />
     <ClInclude Include="tailq.hpp" />
+    <ClInclude Include="ulib.h" />
     <ClInclude Include="vgamodes.h" />
     <ClInclude Include="vid.h" />
     <ClInclude Include="vid_dos.h" />

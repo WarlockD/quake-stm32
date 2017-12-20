@@ -99,7 +99,7 @@ void Z_Stats_f(void)
 {
 	quake::con << z_bytes << "bytes in " << z_count << " blocks" << std::endl;
 }
-void Z_Stats_f(cmd_source_t source, size_t argc, const quake::string_view args[]) { Z_Stats_f(); }
+void Z_Stats_f(cmd_source_t source, const StringArgs& args) { Z_Stats_f(); }
 
 /*
 ========================
@@ -123,7 +123,7 @@ void Z_Print_f()
 	}
 
 }
-void Z_Print_f(cmd_source_t source, size_t argc, const quake::string_view args[]) { Z_Print_f(); }
+void Z_Print_f(cmd_source_t source, const StringArgs& args) { Z_Print_f(); }
 /*
 ========================
 Z_FreeTags
@@ -600,7 +600,7 @@ void Hunk_Print (qboolean all)
 Hunk_AllocName
 ===================
 */
-void *Hunk_AllocName (int size, const quake::string_view& name)
+void *Hunk_AllocName (int size, const std::string_view& name)
 {
 	hunk_t	*h;
 	
@@ -626,8 +626,7 @@ void *Hunk_AllocName (int size, const quake::string_view& name)
 	
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	name.copy(h->name, sizeof(h->name));
-	h->name[7] = 0; 
+	Q_strncpy(h->name, name.data(),std::min(sizeof(h->name)-1,name.size()));
 
 	
 	return (void *)(h+1);
@@ -686,7 +685,7 @@ void Hunk_FreeToHighMark (int mark)
 Hunk_HighAllocName
 ===================
 */
-void *Hunk_HighAllocName (size_t size, const quake::string_view&  name)
+void *Hunk_HighAllocName (size_t size, const std::string_view&   name)
 {
 	hunk_t	*h;
 
@@ -964,7 +963,7 @@ Cache_Flush
 Throw everything out, so new data will be demand cached
 ============
 */
-void Cache_Flush (cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Cache_Flush (cmd_source_t source, const StringArgs& args)
 {
 	while (cache_head.next != &cache_head)
 		Cache_Free ( cache_head.next->user );	// reclaim the space
@@ -1019,7 +1018,7 @@ void Cache_Init (void)
 	cache_head.next = cache_head.prev = &cache_head;
 	cache_head.lru_next = cache_head.lru_prev = &cache_head;
 
-	Cmd_AddCommand ("flush", Cache_Flush);
+
 }
 
 /*
@@ -1076,7 +1075,7 @@ void *Cache_Check (cache_user_t *c)
 Cache_Alloc
 ==============
 */
-void *Cache_Alloc (cache_user_t *c, int size, const quake::string_view& name)
+void *Cache_Alloc (cache_user_t *c, int size, const std::string_view&  name)
 {
 	cache_system_t	*cs;
 
@@ -1121,19 +1120,21 @@ void *Cache_Alloc (cache_user_t *c, int size, const quake::string_view& name)
 Memory_Init
 ========================
 */
+void  StringInit(); // MUST be done first
 void Memory_Init(void *buf, size_t size)
 {
 	size_t p;
 	int zonesize = DYNAMIC_SIZE;
-	quake::string_view value;
+	cstring_t value;
 
 	hunk_base = (byte*)buf;
 	hunk_size = size;
 	hunk_low_used = 0;
 	hunk_high_used = 0;
 
-	Cache_Init();
 
+	Cache_Init();
+#if 0
 	if ((p = host_parms.COM_CheckParmValue("-zone", value)) != 0)
 	{
 		if (!value.empty() && ::isdigit(value[0]))
@@ -1141,8 +1142,12 @@ void Memory_Init(void *buf, size_t size)
 		else
 			Sys_Error("Memory_Init: you must specify a size in KB after -zone");
 	}
+#endif
 	mainzone = (memzone_t*)Hunk_AllocName(zonesize, "zone");
 	Z_ClearZone(mainzone, zonesize);
+	StringInit();
+
+	Cmd_AddCommand("flush", Cache_Flush);
 }
 
 /// umm stuff

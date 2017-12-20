@@ -312,7 +312,7 @@ void SV_WaterJump (void)
 	|| !sv_player->v.waterlevel)
 	{
 		sv_player->v.flags = static_cast<float>((int)sv_player->v.flags & ~FL_WATERJUMP);
-		sv_player->v.teleport_time = idTime::zero();
+		sv_player->v.teleport_time = static_cast<float>(idTime::zero());
 	}
 	sv_player->v.velocity[0] = sv_player->v.movedir[0];
 	sv_player->v.velocity[1] = sv_player->v.movedir[1];

@@ -42,10 +42,10 @@ void Con_Print (const char *txt);
 void Con_Printf (const char *fmt, ...);
 void Con_DPrintf (const char *fmt, ...);
 void Con_SafePrintf (const char *fmt, ...);
-void Con_Clear_f(cmd_source_t source, size_t argc, const quake::string_view&  argv);
+void Con_Clear_f(cmd_source_t source, size_t argc, cstring_t  argv);
 void Con_DrawNotify (void);
 void Con_ClearNotify (void);
-void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
+void Con_ToggleConsole_f(cmd_source_t source, const StringArgs& args);
 
 void Con_NotifyBox (char *text);	// during startup for sound / cd warnings
 

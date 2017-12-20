@@ -272,8 +272,6 @@ SV_TouchLinks
 */
 void SV_TouchLinks ( edict_t *ent, areanode_t *node )
 {
-	int			old_self, old_other;
-
 // touch linked edicts
 	for (auto& touch : node->trigger_edicts) {
 		if (&touch == ent)
@@ -287,14 +285,13 @@ void SV_TouchLinks ( edict_t *ent, areanode_t *node )
 			|| ent->v.absmax[1] < touch.v.absmin[1]
 			|| ent->v.absmax[2] < touch.v.absmin[2])
 			continue;
-		old_self = vm.pr_global_struct->self;
-		old_other = vm.pr_global_struct->other;
+		auto old_self = vm.pr_global_struct->self;
+		auto old_other = vm.pr_global_struct->other;
 
-		vm.pr_global_struct->self = vm.EDICT_TO_PROG(&touch);
-		vm.pr_global_struct->other = vm.EDICT_TO_PROG(ent);
+		vm.pr_global_struct->self = &touch;
+		vm.pr_global_struct->other = ent;
 		vm.pr_global_struct->time = idCast<float>(sv.time);
-		PR_ExecuteProgram(touch.v.touch);
-
+		touch.v.touch->call();
 		vm.pr_global_struct->self = old_self;
 		vm.pr_global_struct->other = old_other;
 	}
@@ -832,9 +829,9 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 			return;
 		if (clip->passedict)
 		{
-		 	if (vm.PROG_TO_EDICT(touch.v.owner) == clip->passedict)
+		 	if (touch.v.owner == clip->passedict)
 				continue;	// don't clip against own missiles
-			if (vm.PROG_TO_EDICT(clip->passedict->v.owner) == &touch)
+			if (clip->passedict->v.owner == &touch)
 				continue;	// don't clip against owner
 		}
 

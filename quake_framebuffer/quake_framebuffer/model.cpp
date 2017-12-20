@@ -182,7 +182,7 @@ Mod_FindName
 
 ==================
 */
-static model_t *Mod_FindName (const quake::string_view& name)
+static model_t *Mod_FindName (cstring_t name)
 {
 	int		i;
 	model_t	*mod;
@@ -219,7 +219,7 @@ static model_t *Mod_FindName (const quake::string_view& name)
 		}
 		else
 			mod_numknown++;
-		name.copy(mod->name, sizeof(mod->name));
+		mod->name = string_t::intern(name);
 		mod->needload = NL_NEEDS_LOADED;
 	}
 
@@ -232,7 +232,7 @@ Mod_TouchModel
 
 ==================
 */
-void Mod_TouchModel (const quake::string_view& name)
+void Mod_TouchModel (cstring_t name)
 {
 	model_t	*mod;
 	
@@ -245,7 +245,7 @@ void Mod_TouchModel (const quake::string_view& name)
 	}
 }
 template<size_t SIZE>
-void COM_FileBase(const quake::string_view& in, char(&out)[SIZE])
+static void COM_FileBase(const std::string_view& in, char(&out)[SIZE])
 {
 	const char *s2;
 	const char* s = &in.back();
@@ -298,7 +298,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // load the file
 //
-	buf = (unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
+	buf = (unsigned *)COM_LoadStackFile (mod->name.c_str(), stackbuf, sizeof(stackbuf));
 	if (!buf)
 	{
 		if (crash)
@@ -309,7 +309,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // allocate a new model
 
-	COM_FileBase(mod->name, loadname);
+	COM_FileBase(mod->name.c_str(), loadname);
 
 	
 	loadmodel = mod;
@@ -346,7 +346,7 @@ Mod_ForName
 Loads in a model for the given name
 ==================
 */
-model_t *Mod_ForName (const quake::string_view& name, qboolean crash)
+model_t *Mod_ForName (cstring_t name, qboolean crash)
 {
 	model_t	*mod;
 
@@ -1230,10 +1230,10 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 		{	// duplicate the basic information
 			char	name[10];
 
-			sprintf (name, "*%i", i+1);
+			Q_sprintf(name, "*%i", i+1);
 			loadmodel = Mod_FindName (name);
 			*loadmodel = *mod;
-			strcpy (loadmodel->name, name);
+			loadmodel->name = string_t::intern(name);
 			mod = loadmodel;
 		}
 	}
@@ -1874,7 +1874,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 Mod_Print
 ================
 */
-void Mod_Print(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Mod_Print(cmd_source_t source, const StringArgs& args)
 {
 	int		i;
 	model_t	*mod;

@@ -123,35 +123,48 @@ private:
 
 #else
 struct cvar_t {
-	const char* name;
-	quake::string string;
+	cstring_t name;
+	cstring_t string;
 	float value;
+
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
 	qboolean server;		// notifies players when changed
+
 	cvar_t *next;
-};
+	cvar_t(cstring_t name, cstring_t string) : name(name), string(string), value(0.0f), archive(false), server(false) {}
+	cvar_t(cstring_t name, cstring_t string, float value,bool archive=false, bool server=false) : name(name), string(string), value(value), archive(archive), server(server) {}
+	cvar_t(cstring_t name, cstring_t string, bool value, bool archive = false, bool server = false) : name(name), string(string), value(static_cast<float>(value)), archive(archive), server(server) {}
+	
+	void set(const std::string_view& value);
+	void set(float value);
+private:
+
+	string_t _string;
+};	
 #endif
 void 	Cvar_RegisterVariable (cvar_t *variable);
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
-void 	Cvar_Set (const quake::string_view& var_name, const quake::string_view& value);
+void 	Cvar_Set (string_t var_name, const std::string_view& value);
 // equivelant to "<name> <variable>" typed at the console
 
-void	Cvar_SetValue (const quake::string_view& var_name, float value);
+void	Cvar_SetValue (string_t var_name, float value);
+
+
 // expands value to a string and calls Cvar_Set
 
-float	Cvar_VariableValue (const quake::string_view& var_name);
+float	Cvar_VariableValue (string_t var_name);
 // returns 0 if not defined or non numeric
 
-quake::string_view Cvar_VariableString (const quake::string_view &var_name);
+std::string_view Cvar_VariableString (string_t var_name);
 // returns an empty string if not defined
 
-quake::string_view Cvar_CompleteVariable (const quake::string_view & partial);
+std::string_view Cvar_CompleteVariable (const std::string_view& partial);
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 
-//qboolean Cvar_Command (size_t argc, const quake::string_view argv[]);
+//qboolean Cvar_Command (const StringArgs& args);
 // called by Cmd_ExecuteString when Cmd_Argv(0) doesn't match a known
 // command.  Returns true if the command was a variable reference that
 // was handled. (print or change)
@@ -160,8 +173,7 @@ void 	Cvar_WriteVariables (std::ostream& f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
-cvar_t *Cvar_FindVar (const quake::string_view& var_name);
-
+cvar_t *Cvar_FindVar (string_t  var_name);
 
 extern	cvar_t	registered;
 //extern cvar_t	*cvar_vars;

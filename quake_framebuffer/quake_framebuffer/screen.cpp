@@ -62,7 +62,7 @@ qboolean	scr_skipupdate;
 
 qboolean	block_drawing;
 
-static void  SCR_ScreenShot_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
+static void  SCR_ScreenShot_f(cmd_source_t source, const StringArgs& args);
 
 /*
 ===============================================================================
@@ -284,7 +284,7 @@ SCR_SizeUp_f
 Keybinding command
 =================
 */
-void SCR_SizeUp_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void SCR_SizeUp_f(cmd_source_t source, const StringArgs& args)
 {
 	Cvar_SetValue ("viewsize",scr_viewsize.value+10);
 	vid.recalc_refdef = 1;
@@ -298,7 +298,7 @@ SCR_SizeDown_f
 Keybinding command
 =================
 */
-void SCR_SizeDown_f(cmd_source_t source, size_t argc, const quake::string_view argv[]){
+void SCR_SizeDown_f(cmd_source_t source, const StringArgs& args){
 	Cvar_SetValue ("viewsize",scr_viewsize.value-10);
 	vid.recalc_refdef = 1;
 }
@@ -612,7 +612,7 @@ void WritePCXfile (const char *filename, byte *data, int width, int height,
 SCR_ScreenShot_f
 ================== 
 */  
-static void SCR_ScreenShot_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+static void SCR_ScreenShot_f(cmd_source_t source, const StringArgs& args)
 { 
 	quake::fixed_string_stream<MAX_OSPATH> checkname;
 

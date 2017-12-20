@@ -73,7 +73,7 @@ Sbar_ShowScores
 Tab key down
 ===============
 */
-void Sbar_ShowScores(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Sbar_ShowScores(cmd_source_t source, const StringArgs& args)
 {
 	if (sb_showscores)
 		return;
@@ -88,7 +88,7 @@ Sbar_DontShowScores
 Tab key up
 ===============
 */
-void Sbar_DontShowScores(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Sbar_DontShowScores(cmd_source_t source, const StringArgs& args)
 {
 	sb_showscores = false;
 	sb_updates = 0;
@@ -112,7 +112,7 @@ Sbar_Init
 void Sbar_Init (void)
 {
 	int		i;
-	quake::fixed_printf_buffer<64> va;
+	quake::va_stack<64> va;
 	for (i=0 ; i<10 ; i++)
 	{
 		sb_nums[0][i] = Draw_PicFromWad (va("num_%i",i));

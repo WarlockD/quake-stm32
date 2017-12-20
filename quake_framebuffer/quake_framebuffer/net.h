@@ -231,9 +231,9 @@ idTime SetNetTime(void);
 
 struct hostcache_t
 {
-	char	name[16];
-	char	map[16];
-	char	cname[32];
+	string_t	name;
+	string_t	map;
+	string_t	cname;
 	int		users;
 	int		maxusers;
 	int		driver;
@@ -279,7 +279,7 @@ void		NET_Shutdown (void);
 qsocket_t	*NET_CheckNewConnections (void);
 // returns a new connection number if there is one pending, else -1
 
-qsocket_t	*NET_Connect (quake::string_view host);
+qsocket_t	*NET_Connect (std::string_view host);
 // called by client to connect to a host.  Returns -1 if not able to
 
 qboolean NET_CanSendMessage (qsocket_t *sock);

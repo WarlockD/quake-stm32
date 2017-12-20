@@ -65,11 +65,9 @@ Dumps the current net message, prefixed by the length and view angles
 */
 void CL_WriteDemoMessage (void)
 {
-	int		len;
-	int		i;
 	id_little_binary_writer bw(quake::cls.demofile);
 	bw << net_message.size();
-	for (i = 0; i < 3; i++)
+	for (int i = 0; i < 3; i++)
 		bw << quake::cl.viewangles[i];
 	bw.write(net_message.data(), net_message.size());
 	quake::cls.demofile.flush();
@@ -170,7 +168,7 @@ void client_static_t::stop() {
 	demorecording = false;
 	quake::con << "Completed demo" << std::endl;
 }
-void CL_Stop_f (cmd_source_t source, size_t argc, const quake::string_view argv[])
+void CL_Stop_f (cmd_source_t source, const StringArgs& args)
 {
 	if (source != src_command)
 		return;
@@ -185,7 +183,7 @@ CL_Record_f
 record <demoname> <map> [cd track]
 ====================
 */
-void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view args[])
+void CL_Record_f (cmd_source_t source, const StringArgs& args)
 {
 	int		c;
 
@@ -194,14 +192,14 @@ void CL_Record_f (cmd_source_t source, size_t argc, const quake::string_view arg
 	if (source != src_command)
 		return;
 
-	c = argc;
+	c = args.size();
 	if (c != 2 && c != 3 && c != 4)
 	{
 		Con_Printf ("record <demoname> [<map> [cd track]]\n");
 		return;
 	}
 
-	if (args[1].find("..") != quake::string_view::npos)
+	if (args[1].find("..") != std::string_view::npos)
 	{
 		Con_Printf ("Relative pathnames are not allowed.\n");
 		return;
@@ -265,7 +263,7 @@ play [demoname]
 ====================
 */
 
-void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[])
+void CL_PlayDemo_f(cmd_source_t source, const StringArgs& args)
 {
 	int c;
 	qboolean neg = false;
@@ -273,7 +271,7 @@ void CL_PlayDemo_f(cmd_source_t source, size_t argc, const quake::string_view ar
 	if (source != src_command)
 		return;
 
-	if (argc != 2)
+	if (args.size() != 2)
 	{
 		Con_Printf ("play <demoname> : plays a demo\n");
 		return;
@@ -348,18 +346,18 @@ CL_TimeDemo_f
 timedemo [demoname]
 ====================
 */
-void CL_TimeDemo_f(cmd_source_t source, size_t argc, const quake::string_view args[])
+void CL_TimeDemo_f(cmd_source_t source, const StringArgs& args)
 {
 	if (source != src_command)
 		return;
 
-	if (argc != 2)
+	if (args.size() != 2)
 	{
 		Con_Printf ("timedemo <demoname> : gets demo speeds\n");
 		return;
 	}
 
-	CL_PlayDemo_f (source,argc, args);
+	CL_PlayDemo_f (source,args);
 	
 // quake::cls.td_starttime will be grabbed at the second frame of the demo, so
 // all the loading time doesn't get counted

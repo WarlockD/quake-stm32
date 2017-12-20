@@ -124,7 +124,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 typedef enum {key_game, key_console, key_message, key_menu} keydest_t;
 
 extern keydest_t	key_dest;
-extern quake::fixed_string<64> keybindings[256];
+extern string_t keybindings[256];
 extern	int		key_repeats[256];
 extern	int		key_count;			// incremented every key event
 extern	int		key_lastpress;

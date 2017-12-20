@@ -304,7 +304,7 @@ qboolean Cbuf_AddLateCommands (void)
 // build the combined string to parse from
 	s = 0;
 	argc = COM_Argc();
-	for (i=1 ; i<argc ; i++)
+	for (i=1 ; i<argc; i++)
 	{
 		s += strlen (COM_Argv(i)) + 1;
 	}
@@ -525,7 +525,7 @@ char	*Cmd_Argv (int arg)
 ============
 Cmd_Args
 
-Returns a single string containing argv(1) to argv(argc()-1)
+Returns a single string containing args(1) to args(args.size()()-1)
 ============
 */
 char		*Cmd_Args (void)

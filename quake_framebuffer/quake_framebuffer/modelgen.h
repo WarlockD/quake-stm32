@@ -56,7 +56,7 @@ typedef enum { ALIAS_SINGLE=0, ALIAS_GROUP } aliasframetype_t;
 
 typedef enum { ALIAS_SKIN_SINGLE=0, ALIAS_SKIN_GROUP } aliasskintype_t;
 
-typedef struct {
+struct mdl_t {
 	int			ident;
 	int			version;
 	vec3_t		scale;
@@ -72,15 +72,15 @@ typedef struct {
 	synctype_t	synctype;
 	int			flags;
 	float		size;
-} mdl_t;
+} ;
 
 // TODO: could be shorts
 
-typedef struct {
+struct  stvert_t {
 	int		onseam;
 	int		s;
 	int		t;
-} stvert_t;
+} ;
 
 typedef struct dtriangle_s {
 	int					facesfront;

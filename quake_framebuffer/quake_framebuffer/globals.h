@@ -36,7 +36,7 @@ public:
 	const char* name;
 	const char* value;
 	static void operator delete(void *ptr);
-	static cmdalias_t* create(const quake::string_view& name, const quake::string_view& value);
+	static cmdalias_t* create(const std::string_view& name, const std::string_view& value);
 	//char	name[MAX_ALIAS_NAME];
 	//quake::fixed_string<256> value; // this can be a script.. humm
 } ;
@@ -46,7 +46,7 @@ struct cmd_function_t
 {
 	cmd_function_t	*next;
 	xcommand_t		function;
-	char name[1];
+	string_t name;
 } ;
 
 
@@ -61,7 +61,7 @@ typedef struct {
 struct prstack_t
 {
 	int				s;
-	dfunction_t		*f;
+	const dfunction_t		*f;
 } ;
 
 #define	PR_MAX_STACK_DEPTH		32

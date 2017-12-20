@@ -228,6 +228,9 @@
     <ClCompile Include="icommon.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="pr_print.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">
@@ -443,6 +446,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="iqueue.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="pr_print.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="macros.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="cx_util.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="ulib.h">
       <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>

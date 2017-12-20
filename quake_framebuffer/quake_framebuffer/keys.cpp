@@ -25,9 +25,8 @@ key up events are sent even if in console mode
 
 */
 
-
 #define		MAXCMDLINE	256
-char	key_lines[32][MAXCMDLINE];
+quake::fixed_string<MAXCMDLINE>	key_lines[32];
 int		key_linepos;
 int		shift_down=false;
 int		key_lastpress;
@@ -39,7 +38,7 @@ keydest_t	key_dest;
 
 int		key_count;			// incremented every key event
 
-quake::fixed_string<64> keybindings[256];
+string_t keybindings[256];
 qboolean	consolekeys[256];	// if true, can't be rebound while in console
 qboolean	menubound[256];	// if true, can't be rebound while in menu
 int		keyshift[256];		// key to map to if shift held down in console
@@ -161,12 +160,12 @@ void Key_Console (int key)
 	
 	if (key == K_ENTER)
 	{
-		Cbuf_AddText (key_lines[edit_line]+1);	// skip the >
+		Cbuf_AddText (key_lines[edit_line].substr(1));	// skip the >
 		Cbuf_AddText ("\n");
-		Con_Printf ("%s\n",key_lines[edit_line]);
+		Con_Printf ("%s\n",key_lines[edit_line].c_str());
 		edit_line = (edit_line + 1) & 31;
 		history_line = edit_line;
-		key_lines[edit_line][0] = ']';
+		key_lines[edit_line] = "]";
 		key_linepos = 1;
 		if (quake::cls.state == ca_disconnected)
 			SCR_UpdateScreen ();	// force an update, because the command
@@ -176,16 +175,13 @@ void Key_Console (int key)
 
 	if (key == K_TAB)
 	{	// command completion
-		quake::string_view cmd = Cmd_CompleteCommand (key_lines[edit_line]+1);
+		std::string_view cmd = Cmd_CompleteCommand (key_lines[edit_line].substr(1));
 		if (cmd.empty())
-			cmd = Cvar_CompleteVariable (key_lines[edit_line]+1);
+			cmd = Cvar_CompleteVariable (key_lines[edit_line].substr(1));
 		if (!cmd.empty())
 		{
-			cmd.copy(key_lines[edit_line] + 1,sizeof(key_lines[edit_line]) - 1);
-			key_linepos = cmd.size() + 1;
-			key_lines[edit_line][key_linepos] = ' ';
-			key_linepos++;
-			key_lines[edit_line][key_linepos] = 0;
+			key_lines[edit_line] = cmd.substr(1);
+			key_lines[edit_line] += ' ';
 			return;
 		}
 	}
@@ -203,11 +199,11 @@ void Key_Console (int key)
 		{
 			history_line = (history_line - 1) & 31;
 		} while (history_line != edit_line
-				&& !key_lines[history_line][1]);
+				&& key_lines[history_line].size() > 1);
 		if (history_line == edit_line)
 			history_line = (edit_line+1)&31;
-		Q_strcpy(key_lines[edit_line], key_lines[history_line]);
-		key_linepos = Q_strlen(key_lines[edit_line]);
+		key_lines[edit_line] = key_lines[history_line];
+		key_linepos = key_lines[edit_line].size();
 		return;
 	}
 
@@ -219,16 +215,16 @@ void Key_Console (int key)
 			history_line = (history_line + 1) & 31;
 		}
 		while (history_line != edit_line
-			&& !key_lines[history_line][1]);
+			&& key_lines[history_line].size() < 1);
 		if (history_line == edit_line)
 		{
-			key_lines[edit_line][0] = ']';
+			key_lines[edit_line] = "]";
 			key_linepos = 1;
 		}
 		else
 		{
-			Q_strcpy(key_lines[edit_line], key_lines[history_line]);
-			key_linepos = Q_strlen(key_lines[edit_line]);
+			key_lines[edit_line] = key_lines[history_line];
+			key_linepos = key_lines[edit_line].size();
 		}
 		return;
 	}
@@ -266,9 +262,8 @@ void Key_Console (int key)
 		
 	if (key_linepos < MAXCMDLINE-1)
 	{
-		key_lines[edit_line][key_linepos] = key;
+		key_lines[edit_line] += key;
 		key_linepos++;
-		key_lines[edit_line][key_linepos] = 0;
 	}
 
 }
@@ -337,7 +332,7 @@ the given string.  Single ascii characters return themselves, while
 the K_* names are matched up.
 ===================
 */
-int Key_StringToKeynum (const quake::string_view& str)
+int Key_StringToKeynum (cstring_t str)
 {
 	keyname_t	*kn;
 	
@@ -390,7 +385,7 @@ const char *Key_KeynumToString (int keynum)
 Key_SetBinding
 ===================
 */
-static void Key_SetBinding (int keynum, const quake::string_view& binding)
+static void Key_SetBinding (int keynum, cstring_t binding)
 {
 	char	*new_ptr;
 
@@ -403,32 +398,31 @@ static void Key_SetBinding (int keynum, const quake::string_view& binding)
 Key_Unbind_f
 ===================
 */
-void Key_Unbind_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Key_Unbind_f(cmd_source_t source, const StringArgs& args)
 {
 	int		b;
 
-	if (argc!= 2)
-	{
+	if (args.size()!= 2) {
 		Con_Printf ("unbind <key> : remove commands from a key\n");
 		return;
 	}
 	
-	b = Key_StringToKeynum (argv[1]);
+	b = Key_StringToKeynum (args[1]);
 	if (b==-1)
 	{
-		Con_Printf ("\"%s\" isn't a valid key\n", argv[1]);
+		quake::con << '"' << args[1] << "\" isn't a valid key" << std::endl;
 		return;
 	}
-	keybindings[b].clear();
+	keybindings[b] = string_t();
 }
 
-void Key_Unbindall_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Key_Unbindall_f(cmd_source_t source, const StringArgs& args)
 {
 	int		i;
 	
 	for (i = 0; i < 256; i++)
 		if (!keybindings[i].empty())
-			keybindings[i].clear();
+			keybindings[i] = string_t();
 }
 
 
@@ -437,40 +431,38 @@ void Key_Unbindall_f(cmd_source_t source, size_t argc, const quake::string_view 
 Key_Bind_f
 ===================
 */
-void Key_Bind_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void Key_Bind_f(cmd_source_t source, const StringArgs& args)
 {
-	int			 c, b;
-
-	
-	c = argc;
+	int c = args.size();
 
 	if (c != 2 && c != 3)
 	{
 		Con_Printf ("bind <key> [command] : attach a command to a key\n");
 		return;
 	}
-	b = Key_StringToKeynum (argv[1]);
+	int b = Key_StringToKeynum (args[1]);
 	if (b==-1)
 	{
-		quake::con << "\"" << argv[1] << "\" isn't a valid key" << std::endl;
+		quake::con << "\"" << args[1] << "\" isn't a valid key" << std::endl;
 		return;
 	}
 	auto& cmd = keybindings[b];
 	if (c == 2)
 	{
 		if (!cmd.empty())
-			quake::con << "\"" << argv[1] << "\" = \"" << cmd << "\"" << std::endl;
+			quake::con << "\"" << args[1] << "\" = \"" << cmd << "\"" << std::endl;
 		else
-			quake::con << "\"" << argv[1] << "\"  is not bound" << std::endl;
+			quake::con << "\"" << args[1] << "\"  is not bound" << std::endl;
 		return;
 	}
-	cmd.clear();
+	quake::fixed_string_stream<128> ss;
 // copy the rest of the command line
 	for (int i=2 ; i< c ; i++)
 	{
-		if (i > 2) cmd.push_back(' ');
-		cmd.append(argv[i]);
+		if (i > 2) ss << ' ';
+		ss << args[i];
 	}
+	cmd = ss.str().c_str();
 }
 
 /*
@@ -496,12 +488,10 @@ Key_Init
 void Key_Init (void)
 {
 	int		i;
+	string_t default = string_t::intern("]");
 
 	for (i=0 ; i<32 ; i++)
-	{
-		key_lines[i][0] = ']';
-		key_lines[i][1] = 0;
-	}
+		key_lines[i] = default;
 	key_linepos = 1;
 	
 //
@@ -639,16 +629,16 @@ void Key_Event (int key, qboolean down)
 		auto& kb = keybindings[key];
 		if (!kb.empty() && kb[0] == '+')
 		{
-			quake::fixed_printf_buffer<512> cmd;
-			Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
+			quake::va_stack<512> cmd;
+			Cbuf_AddText(cmd("-%s %i\n", kb.c_str() + 1, key));
 		}
 		if (keyshift[key] != key)
 		{
 			kb = keybindings[keyshift[key]];
 			if (!kb.empty() && kb[0] == '+')
 			{
-				quake::fixed_printf_buffer<512> cmd;
-				Cbuf_AddText(cmd("-%s %i\n", kb.data() + 1, key));
+				quake::va_stack<512> cmd;
+				Cbuf_AddText(cmd("-%s %i\n", kb.c_str() + 1, key));
 			}
 		}
 		return;
@@ -675,7 +665,7 @@ void Key_Event (int key, qboolean down)
 		{
 			if (kb.front() == '+')
 			{	// button commands add keynum as a parm
-				quake::fixed_printf_buffer<512> cmd;
+				quake::va_stack<512> cmd;
 				Cbuf_AddText(cmd("%s %i\n", kb.c_str() + 1, key));
 			}
 			else

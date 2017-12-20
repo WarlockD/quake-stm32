@@ -263,13 +263,13 @@ void R_SetSkyFrame (void)
 	int		g, s1, s2;
 	float	temp;
 
-	skyspeed = iskyspeed;
-	skyspeed2 = iskyspeed2;
+	skyspeed = static_cast<vec_t>(iskyspeed);
+	skyspeed2 = static_cast<vec_t>(iskyspeed2);
 
 	g = GreatestCommonDivisor (iskyspeed, iskyspeed2);
 	s1 = iskyspeed / g;
 	s2 = iskyspeed2 / g;
-	temp = SKYSIZE * s1 * s2;
+	temp = static_cast<vec_t>(SKYSIZE * s1 * s2);
 
 	skytime = quake::cl.time - std::chrono::seconds(static_cast<int>((idCast<float>(quake::cl.time) / temp) * temp));
 	

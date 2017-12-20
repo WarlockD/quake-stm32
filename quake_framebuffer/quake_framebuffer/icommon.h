@@ -1,12 +1,9 @@
 #pragma once
 // internal header for some functions
 
-#include "icommon.h"
 
 #include "quakedef.h"
-#include <type_traits>
-#include <utility>
-#include <algorithm>
+
 
 // because, some times, we got to use something we know that works, and might be a shit ton of macros
 #include "iqueue.h"

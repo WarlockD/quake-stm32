@@ -44,7 +44,8 @@ int			con_totallines;		// total lines in console scrollback
 int			con_backscroll;		// lines up from bottom to display
 int			con_current;		// where next message will be printed
 int			con_x;				// offset in current line for next print
-char		*con_text=0;
+
+static quake::string_buffer con_text;
 
 cvar_t		con_notifytime = {"con_notifytime","3"};		//seconds
 
@@ -57,7 +58,8 @@ int			con_vislines;
 qboolean	con_debuglog;
 
 #define		MAXCMDLINE	256
-extern	char	key_lines[32][MAXCMDLINE];
+
+extern	quake::fixed_string<MAXCMDLINE>	key_lines[32];
 extern	int		edit_line;
 extern	int		key_linepos;
 		
@@ -66,15 +68,16 @@ qboolean	con_initialized;
 
 int			con_notifylines;		// scan lines to clear for notify lines
 
-extern void M_Menu_Main_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
+extern void M_Menu_Main_f(cmd_source_t source, const StringArgs& args);
 
 /*
 ================
 Con_ToggleConsole_f
 ================
 */
-void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_view  argv[])
+void Con_ToggleConsole_f(cmd_source_t source, const StringArgs& args)
 {
+	
 	if (key_dest == key_console)
 	{
 		if (quake::cls.state == ca_connected)
@@ -85,7 +88,7 @@ void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_v
 		}
 		else
 		{
-			M_Menu_Main_f (source,argc, argv);
+			M_Menu_Main_f (source,args);
 		}
 	}
 	else
@@ -100,10 +103,10 @@ void Con_ToggleConsole_f(cmd_source_t source, size_t argc, const quake::string_v
 Con_Clear_f
 ================
 */
-void Con_Clear_f(cmd_source_t source, size_t argc, const quake::string_view  argv[])
+void Con_Clear_f(cmd_source_t source, const StringArgs& args)
 {
-	if (con_text)
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+	if (con_text) con_text.assign(' ', CON_TEXTSIZE);
+	con_backscroll = 0; //johnfitz -- if console is empty, being scrolled up is confusing
 }
 
 						
@@ -128,7 +131,7 @@ Con_MessageMode_f
 */
 extern qboolean team_message;
 
-void Con_MessageMode_f(cmd_source_t source, size_t argc, const quake::string_view args[])
+void Con_MessageMode_f(cmd_source_t source, const StringArgs& args)
 {
 	key_dest = key_message;
 	team_message = false;
@@ -140,7 +143,7 @@ void Con_MessageMode_f(cmd_source_t source, size_t argc, const quake::string_vie
 Con_MessageMode2_f
 ================
 */
-void Con_MessageMode2_f(cmd_source_t source, size_t argc, const quake::string_view args[])
+void Con_MessageMode2_f(cmd_source_t source, const StringArgs& args)
 {
 	key_dest = key_message;
 	team_message = true;
@@ -154,47 +157,42 @@ Con_CheckResize
 If the line width has changed, reformat the buffer.
 ================
 */
-void Con_CheckResize (void)
-{
-	int		i, j, width, oldwidth, oldtotallines, numlines, numchars;
+void Con_CheckResize (void) {
 	char	tbuf[CON_TEXTSIZE];
 
-	width = (vid.width >> 3) - 2;
-
-	if (width == con_linewidth)
-		return;
+	int width = (vid.width >> 3) - 2;
+	if (width == con_linewidth) return;
 
 	if (width < 1)			// video hasn't been initialized yet
 	{
 		width = 38;
 		con_linewidth = width;
 		con_totallines = CON_TEXTSIZE / con_linewidth;
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
-	}
-	else
-	{
-		oldwidth = con_linewidth;
+		con_text.assign(' ', CON_TEXTSIZE);
+	} else {
+		int oldwidth = con_linewidth;
 		con_linewidth = width;
-		oldtotallines = con_totallines;
+		int oldtotallines = con_totallines;
 		con_totallines = CON_TEXTSIZE / con_linewidth;
-		numlines = oldtotallines;
+		int numlines = oldtotallines;
 
 		if (con_totallines < numlines)
 			numlines = con_totallines;
 
-		numchars = oldwidth;
+		int numchars = oldwidth;
 	
 		if (con_linewidth < numchars)
 			numchars = con_linewidth;
 
 		Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
+		con_text.assign(' ', CON_TEXTSIZE);
 		Q_memset (con_text, ' ', CON_TEXTSIZE);
 
-		for (i=0 ; i<numlines ; i++)
+		for (int i=0 ; i<numlines ; i++)
 		{
-			for (j=0 ; j<numchars ; j++)
+			for (int j=0 ; j<numchars ; j++)
 			{
-				con_text[(con_totallines - 1 - i) * con_linewidth + j] =
+				con_text[(  - 1 - i) * con_linewidth + j] =
 						tbuf[((con_current - i + oldtotallines) %
 							  oldtotallines) * oldwidth + j];
 			}
@@ -226,8 +224,10 @@ void Con_Init (void)
 			temp << COM_GameDir << '/' << t2;
 			unlink (temp.str().c_str());
 	}
-	con_text = (char*)Hunk_AllocName (CON_TEXTSIZE, "context");
-	Q_memset (con_text, ' ', CON_TEXTSIZE);
+	con_text = quake::string_buffer((char*)Hunk_AllocName(CON_TEXTSIZE, "context"), CON_TEXTSIZE+1);
+	con_text.assign(' ', CON_TEXTSIZE);
+	//con_text =;
+	//Q_memset (con_text, ' ', CON_TEXTSIZE);
 	con_linewidth = -1;
 	Con_CheckResize ();
 	
@@ -578,23 +578,22 @@ void Con_DrawInput (void)
 {
 	int		y;
 	int		i;
-	char	*text;
 
 	if (key_dest != key_console && !con_forcedup)
 		return;		// don't draw anything
 
-	text = key_lines[edit_line];
+	auto& text = key_lines[edit_line];
 	
 // add the cursor frame
-	text[key_linepos] = 10+((int)(idCast<float>(realtime)*con_cursorspeed)&1);
+	text += (char)( 10+((int)(idCast<float>(realtime)*con_cursorspeed)&1));
 	
 // fill out remainder with spaces
 	for (i=key_linepos+1 ; i< con_linewidth ; i++)
-		text[i] = ' ';
+		text += ' ';
 		
 //	prestep if horizontally scrolling
 	if (key_linepos >= con_linewidth)
-		text += 1 + key_linepos - con_linewidth;
+		text.resize(1 + key_linepos - con_linewidth);
 		
 // draw it
 	y = con_vislines-16;
@@ -603,7 +602,7 @@ void Con_DrawInput (void)
 		Draw_Character ( (i+1)<<3, con_vislines - 16, text[i]);
 
 // remove cursor
-	key_lines[edit_line][key_linepos] = 0;
+	key_lines[edit_line].clear();
 }
 
 
@@ -614,26 +613,21 @@ Con_DrawNotify
 Draws the last few lines of output transparently over the game top
 ================
 */
-void Con_DrawNotify (void)
-{
-	int		x, v;
-	char	*text;
-	int		i;
-	idTime	time;
+void Con_DrawNotify (void) {
 	extern char chat_buffer[];
-
-	v = 0;
-	for (i= con_current-NUM_CON_TIMES+1 ; i<=con_current ; i++)
+	int x;
+	int v = 0;
+	for (int i= con_current-NUM_CON_TIMES+1 ; i<=con_current ; i++)
 	{
 		if (i < 0)
 			continue;
-		time = con_times[i % NUM_CON_TIMES];
+		idTime time = con_times[i % NUM_CON_TIMES];
 		if (time == idTime::zero())
 			continue;
 		time = realtime - time;
 		if (idCast<float>(time) > con_notifytime.value)
 			continue;
-		text = con_text + (i % con_totallines)*con_linewidth;
+		const char* text = con_text + (i % con_totallines)*con_linewidth;
 		
 		clearnotify = 0;
 		scr_copytop = 1;
@@ -649,16 +643,13 @@ void Con_DrawNotify (void)
 	{
 		clearnotify = 0;
 		scr_copytop = 1;
-	
-		x = 0;
-		
-		Draw_String (8, v, "say:");
-		while(chat_buffer[x])
-		{
-			Draw_Character ( (x+5)<<3, v, chat_buffer[x]);
-			x++;
-		}
-		Draw_Character ( (x+5)<<3, v, 10+((int)(idCast<float>(realtime)*con_cursorspeed)&1));
+
+		Draw_String(8, v, "say:");
+
+		for (x= 0; chat_buffer[x]; x++)
+			Draw_Character((x + 5) << 3, v, chat_buffer[x]);
+
+		Draw_Character((x + 5) << 3, v, 10 + ((int)(idCast<float>(realtime)*con_cursorspeed) & 1));
 		v += 8;
 	}
 	
@@ -674,15 +665,8 @@ Draws the console with the solid background
 The typing input line at the bottom should only be drawn if typing is allowed
 ================
 */
-void Con_DrawConsole (int lines, qboolean drawinput)
-{
-	int				i, x, y;
-	int				rows;
-	char			*text;
-	int				j;
-	
-	if (lines <= 0)
-		return;
+void Con_DrawConsole (int lines, qboolean drawinput) {
+	if (lines <= 0) return;
 
 // draw the background
 	Draw_ConsoleBackground (lines);
@@ -690,17 +674,17 @@ void Con_DrawConsole (int lines, qboolean drawinput)
 // draw the text
 	con_vislines = lines;
 
-	rows = (lines-16)>>3;		// rows of text to draw
-	y = lines - 16 - (rows<<3);	// may start slightly negative
+	int rows = (lines-16)>>3;		// rows of text to draw
+	int y = lines - 16 - (rows<<3);	// may start slightly negative
 
-	for (i= con_current - rows + 1 ; i<=con_current ; i++, y+=8 )
+	for (int i= con_current - rows + 1 ; i<=con_current ; i++, y+=8 )
 	{
-		j = i - con_backscroll;
-		if (j<0)
-			j = 0;
-		text = con_text + (j % con_totallines)*con_linewidth;
+		int j = i - con_backscroll;
+		if (j<0) j = 0;
+		int linno = (j % con_totallines)*con_linewidth;
+		const char* text = con_text + linno;
 
-		for (x=0 ; x<con_linewidth ; x++)
+		for (int x=0 ; x<con_linewidth ; x++)
 			Draw_Character ( (x+1)<<3, y, text[x]);
 	}
 

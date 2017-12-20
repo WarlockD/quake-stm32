@@ -225,7 +225,7 @@ void Draw_String (int x, int y, const char * str)
 		x += 8;
 	}
 }
-void Draw_String(int x, int y, const quake::string_view& str) {
+void Draw_String(int x, int y, cstring_t str) {
 	for (auto c : str) {
 		Draw_Character(x, y, c);
 		x += 8;

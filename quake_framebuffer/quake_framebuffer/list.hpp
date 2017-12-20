@@ -14,7 +14,7 @@
 namespace list {
 	template<typename T> struct entry;
 	template<typename T> using field = entry<T> T::*;
-	template<typename T, field<T> FIELD> class head_impl;
+	template<typename T, field<T> FIELD> struct head_impl;
 	template<typename T, field<T> FIELD, bool _is_const> struct iterator;
 	template<typename T, field<T> FIELD> struct container;
 	constexpr static uintptr_t UNLINK_MAGIC_VALUE = 0x87654321;

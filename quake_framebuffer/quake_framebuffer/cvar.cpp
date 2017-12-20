@@ -25,20 +25,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 cvar_t	*cvar_vars;
 char	*cvar_null_string = "";
 
+static std::unordered_map<string_t, cvar_t*> c_vars;
 /*
 ============
 Cvar_FindVar
 ============
 */
-cvar_t *Cvar_FindVar (const quake::string_view& var_name)
+cvar_t *Cvar_FindVar(string_t var_name)
 {
-	cvar_t	*var;
-	
-	for (var=cvar_vars ; var ; var=var->next)
-		if (var_name == var->name)
-			return var;
-
-	return nullptr;
+	auto it = c_vars.find(var_name);
+	return  (it != c_vars.end()) ? it->second : nullptr;
 }
 
 /*
@@ -46,11 +42,8 @@ cvar_t *Cvar_FindVar (const quake::string_view& var_name)
 Cvar_VariableValue
 ============
 */
-float	Cvar_VariableValue (const quake::string_view& var_name)
-{
-	cvar_t	*var;
-	
-	var = Cvar_FindVar (var_name);
+float	Cvar_VariableValue (string_t var_name) {
+	cvar_t	*var = Cvar_FindVar(var_name);
 	if (!var)
 		return std::numeric_limits<float>::quiet_NaN();
 	return Q_atof (var->string);
@@ -62,13 +55,11 @@ float	Cvar_VariableValue (const quake::string_view& var_name)
 Cvar_VariableString
 ============
 */
-quake::string_view Cvar_VariableString (const quake::string_view & var_name)
+std::string_view Cvar_VariableString (string_t var_name)
 {
-	cvar_t *var;
-	
-	var = Cvar_FindVar (var_name);
+	cvar_t *var = Cvar_FindVar (var_name);
 	if (!var)
-		return quake::string_view();
+		return std::string_view();
 	return var->string;
 }
 
@@ -78,7 +69,7 @@ quake::string_view Cvar_VariableString (const quake::string_view & var_name)
 Cvar_CompleteVariable
 ============
 */
-quake::string_view  Cvar_CompleteVariable (const quake::string_view&	partial)
+std::string_view  Cvar_CompleteVariable (const std::string_view&	partial)
 {
 	cvar_t		*cvar;
 	int			len;
@@ -88,10 +79,10 @@ quake::string_view  Cvar_CompleteVariable (const quake::string_view&	partial)
 		
 // check functions
 	for (cvar=cvar_vars ; cvar ; cvar=cvar->next)
-		if (!Q_strncmp (partial.data(),cvar->name, partial.size()))
+		if (cvar->name == partial)
 			return cvar->name;
 
-	return quake::string_view();
+	return std::string_view();
 }
 
 
@@ -100,49 +91,43 @@ quake::string_view  Cvar_CompleteVariable (const quake::string_view&	partial)
 Cvar_Set
 ============
 */
-void Cvar_Set (const quake::string_view& var_name, const quake::string_view& value)
+void Cvar_Set (string_t var_name, const std::string_view& value)
 {
-	cvar_t	*var;
-	qboolean changed;
-	
-	var = Cvar_FindVar (var_name);
+	cvar_t	*var = Cvar_FindVar(var_name);
 	if (!var)
 	{	// there is an error in C code if this happens
 		quake::con << "Cvar_Set: variable " << var_name << " not found" << std::endl;
 		return;
 	}
-	quake::string temp(value.data(), value.size());
-	if (var->string != temp) {
-		var->string = std::move(temp);
-#if 0
-		Z_Free(var->string);	// free the old value string
-
-		var->string = (char*)Z_Malloc(value.size() + 1);
-		value.copy(var->string, value.size());
-		var->string[value.size()] = 0;
-#endif
-		float f = Q_atof(var->string);
-		var->value = f;
-
-		if (var->server && changed)
+	var->set(value);
+}
+void cvar_t::set(const std::string_view& value) {
+	if (string != value) {
+		_string = string_t::intern(value);
+		string = _string;
+		this->value = Q_atof(string.c_str());
+		if (server)
 		{
 			if (sv.active)
-				SV_BroadcastPrintf("\"%s\" changed to \"%s\"\n", var->name, var->string);
+				SV_BroadcastPrintf("\"%s\" changed to \"%s\"\n",this->name.c_str(),_string.c_str());
 		}
 	}
 }
-
+void cvar_t::set(float value) {
+	quake::fixed_string_stream<32> val;
+	val << value;
+	set(val.str().c_str());
+}
 /*
 ============
 Cvar_SetValue
 ============
 */
-void Cvar_SetValue (const quake::string_view& var_name, float value)
-{
+void Cvar_SetValue (string_t  var_name, float value) {
 	quake::fixed_string_stream<32> val;
 	val << value;
 	auto test = val.str();
-	Cvar_Set (var_name, val.str());
+	Cvar_Set (var_name, val.str().c_str());
 }
 
 
@@ -176,7 +161,8 @@ void Cvar_RegisterVariable (cvar_t *variable)
 //	variable->string = (char*)Z_Malloc (Q_strlen(variable->string)+1);
 //	Q_strcpy (variable->string, oldstr);
 	variable->value = Q_atof (variable->string);
-	
+	c_vars.emplace(variable->name, variable);
+	variable->name = string_t::intern(variable->name); // fix it
 // link the variable in
 	variable->next = cvar_vars;
 	cvar_vars = variable;
@@ -190,24 +176,25 @@ Handles variable inspection and changing from the console
 ============
 */
 
-qboolean	Cvar_Command (size_t argc, const quake::string_view argv[])
+qboolean	Cvar_Command (const StringArgs& args)
 {
+	
 	cvar_t			*v;
 
 // check variables
-	v = Cvar_FindVar (argv[0]);
+	v = Cvar_FindVar (args[0]);
 	if (!v)
 		return false;
 		
 // perform a variable print or set
-	if (argc == 1)
+	if (args.size() == 1)
 	{
 		quake::con << "\"" << v->name << "\" is \"" << v->string << "\"" << std::endl;
 		return true;
 	}
 
 
-	Cvar_Set (v->name, argv[1]);
+	Cvar_Set (v->name, args[1]);
 	return true;
 }
 

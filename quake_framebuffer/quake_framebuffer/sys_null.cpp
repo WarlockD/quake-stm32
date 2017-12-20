@@ -208,8 +208,10 @@ namespace quake {
 			*pptr() = char_traits::to_char_type(ch);
 			pbump(1);
 			sync();
+			//assert()
+			//_Myios::setstate(ios_base::badbit);	// sync failed
 		}
-		return char_traits::not_eof(ch);
+		return ch;
 	}
 	class console_buffer_t : public quake_console_buffer {
 	public:
@@ -232,7 +234,7 @@ namespace quake {
 	static debug_buffer_t debug_buffer;
 	std::ostream con(&console_buffer); // this is the main console out
 
-	extern std::ostream debug(&debug_buffer); // this is the console out
+	std::ostream debug(&debug_buffer); // this is the console out
 }
 
 
@@ -370,7 +372,7 @@ void Sys_LowFPPrecision (void)
 //=============================================================================
 static char test_block[MEMORY_SIZE];
 
-void main (int argc, const char **argv)
+void main (int argc, const char **args)
 {
 	idTime		time, oldtime, newtime;
 	quakeparms_t    parms;
@@ -400,12 +402,12 @@ void main (int argc, const char **argv)
 	parms.basedir = ".";
 	
 	for (int i = 0; i < argc; i++)
-		parms.COM_AddArg(argv[i]);
+		parms.COM_AddArg(args[i]);
 
 
-	//COM_GArgs.InitArgv(argc, argv);
+	//COM_GArgs.InitArgv(args);
 
-	quake::memblock block;
+
 
 
 	printf ("Host_Init\n");

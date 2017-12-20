@@ -22,10 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /*
 	Some side notes on the original Quake.  I havn't looked at Quake2 yet but they do ALOT of string copies.  First its copyied to com_token, THEN to another buff
 	THEN another buffer for vector_t for the Q_atof.  Thats just WAY to much because ware are directly moving it to the dictionary
-	So I made a class c alled quake::string_view that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
+	So I made a class c alled std::string_view that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
 	that crazy copying.
 
-	Just watch it as if the file is unloaded all the quake::string_view's suddenly become invalid
+	Just watch it as if the file is unloaded all the std::string_view's suddenly become invalid
 */
 #include "icommon.h"
 
@@ -47,7 +47,14 @@ int				pr_edict_size;	// in bytes
 
 #endif
 
-qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& value);
+// mainly for debugging
+
+// not sure where to put this
+
+
+
+qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& value);
+qboolean	ED_ParseEpair(edict_t *base, const ddef_t *key, const std::string_view& value);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
 cvar_t	gamecfg = {"gamecfg", "0"};
@@ -62,27 +69,21 @@ cvar_t	saved3 = {"saved3", "0", true};
 cvar_t	saved4 = {"saved4", "0", true};
 
 
-
-
-edict_t::edict_t(int num) : num(num) , vars() , free(false) {
-	VectorCopy(vec3_origin, v.origin);
-	VectorCopy(vec3_origin, v.angles);
-
-	v.nextthink = idTime(-1s);
-
+edict_t::edict_t(int num, int offset) : num(num) , offset(offset),free(false), vars(vm._field_info,&v) {
+	ClearFields();
+	set("origin", vec3_origin);
+	set("angles", vec3_origin);
+	set("nextthink", -1.0f);
 }
 edict_t::~edict_t() {
 	if (area.islinked()) area.remove<&edict_t::area>();
 }
-void edict_t::ClearFields() { std::memset(&v, 0, vm.progs->entityfields * 4); }
-/*
-=================
-ED_ClearEdict
-
-Sets everything to NULL
-=================
-*/
-
+void edict_t::ClearFields() {
+	std::memset(&v, 0, vm.progs->entityfields * sizeof(float));
+	set("origin", vec3_origin);
+	set("angles", vec3_origin);
+	set("nextthink", -1.0f);
+}
 
 /*
 =================
@@ -95,47 +96,71 @@ instead of being removed and recreated, which can cause interpolated
 angles and bad trails.
 =================
 */
-void pr_system_t::ED_HulkAllocEdicts(size_t size) {
+void pr_system_t::ED_HulkAllocEdicts(size_t count) {
 
 	const size_t total_size = pr_edict_size;
 	const size_t var_size = sizeof(entvars_t);
 	const size_t bentityfields = progs->entityfields * 4;
+
+
 	const size_t size_of_entvars = bentityfields - var_size;
 	const size_t edict_value_size = pr_edict_size - sizeof(edict_t) + var_size;
 	const size_t field_size = progs->entityfields * sizeof(uint32_t);
-	//return (edict_t *)((byte *)sv.edicts + (n)*pr_edict_size);
-	new(&free_pool) edict_list_t;
-	new(&used_pool) edict_list_t;
-	new(&reserved_pool) edict_list_t;
+
+
+	const size_t sizeof_edict = sizeof(edict_t) + progs->entityfields * 4 - sizeof(entvars_t);
+	const size_t allinged_sizeof_edict = (sizeof_edict + (sizeof(float) - 1)) & size_t(-int(sizeof(float)));
+	const size_t total_size_of_all_edicts = allinged_sizeof_edict * count;
+
+	assert(pr_edict_size == allinged_sizeof_edict);
+	free_pool.clear();
+	used_pool.clear();
+	reserved_pool.clear();
 	pr_edicts.clear();
-	pr_edicts.reserve(size);
-	char* ptr = (char*)Hunk_AllocName(size*pr_edict_size, "edicts");
-	pr_max_edicts = size;
-	for (size_t i = 0; i < pr_max_edicts; i++) {
-		edict_t* e = new(ptr + (i * pr_edict_size)) edict_t(i);
+
+	pr_edicts.reserve(count);
+	pr_edicts.clear();
+	
+	char* ptr = (char*)Hunk_AllocName(total_size_of_all_edicts, "edicts");
+	for (size_t i = 0; i < count; i++) {
+		ptrdiff_t offset = (i * allinged_sizeof_edict);
+		edict_t* e = new(ptr + offset) edict_t(i, offset);
 		e->free = true;
 		pr_edicts.emplace_back(e);
-		free_pool.push_back(e);
-
+		free_pool.emplace_back(e);
 #if 0
 		block_header_t* b = reinterpret_cast<block_header_t*>(ptr + (i * pr_edict_size));
 		new(b) block_header_t;
 
 		free_pool.push_back(b);
 #endif
+
 	}
 }
-edict_t *pr_system_t::ED_Alloc(bool reserve)
+edict_t *pr_system_t::ED_Alloc(bool reserve, edict_t* e)
 {
-	edict_t* eb = free_pool.pop_front();
-	assert(eb && eb->free);
-	eb->free = false;
-	++pr_num_edicts;
-	if (reserve)
-		reserved_pool.push_back(eb);
+	if (e == nullptr) {
+		if (free_pool.empty()) { // long search for one thats free
+			std::copy_if(
+				std::make_move_iterator(used_pool.begin()),
+				std::make_move_iterator(used_pool.end()),
+				std::back_inserter(free_pool),
+				[](const edict_t* e) { return e->free; }
+			);
+			assert(!free_pool.empty()); // if we are still empty, something went wrong
+		}
+		e = free_pool.front();
+		free_pool.pop_front();
+	}
+	else {
+		assert(e->free); // make sure we are free on suggestions
+	}
+	e->free = false;
+	if (!reserve)
+		used_pool.insert(e);
 	else
-		used_pool.push_back(eb);
-	return eb;
+		reserved_pool.insert(e);
+	return e;
 }
 
 /*
@@ -149,143 +174,18 @@ FIXME: walk all entities and NULL out references to this entity
 void pr_system_t::ED_Free(edict_t *e)
 {
 	if (!e->free) {
-		--pr_num_edicts;
-		used_pool.remove(e);
-		e->ClearFields();
-		VectorCopy(vec3_origin, e->v.angles);
-		VectorCopy(vec3_origin, e->v.origin);
-		e->v.nextthink = idTime(-1s);
-		e->freetime = sv.time;
-		free_pool.push_back(e);
-		e->vars.clear();
+		used_pool.erase(e);
 		e->free = true;
+		e->ClearFields();
+		e->freetime = sv.time;
+		free_pool.emplace_back(e);
+		//std::destroy_at(e);
 	}
-	//	assert(field_size == var_size);
-#if 0
-	std::memset(&v, 0, sizeof(entvars_t));
-	if (vars) vars->clear();
-	else vars = new map_t;
-	if (area.le_prev == nullptr) { area.le_prev = &(this->area.le_next); area.le_next = nullptr; }
-	assert(area.islinked());
-	free = false;
-#endif
-}
-//static_assert(sizeof(eval_t) == sizeof(uint32_t), "Eval union needs to be 4 bytes");
-
-
-eval_t& edict_t::get_field(const quake::string_view& field) {
-	ddef_t* def = vm.ED_FindField(field);
-	assert(def);
-	return get_field(def->ofs);
-}
-const eval_t& edict_t::get_field(const quake::string_view& field) const {
-	ddef_t* def = vm.ED_FindField(field);
-	assert(def);
-	return get_field(def->ofs);
 }
 
 
 
-//===========================================================================
 
-/*
-============
-ED_GlobalAtOfs
-============
-*/
-ddef_t *pr_system_t::ED_GlobalAtOfs (int ofs)
-{
-	ddef_t		*def;
-	int			i;
-	
-	for (i=0 ; i<progs->numglobaldefs ; i++)
-	{
-		def = &pr_globaldefs[i];
-		if (def->ofs == ofs)
-			return def;
-	}
-	return NULL;
-}
-
-/*
-============
-ED_FieldAtOfs
-============
-*/
-ddef_t *pr_system_t::ED_FieldAtOfs (int ofs)
-{
-	ddef_t		*def;
-	int			i;
-	
-	for (i=0 ; i<progs->numfielddefs ; i++)
-	{
-		def = &pr_fielddefs[i];
-		if (def->ofs == ofs)
-			return def;
-	}
-	return NULL;
-}
-
-/*
-============
-ED_FindField
-============
-*/
-ddef_t *pr_system_t::ED_FindField (const quake::string_view& name)
-{
-	ddef_t		*def = nullptr;
-	assert(dprograms_t::fields.data());
-	auto it = dprograms_t::fields.find(name);
-	if (it != dprograms_t::fields.end()) def= it->second;
-#if 0
-	
-	for (int i =0 ; i<progs->numfielddefs ; i++)
-	{
-		def = &pr_fielddefs[i];
-		const char* def_name = vm.pr_strings + def->s_name;
-		if (name == def_name) return def;
-	}
-#endif
-	return def;
-}
-
-
-/*
-============
-ED_FindGlobal
-============
-*/
-ddef_t *pr_system_t::ED_FindGlobal (const quake::string_view& name)
-{
-	ddef_t		*def = nullptr;
-	assert(dprograms_t::globals.data());
-	auto it = dprograms_t::globals.find(name);
-	if (it != dprograms_t::globals.end()) def = it->second;
-	return def;
-}
-
-
-/*
-============
-ED_FindFunction
-============
-*/
-dfunction_t *pr_system_t::ED_FindFunction (const quake::string_view& name)
-{
-	dfunction_t		*func = nullptr;
-	assert(dprograms_t::functions.data());
-	auto it = dprograms_t::functions.find(name);
-	if (it != dprograms_t::functions.end()) func = it->second;
-#if 0
-	for (int i=0 ; i<progs->numfunctions ; i++)
-	{
-		func = &pr_functions[i];
-		const char* func_name = vm.pr_strings + func->s_name;
-		if (name == func_name) return func;
-	}
-#endif
-	return func;
-}
 
 
 
@@ -301,37 +201,30 @@ class PR_UglyValueString : public quake::stream_output {
 public:
 	PR_UglyValueString(idType type, eval_t *val) : type(type), val(val) {}
 	void text_output(std::ostream& os) const override final {
-		ddef_t		*def;
-		dfunction_t	*f;
+
 
 		switch (type)
 		{
 		case etype_t::ev_string:
-			os << (const char*)(vm.pr_strings + val->string);
+			os << val->string.c_str();
 			break;
 		case etype_t::ev_entity:
-			os << (int)(vm.NUM_FOR_EDICT(vm.PROG_TO_EDICT(val->edict)));
+			os << (int)(vm.NUM_FOR_EDICT(val->edict));
 			break;
 		case etype_t::ev_function:
-		{
-			dfunction_t	*f = vm.pr_functions + val->function;
-			os << (const char*)(vm.pr_strings + f->s_name);
-		}
+			os << val->function->name();
 		break;
-		case etype_t::ev_field:
-		{
-			ddef_t		*def = vm.ED_FieldAtOfs(val->_int);
-			os << (const char*)(vm.pr_strings + def->s_name);
-		}
+		case etype_t::ev_field: 
+			os << val->field->name();
 		break;
 		case etype_t::ev_void:
 			os << "void";
 			break;
 		case etype_t::ev_float:
-			os << (float)val->_float;
+			os << val->_float;
 			break;
 		case etype_t::ev_vector:
-			os << (float)val->vector[0] << ' ' << (float)val->vector[1] << ' ' << (float)val->vector[2];
+			os << val->vector[0] << ' ' << val->vector[1] << ' ' << val->vector[2];
 			break;
 		default:
 			os << "bad type " << (int)(etype_t)type;
@@ -356,14 +249,17 @@ For debugging
 
 void edict_t::Print()
 {
-	ddef_t	*d;
-	int		*v;
-	char	*name;
-	int j;
+
 	auto ed = this;
 
 	quake::con << std::endl;
 	quake::con << "EDICT " << vm.NUM_FOR_EDICT(ed) << ':' << std::endl;
+	assert(0);
+#if 0
+	ddef_t	*d;
+	int		*v;
+	char	*name;
+	int j;
 	for (int i=1 ; i<vm.progs->numfielddefs ; i++)
 	{
 		d = &vm.pr_fielddefs[i];
@@ -385,6 +281,7 @@ void edict_t::Print()
 	
 		quake::con << std::left << std::setw(15) << name << quake::PR_ValueString(d->type, (eval_t *)v) << std::endl;	
 	}
+#endif
 }
 
 /*
@@ -396,12 +293,14 @@ For savegames
 */
 void ED_Write(std::ostream& f, edict_t *ed)
 {
+
+	assert(0);
+#if 0
 	ddef_t	*d;
 	int		*v;
 	size_t j;
 	char	*name;
 	idType	type;
-
 	f << '{' << std::endl;
 
 	for (size_t i = 1; i < (size_t)vm.progs->numfielddefs; i++)
@@ -425,6 +324,7 @@ void ED_Write(std::ostream& f, edict_t *ed)
 	}
 
 	f << ')' << std::endl;
+#endif
 }
 
 void ED_PrintNum (int ent)
@@ -441,11 +341,13 @@ For debugging, prints all the entities in the current server
 */
 void ED_PrintEdicts()
 {
-	int		i;
-	
-	Con_Printf ("%i entities\n", vm.pr_num_edicts);
-	for (i=0 ; i<vm.pr_num_edicts; i++)
-		ED_PrintNum (i);
+
+	Con_Printf ("%i entities\n", vm.used_pool.size());
+	for (auto e : vm) {
+		assert(0);
+		//ED_PrintNum(i);
+	}
+
 }
 
 /*
@@ -455,16 +357,15 @@ ED_PrintEdict_f
 For debugging, prints a single edicy
 =============
 */
-void ED_PrintEdict_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void ED_PrintEdict_f(cmd_source_t source, const StringArgs& args)
 {
-	int		i;
-	
-	i = Q_atoi (argv[1]);
-	if (i >= vm.pr_num_edicts)
+	size_t i = (size_t)Q_atoi (args[1]);
+	if (i >= vm.used_pool.size())
 	{
 		Con_Printf("Bad edict number\n");
 		return;
 	}
+	assert(0);
 	ED_PrintNum (i);
 }
 
@@ -475,28 +376,28 @@ ED_Count
 For debugging
 =============
 */
-void ED_Count(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void ED_Count(cmd_source_t source, const StringArgs& args)
 {
-	int		i;
-	edict_t	*ent;
+	const edict_t	*ent;
 	int		active, models, solid, step;
 
 	active = models = solid = step = 0;
-	for (const edict_t& ent : vm) {
+	for (const auto& it : vm) {
+		ent = it;
 		active++;
-		if (ent.v.solid)
+		if (ent->v.solid)
 			solid++;
-		if (ent.v.model) {
+		if (ent->v.model) {
 			models++;
 			//assert(ent.vars->find("model") != ent.vars.end());
 
 		}
 
-		if (ent.v.movetype == MOVETYPE_STEP)
+		if (ent->v.movetype == MOVETYPE_STEP)
 			step++;
 	}
 
-	Con_Printf ("num_edicts:%3i\n", vm.pr_num_edicts);
+	Con_Printf ("num_edicts:%3i\n", vm.used_edicts());
 	Con_Printf ("active    :%3i\n", active);
 	Con_Printf ("view      :%3i\n", models);
 	Con_Printf ("touch     :%3i\n", solid);
@@ -520,21 +421,18 @@ ED_WriteGlobals
 */
 void ED_WriteGlobals (std::ostream& f)
 {
-	ddef_t		*def;
-	idType		type;
 	f << '{' << std::endl;
 	for (int i=0 ; i<vm.progs->numglobaldefs ; i++)
 	{
-		def = &vm.pr_globaldefs[i];
-		type = def->type;
+		auto def = &vm.pr_globaldefs[i];
+		idType type = def->type;
 		if ( !type.saveglobal())
 			continue;
 		switch (type) {
 		case etype_t::ev_string:
 		case etype_t::ev_float:
 		case etype_t::ev_entity:
-			const char* name = vm.pr_strings + def->s_name;
-			f << '"' << name << "\" \"" << PR_UglyValueString(type, (eval_t *)&vm.pr_globals[def->ofs]) << '"' << std::endl;
+			f << '"' << def->name() << "\" \"" << PR_UglyValueString(type, (eval_t *)&vm.pr_globals[def->ofs]) << '"' << std::endl;
 		}
 		break;
 	}
@@ -548,7 +446,7 @@ ED_ParseGlobals
 */
 void ED_ParseGlobals (COM_Parser& parser)
 {
-	quake::string_view keyname,value;
+	std::string_view keyname,value;
 	while (parser.Next(keyname))
 	{	
 		if (keyname.empty())
@@ -562,92 +460,254 @@ void ED_ParseGlobals (COM_Parser& parser)
 
 		if (value[0] == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
-
-
-		ddef_t	* key = vm.ED_FindGlobal (keyname);
+		auto key = vm.ED_FindGlobal (keyname);
 		if (!key)
 		{
 			quake::con << '"' << keyname << "\" is not global" << std::endl;
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)vm.pr_globals, key, value))
+		if (!ED_ParseEpair((void*)vm.pr_globals, key, value))
 			Host_Error ("ED_ParseGlobals: parse error");
 	}
 }
 
-//============================================================================
-// lets make  this a hash table
 
-struct string_save_t {
 
-};
-static	const char	**pr_knownstrings=nullptr;
-static	int		pr_maxknownstrings=0;
-static	int		pr_numknownstrings=0;
 
-static void PR_AllocStringSlots(void)
-{
-	pr_maxknownstrings += PR_STRING_ALLOCSLOTS;
-	Con_DPrintf("PR_AllocStringSlots: realloc'ing for %d slots\n", pr_maxknownstrings);
-	pr_knownstrings = (const char **)Z_Realloc((void *)pr_knownstrings, pr_maxknownstrings * sizeof(char *));
-}
+namespace string_table {
 
-int PR_AllocString(int size, char **ptr)
-{
-	int		i;
+	// string system
+	//string_t pr_strings_last_offset; // last valid offset for new strings in lookup
 
-	if (!size)
-		return 0;
-	for (i = 0; i < pr_numknownstrings; i++)
-	{
-		if (!pr_knownstrings[i])
-			break;
+
+	static constexpr size_t string_table_size = 100000; // 100k, progs.dat takes about 50 so gives ups plenty of space
+	static char* hunk_strings_begin = nullptr;
+	static char* hunk_strings_end = nullptr;
+	static char* hunk_strings_current = nullptr;
+	static constexpr uint16_t alloc_flag = 0x4000;
+	static constexpr uint16_t lit_flag = 0x8000;
+	static constexpr uint16_t size_mask = ~(alloc_flag | lit_flag);
+	static constexpr uint16_t max_string_size = (0xFFFF & size_mask)-16;
+	static const char* empty_string = "";
+	static bool in_string_table(const char* ptr,size_t size) {
+		return hunk_strings_begin >= ptr && hunk_strings_current < (ptr + size); // && *(ptr - 3) == 0;// 0 termated string before
 	}
-	//	if (i >= pr_numknownstrings)
-	//	{
-	if (i >= pr_maxknownstrings)
-		PR_AllocStringSlots();
-	pr_numknownstrings++;
-	//	}
-	pr_knownstrings[i] = (char *)Hunk_AllocName(size, "string");
-	if (ptr)
-		*ptr = (char *)pr_knownstrings[i];
-	return -1 - i;
+	template<typename T>
+	static T* allign_up(T* ptr) {
+		return  reinterpret_cast<T*>((reinterpret_cast<uintptr_t>(ptr) + (sizeof(uintptr_t) - 1)) & -sizeof(uintptr_t));
+	}
+	static uint16_t& get_flag(char* ptr) { return *reinterpret_cast<uint16_t*>(ptr - sizeof(uint16_t)); }
+	static uint16_t get_flag(const char* ptr) { return *reinterpret_cast<const uint16_t*>(ptr - sizeof(uint16_t)); }
+	static uint16_t get_size(const char* ptr) { return get_flag(ptr) & size_mask; }
+	static bool get_alloc(const char* ptr) { return get_flag(ptr) & alloc_flag; }
+	static bool get_lit(const char* ptr) { return get_flag(ptr) & lit_flag; }
+	static const char* get_str(const char* ptr) {
+		return get_lit(ptr) ? *allign_up(reinterpret_cast<const char* const*>(ptr)) : ptr;// check if we are storing the pointer to it
+	}
+	static void set_lit(char* ptr, const char* lit,size_t len) {
+		const char** p = allign_up(reinterpret_cast<const char**>(ptr));
+		*p = lit;
+		get_flag(ptr) = static_cast<uint16_t>(len) | lit_flag;
+	}
+
+	// just so we have empty string set up
+	// sooo the structure of the table is that we have a flag(uint16_t) | char[0] | char[2] ...
+	// however, if we store just the lit pointer, we have to make sure we are allinged so it will look like this
+	// flag(uint16_t)  | fill(uint16_t) | pointer(size_t)
+	// or not, I have all the aligment stuff set up in these functions above
+	// you want to set as many litteral pointers as you can early on however
+	using unique_istring_t = std::unique_ptr<char, void(*)(char*)>;
+	static void dezmalloc(char* s) { Z_Free(reinterpret_cast<void*>(s)); }
+	static void nodemalloc(char* s) { (void)s; }
+	static void hulk_revert(char* s) {  hunk_strings_current = s - sizeof(uint16_t); }
+	struct istring_equal {
+		bool operator()(const char* l, const char* r) const {
+			return l == r || (get_size(l) == get_size(r)  && cstring_t::str_cmp(get_str(l), get_str(l)+get_size(l) ,  get_str(r), get_str(r)+get_size(r)));
+		}
+	};
+	struct istring_hash {
+		size_t operator()(const char* l) const { return cstring_t::hasher(get_str(l), get_size(l)); }
+	};
+	using string_lookup_t = std::unordered_set<const char*, istring_hash, istring_equal>; // allocated on hulk
+	static string_lookup_t stringtable_lookup;
+
+	static char* push_literal(const char* ptr, size_t size) {
+		if ((hunk_strings_current + 9) >= hunk_strings_end) Sys_Error("Out of string space!");
+		hunk_strings_current += sizeof(uint16_t);
+		char* ret = hunk_strings_current;
+		set_lit(ret, ptr, size);
+		return ret;
+	}
+	static char* push_string(const char* ptr, size_t size) {
+		if(size >= max_string_size) Sys_Error("string to long, try using a literal?");
+		if ((hunk_strings_current + size) >= hunk_strings_end) Sys_Error("Out of string space!");
+		uint16_t& flag = *reinterpret_cast<uint16_t*>(hunk_strings_current);
+		char* ns = hunk_strings_current + sizeof(uint16_t);
+		flag = 0;
+		//uint8_t& count = reinterpret_cast<uint8_t&>(*start++);
+		while (size--) {
+			int c = *ptr++;
+			if (c == '\\') {
+				switch (*(++ptr)) {
+				case 'n': c = '\n'; break;
+				default: c = '\\'; break;
+				}
+			} 
+			ns[flag++] = c;
+		}
+		ns[flag++] = '\0';
+		hunk_strings_current = allign_up(ns + flag); // Round up to pointer boundry
+		return ns; // default is to revert
+	}
+
+	static const char* intern(const char* s, size_t len) {
+		if (in_string_table(s, len)) {
+			assert(*(s - 3) == 0);// 0 termated string before
+			return s;
+		}
+		if (s == "" || len == 0) return "";
+		char* ns = push_string(s, len); // create zero length string	
+		auto it = stringtable_lookup.emplace(ns);
+		if (it.second) return ns;
+		hulk_revert(ns);
+		return *it.first;
+	}
+	static const char* intern(const std::string_view&  s) {
+		return intern(s.data(), s.size());
+	}
+	static const char* intern_literal(const char* str,bool force=false){
+		size_t len = ::strlen(str);
+		if (!force&& len < 5) return intern(str); // less than the size of the physical pointer?
+		char*  ns = push_literal(str, len); // create zero length string	
+		auto it = stringtable_lookup.emplace(ns);
+		if (it.second) return ns;
+		hulk_revert(ns);
+		return *it.first;
+	}
+
+
+	void init() {
+		hunk_strings_current=hunk_strings_begin = (char*)Hunk_AllocName(string_table_size, "string");
+		hunk_strings_end = hunk_strings_begin + string_table_size;
+		intern_literal("", true); // create zero length string 	
+
+	}
 }
-
-
-
+const char* string_t::intern(const char* str,size_t size) { return string_table::intern(str, size); }
+const char* string_t::intern(const char* str) { return string_table::intern(str, ::strlen(str));   }
+const char* string_t::intern(const std::string_view& str) { return string_table::intern(str); }
 
 /*
 =============
 ED_NewString
 =============
 */
-const pr_system_t::string_lookup_t::value_type& pr_system_t::ED_NewString (const quake::string_view& string)
-{
-	// first check if its in the hash
-	auto it = pr_strings_lookup.find(string);
-	if (it != pr_strings_lookup.end()) {
-		return *it;
+
+void pr_system_t::ED_ClearStrings() {
+	// never need to clear strings
+}
+namespace priv {
+	// helps alot
+	/* calculate absolute value */
+	constexpr int abs_val(int x) { return x < 0 ? -x : x; }
+	/* calculate number of digits needed, including minus sign */
+	constexpr int num_digits(int x) { return x < 0 ? 1 + num_digits(-x) : x < 10 ? 1 : 1 + num_digits(x / 10); }
+	/* metaprogramming string type: each different string is a unique type */
+	template<char... args>
+	struct metastring {
+		const char data[sizeof... (args)+1] = { '*', args... };
+	};
+	/* recursive number-printing template, general case (for three or more digits) */
+	template<int size, int x, char... args>
+	struct numeric_builder {
+		typedef typename numeric_builder<size - 1, x / 10, '0' + abs_val(x) % 10, args...>::type type;
+	};
+
+	/* special case for two digits; minus sign is handled here */
+	template<int x, char... args>
+	struct numeric_builder<2, x, args...> {
+		typedef metastring < x < 0 ? '-' : '0' + x / 10, '0' + abs_val(x) % 10, args...> type;
+	};
+
+	/* special case for one digit (positive numbers only) */
+	template<int x, char... args>
+	struct numeric_builder<1, x, args...> {
+		typedef metastring<'0' + x, args...> type;
+	};
+
+
+	/* convenience wrapper for numeric_builder */
+	template<int x>
+	class numeric_string
+	{
+	public:
+		/* generate a unique string type representing this number */
+		typedef typename numeric_builder<num_digits(x), x, '\0'>::type type;
+
+		/* declare a static string of that type (instantiated later at file scope) */
+		static constexpr type value{};
+		/* returns a pointer to the instantiated string */
+		static constexpr const char* get() { return value.data; }
+	};
+# define REQUIRES(...)  typename std::enable_if<(__VA_ARGS__), bool>::type = true
+	template <int N>
+	class string_literal
+	{
+		const char(&_lit)[N + 1];
+	public:
+		constexpr string_literal(const char(&lit)[N + 1]) : _lit(lit) {}
+		constexpr char operator[](int i) const { return assert(i >= 0 && i < N), _lit[i]; }
+	};
+	template <int N_PLUS_1>
+	constexpr auto literal(const char(&lit)[N_PLUS_1]) -> string_literal<N_PLUS_1 - 1> { return string_literal<N_PLUS_1 - 1>(lit); }
+	
+	template<int x>
+	constexpr typename numeric_string<x>::type numeric_string<x>::value;
+
+
+	template<unsigned N1, unsigned... I1, unsigned N2, unsigned... I2>
+	constexpr std::array<char const, N1 + N2 - 1> concat(char const (&a1)[N1], char const (&a2)[N2], std::index_sequence<I1...>, std::index_sequence<I2...>) {
+		return { { a1[I1]..., a2[I2]... } };
 	}
-	char	*new_ptr, *new_p;	
-	size_t l = string.size() + 1;
-	new_ptr = (char*)Hunk_AllocName(l,"string");
-	new_p = new_ptr;
-	for (auto it = string.begin(); it != string.end();it++) {
-		if (*it == '\\') {
-			if (*++it == 'n')
-				*new_p++ = '\n';
-			else
-				*new_p++ = '\\';
-		}
-		else *new_p++ = *it;
+
+	template<unsigned N1, unsigned N2>
+	constexpr std::array<char const, N1 + N2 - 1> concat(char const (&a1)[N1], char const (&a2)[N2]) {
+		return concat(a1, a2, std::make_index_sequence<N1 - 1>{}, std::make_index_sequence<N2>{});
 	}
-	*new_p = 0;
-	// else we got a new string
-	string_t index = new_ptr - pr_strings;
-	return *pr_strings_lookup.emplace(new_ptr, index).first;
+#if 0
+	template<unsigned N>
+	constexpr std::array<char const, N + 1> add_star(char const (&a1)[N]) {
+		return concat("*", a1);
+	}
+#endif
+	template<size_t... Indices>
+	constexpr auto make_number_array(std::index_sequence<Indices...>)
+		->std::array<const char* const, sizeof...(Indices)>
+	{
+		return { { numeric_string<Indices>::get() ...  }  };
+	}
+
+	template<size_t N>
+	constexpr auto make_number_array()->std::array<const char* const, N>
+	{
+		return make_number_array(std::make_index_sequence<N>{});
+	}
+
+	constexpr auto quck_number_literals = make_number_array<256>();
+}
+const char* pr_system_t::ED_QuickToString(uint8_t v) const { // quickly finds a number to string, super fast
+	const char* number = priv::quck_number_literals[v];
+	return number;
+}
+#if 0
+const char* pr_system_t::ED_LocalModelName(uint8_t v) const { 
+	const char* number = priv::quck_number_literals[v];
+	return number;
+}
+#endif
+string_t pr_system_t::ED_NewString (const std::string_view& string,bool zmalloc) {
+	return string_table::intern(string);
 }
 
 
@@ -661,87 +721,48 @@ returns false if error
 */
 
 
-qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& value)
-{
-	const char* key_name = key->s_name + vm.pr_strings;
-	float*  f;
-	int		i;
-	char	string[128];
-	ddef_t	*def;
-	char	*v, *w;
-	void	*d;
-	dfunction_t	*func;
-	union {
-		void* base;
-		int* i;
-		float* f;
-		char* s;
-	} vd;
-	void* base = (void*)(&ent->v);
-	vd.base = (void *)((int *)base + key->ofs);
-	d = (void *)((int *)base + key->ofs);
-	idType type = key->type;
-	
-	switch (type)
+
+// globals?
+qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& value) {
+	eval_t* d = reinterpret_cast<eval_t*>(reinterpret_cast<uint32_t*>(base) + key->ofs);
+	switch (idType::ClearSaveGlobal(key->type))
 	{
 	case etype_t::ev_string:
-	{
-		auto v = vm.ED_NewString(value);
-		ent->vars.emplace(key_name,edict_t::value_t( v.first));
-		*(string_t *)d = v.second;
-	}
+		d->string = string_t::intern(value);
 		break;
-
 	case etype_t::ev_float:
-	{
-		float v;
-		assert(quake::to_number(value, v));
-		ent->vars.emplace(key_name, edict_t::value_t(v));
-	}
+		assert(quake::to_number(value, d->_float));
 		break;
-
-	case etype_t::ev_vector:
-	{
-		edict_t::vector_t v;
-		quake::string_view fv;
+	case etype_t::ev_vector: {
+		std::string_view fv;
 		COM_Parser parser(value);
 		assert(parser.Next(fv));
-		assert(quake::to_number(fv, v.value[0]));
+		assert(quake::to_number(fv, d->vector[0]));
 		assert(parser.Next(fv));
-		assert(quake::to_number(fv, v.value[1]));
+		assert(quake::to_number(fv, d->vector[1]));
 		assert(parser.Next(fv));
-		assert(quake::to_number(fv, v.value[2]));
-		ent->vars.emplace(key_name, edict_t::value_t(v));
-		::memcpy(d, v.value, sizeof(v.value));
+		assert(quake::to_number(fv, d->vector[2]));
 	}
 	break;
 
 	case etype_t::ev_entity:
-		assert(quake::to_number(value, i));
-		ent->vars.emplace(key_name, edict_t::value_t(vm.EDICT_NUM(i)));
-		*(int *)d = vm.EDICT_TO_PROG(vm.EDICT_NUM(i));
+		assert(quake::to_number(value, d->_int));
+		d->edict = vm.EDICT_NUM(d->_int);
 		break;
 
 	case etype_t::ev_field:
-		def = vm.ED_FindField(value);
-		if (!def)
-		{
+		if ((d->field = vm.ED_FindField(value)) == nullptr) {
 			quake::con << "Can't find field " << value << std::endl;
 			return false;
 		}
-		ent->vars.emplace(key_name, edict_t::value_t(vm.G_INT(def->ofs)));
-		*(int *)d = vm.G_INT(def->ofs);
 		break;
 
 	case etype_t::ev_function:
-		func = vm.ED_FindFunction(value);
-		if (!func)
+		if ((d->function = vm.ED_FindFunction(string_t::intern(value))) == nullptr)
 		{
 			quake::con << "Can't find function " << value << std::endl;
 			return false;
 		}
-		ent->vars.emplace(key_name, edict_t::value_t(func));
-		*(func_t *)d = func - vm.pr_functions;
 		break;
 
 	default:
@@ -750,81 +771,9 @@ qboolean	ED_ParseEpair(edict_t* ent, ddef_t *key, const quake::string_view& valu
 	}
 	return true;
 }
-
-qboolean	ED_ParseEpair(void *base, ddef_t *key, const quake::string_view& value)
-{
-	float*  f;
-	int		i;
-	char	string[128];
-	ddef_t	*def;
-	char	*v, *w;
-	void	*d;
-	dfunction_t	*func;
-	union {
-		void* base;
-		int* i;
-		float* f;
-		char* s;
-	} vd;
-	vd.base = (void *)((int *)base + key->ofs);
-	d = (void *)((int *)base + key->ofs);
-	idType type = key->type;
-	switch (type)
-	{
-	case etype_t::ev_string:
-		*(string_t *)d = vm.ED_NewString(value).second;
-		break;
-
-	case etype_t::ev_float:
-		f = (float*)d;
-		assert(quake::to_number(value, *f));
-		break;
-
-	case etype_t::ev_vector:
-	{
-		COM_Parser parser(value);
-		quake::string_view fv;
-		f = (float*)d;
-		assert(parser.Next(fv)); 
-		assert(quake::to_number(fv, f[0]));
-		assert(parser.Next(fv)); 
-		assert(quake::to_number(fv, f[1]));
-		assert(parser.Next(fv)); 
-		assert(quake::to_number(fv, f[2]));
-	}
-	break;
-
-	case etype_t::ev_entity:
-		assert(quake::to_number(value,i));
-		*(int *)d = vm.EDICT_TO_PROG(vm.EDICT_NUM(i));
-		break;
-
-	case etype_t::ev_field:
-		def = vm.ED_FindField(value);
-		if (!def)
-		{
-			quake::con << "Can't find field " << value << std::endl;
-			return false;
-		}
-		*(int *)d = vm.G_INT(def->ofs);
-		break;
-
-	case etype_t::ev_function:
-		func = vm.ED_FindFunction(value);
-		if (!func)
-		{
-			quake::con << "Can't find function " << value << std::endl;
-			return false;
-		}
-		*(func_t *)d = func - vm.pr_functions;
-		break;
-
-	default:
-		break;
-	}
-	return true;
+qboolean ED_ParseEpair(edict_t* ent, const ddef_t *key, const std::string_view& value) {
+	return ED_ParseEpair(reinterpret_cast<void*>(&ent->v), key, value);
 }
-
 /*
 ====================
 ED_ParseEdict
@@ -834,30 +783,16 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
-static std::unordered_map<quake::string_view, edict_t*> loaded_edicts;
-bool ED_ParseEdict(COM_Parser& parser, edict_t *ent)
-{
-	ddef_t		*key;
-	qboolean	anglehack;
-	qboolean	init;
-	
-	int			n;
-	quake::string_view keyname, value;
-	init = false;
-	//COM_Parser parser(data);
-
+static std::unordered_map<string_t, edict_t*> loaded_edicts;
+edict_t * ED_ParseEdict(COM_Parser& parser, edict_t *ent) {
+	std::string_view keyname, value;
 	// clear it
-	if (ent != sv.worldedict) {
-
-		//memset(&ent->v, 0, vm.progs->entityfields * 4);
-		ent->vars.clear();
-	}
-		// hack
-	assert(!vm.is_edict_free(ent));
+	//if (ent)  std::memset(&ent->v, 0, vm.progs->entityfields * 4);
+	//assert(!vm.is_edict_free(ent)); 		// hack
 
 	// go through all the dictionary pairs
 	// debugging
-	
+	edict_t * init = nullptr;
 	while (1)
 	{
 		if (!parser.Next(keyname))
@@ -866,10 +801,9 @@ bool ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		if (keyname[0] == '}') break;
 		// anglehack is to allow QuakeEd to write single scalar angles
 		// and allow them to be turned into vectors. (FIXME...)
-		anglehack = false;
+		qboolean anglehack = false;
 
-		if (keyname == "angle")
-		{
+		if (keyname == "angle") {
 			keyname =  "angles";
 			anglehack = true; 
 		}
@@ -884,14 +818,17 @@ bool ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 		// parse value	
 		if (!parser.Next(value) || value[0] == '}')
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
-
-		init = true;
+		if (!init) {
+			if (ent && !ent->free)
+				init = ent;
+			else init = vm.ED_Alloc(false, ent);
+		}
 		// keynames with a leading underscore are used for utility comments,
 		// and are immediately discarded by quake
 		if (keyname.front() == '_')
 			continue;
 
-		key = vm.ED_FindField(keyname);
+		auto key = vm.ED_FindField(keyname);
 		if (key == nullptr) {
 			quake::con << '\'' << keyname << "' is not a field" << std::endl;
 			continue;
@@ -902,24 +839,24 @@ bool ED_ParseEdict(COM_Parser& parser, edict_t *ent)
 			quake::fixed_string_stream<128> buf;
 
 			buf << "0 " << value << " 0";
-			if (!ED_ParseEpair(ent, key, buf.str()))
+			if (!ED_ParseEpair(init, key, buf.str()))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 		else {
-			if (!ED_ParseEpair(ent, key, value))
+			if (!ED_ParseEpair(init, key, value))
 				Host_Error("ED_ParseEdict: parse error");
 		}
 
 
 	}
 
-	if (!init) return false;
 
-	assert(ent->v.classname);
-
-	const char* classname = vm.pr_strings + ent->v.classname; 
-	loaded_edicts[classname] = ent;
-	return true;
+	assert(init->v.classname);
+	if (init) {
+		loaded_edicts[init->v.classname] = init;
+		return init;
+	}
+	return nullptr;
 }
 
 
@@ -938,19 +875,17 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
-void ED_LoadFromFile (const quake::string_view& data)
+void ED_LoadFromFile (const std::string_view& data)
 {	
-	edict_t		*ent;
-	int			inhibit;
-	dfunction_t	*func;
-	
-	ent = NULL;
-	inhibit = 0;
-	vm.pr_global_struct->time = sv.time;
+	edict_t		*ent = nullptr;
+	int			inhibit = 0;
+
+	vm.pr_global_struct->time = static_cast<float>(sv.time);
 	COM_Parser parser(data);
-	quake::string_view token;
+	std::string_view token;
+	size_t ent_index = 0;
 // parse ents
-	while (1)
+	while (1) 
 	{
 // parse the opening brace	
 		if (!parser.Next(token,false)) break;
@@ -959,11 +894,11 @@ void ED_LoadFromFile (const quake::string_view& data)
 			Sys_Error("ED_LoadFromFile:  expecting {");
 		}
 
-		if (!ent)
-			ent = vm.EDICT_NUM(0);
+		if (!ent) 
+			ent = sv.worldedict;
 		else
-			ent = vm.ED_Alloc ();
-		ED_ParseEdict (parser, ent);
+			ent = vm.ED_Alloc();
+		ent=ED_ParseEdict (parser, ent);
 
 // remove things from different skill levels or deathmatch
 		if (deathmatch.value)
@@ -996,8 +931,7 @@ void ED_LoadFromFile (const quake::string_view& data)
 		}
 
 	// look for the spawn function
-		quake::string_view ref(vm.pr_strings + ent->v.classname);
-		func = vm.ED_FindFunction (ref);
+		const dfunction_t *func = vm.ED_FindFunction (ent->v.classname);
 
 		if (!func)
 		{
@@ -1007,24 +941,23 @@ void ED_LoadFromFile (const quake::string_view& data)
 			continue;
 		}
 
-		vm.pr_global_struct->self = vm.EDICT_TO_PROG(ent);
-		PR_ExecuteProgram (func - vm.pr_functions);
+		vm.pr_global_struct->self = ent;
+		func->call();
 	}	
 
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
 }
 
-quake::FixedMap<quake::string_view, ddef_t*> dprograms_t::globals;
-quake::FixedMap<quake::string_view, ddef_t*> dprograms_t::fields;
-quake::FixedMap<quake::string_view, dfunction_t*> dprograms_t::functions;
+
 /*
 ===============
 PR_LoadProgs
 ===============
 */
 pr_system_t::pr_system_t() :
-	progs(nullptr), pr_functions(nullptr), pr_strings(nullptr), pr_globaldefs(nullptr), pr_fielddefs(nullptr), 
+	progs(nullptr), pr_functions(nullptr),  pr_globaldefs(nullptr), pr_fielddefs(nullptr), 
 	pr_statements(nullptr), pr_global_struct(nullptr), pr_globals(nullptr), pr_edict_size(0), pr_edicts(), pr_max_edicts(MAX_EDICTS)
+	,vars(_global_info)
 	{
 #if 0
 	dprograms_t		*progs=nullptr;
@@ -1041,39 +974,39 @@ pr_system_t::pr_system_t() :
 	size_t			pr_max_edicts;
 #endif
 }
-void pr_system_t::LoadProgs(void)
-{
-	int		i;
-
+void pr_system_t::LoadProgs(void) {
+	Clear(); // make sure the vm system is clear
 	CRC_Init(&pr_crc);
-
-	progs = (dprograms_t *)COM_LoadHunkFile("progs.dat");
+	size_t file_size;
+	byte* raw = (byte*)COM_LoadHunkFile("progs.dat", &file_size);
+	progs = reinterpret_cast<dprograms_t*>(raw);
 	if (!progs)
 		Sys_Error("PR_LoadProgs: couldn't load progs.dat");
-	Con_DPrintf("Programs occupy %iK.\n", com_filesize / 1024);
+	Con_DPrintf("Programs occupy %iK.\n", file_size / 1024);
 
-	for (i = 0; i < com_filesize; i++)
-		CRC_ProcessByte(&pr_crc, ((byte *)progs)[i]);
+	for (size_t i = 0; i < static_cast<size_t>(file_size); i++)
+		CRC_ProcessByte(&pr_crc, raw[i]);
 
 	// byte swap the header
-	for (i = 0; i < sizeof(*progs) / 4; i++)
+	for (size_t i = 0; i < (sizeof(*progs) / 4); i++)
 		((int *)progs)[i] = LittleLong(((int *)progs)[i]);
 
 	if (progs->version != PROG_VERSION)
 		Sys_Error("progs.dat has wrong version number (%i should be %i)", progs->version, PROG_VERSION);
 	if (progs->crc != PROGHEADER_CRC)
 		Sys_Error("progs.dat system vars have been modified, progdefs.h is out of date");
+	pr_functions = reinterpret_cast<dfunction_t *>(raw + progs->ofs_functions);
+	const char* pr_strings = reinterpret_cast<const char *>(raw + progs->ofs_strings);
+	pr_globaldefs = reinterpret_cast<ddef_t *>(raw + progs->ofs_globaldefs);
+	pr_fielddefs = reinterpret_cast<ddef_t *>(raw + progs->ofs_fielddefs);
+	pr_statements = reinterpret_cast<dstatement_t *>(raw + progs->ofs_statements);
+	pr_global_struct = reinterpret_cast<globalvars_t *>(raw + progs->ofs_globals);
 
-	pr_functions = (dfunction_t *)((byte *)progs + progs->ofs_functions);
-	pr_strings = (char *)progs + progs->ofs_strings;
-	pr_globaldefs = (ddef_t *)((byte *)progs + progs->ofs_globaldefs);
-	pr_fielddefs = (ddef_t *)((byte *)progs + progs->ofs_fielddefs);
-	pr_statements = (dstatement_t *)((byte *)progs + progs->ofs_statements);
-
-	pr_global_struct = (globalvars_t *)((byte *)progs + progs->ofs_globals);
 	pr_globals = (float *)pr_global_struct;
 
-	pr_edict_size = progs->entityfields * 4 + sizeof(edict_t) - sizeof(entvars_t);
+	pr_edict_size = sizeof(edict_t) + static_cast<size_t>(progs->entityfields * 4)  - sizeof(entvars_t);
+
+	quake::con << "EDICT SIZE DIF IS " << (int)((progs->entityfields * 4) - sizeof(entvars_t)) << std::endl;
 	// round off to next highest whole word address (esp for Alpha)
 	// this ensures that pointers in the engine data area are always
 	// properly aligned
@@ -1081,80 +1014,66 @@ void pr_system_t::LoadProgs(void)
 	pr_edict_size &= ~(sizeof(void *) - 1);
 
 	// So we don't keep allocating all new strings, we will create a reverse lookup
-	pr_strings_lookup.clear();
+	// ok, no way around this, we need our own dedicated string space
 	{
-		string_t last_offset = 0;
-		for (size_t i = 0; i < progs->numstrings; i++) {
-			quake::string_view s = pr_strings + last_offset;
-			pr_strings_lookup.emplace(s, last_offset);
-			last_offset += s.size() + 1;
+		for (size_t i = 0; i < static_cast<size_t>(progs->numstrings); i++) {
+			std::string_view sv(pr_strings + i);
+			string_table::intern(sv);
+			i += sv.size();
 		}
 	}
 
 	// byte swap the lumps
-	for (i = 0; i < progs->numstatements; i++)
+	for (size_t i = 0; i < static_cast<size_t>(progs->numstatements); i++)
 	{
-		auto pr_statement = pr_statements + i;
-		pr_statement->op = LittleShort(pr_statement->op);
-		pr_statement->a = LittleShort(pr_statement->a);
-		pr_statement->b = LittleShort(pr_statement->b);
-		pr_statement->c = LittleShort(pr_statement->c);
+		dstatement_t* s = const_cast<dstatement_t*>(pr_statements + i);
+		s->op = LittleShort(s->op);
+		s->a = LittleShort(s->a);
+		s->b = LittleShort(s->b);
+		s->c = LittleShort(s->c);
 
 	}
 	{
-		dprograms_t::functions.alloc_hulk(progs->numfunctions, "fmap");
-		auto ptr = dprograms_t::functions.begin();
-		for (i = 0; i < progs->numfunctions; i++)
+		_function_info.clear();
+		for (size_t i = 0; i < static_cast<size_t>(progs->numfunctions); i++)
 		{
-			pr_functions[i].first_statement = LittleLong(pr_functions[i].first_statement);
-			pr_functions[i].parm_start = LittleLong(pr_functions[i].parm_start);
-			pr_functions[i].s_name = LittleLong(pr_functions[i].s_name);
-			pr_functions[i].s_file = LittleLong(pr_functions[i].s_file);
-			pr_functions[i].numparms = LittleLong(pr_functions[i].numparms);
-			pr_functions[i].locals = LittleLong(pr_functions[i].locals);
-			const char* name = pr_strings + pr_functions[i].s_name;
-			ptr[i] = std::make_pair(name, &pr_functions[i]);
-
-
-		//	dprograms_t::functions.emplace(name, &pr_functions[i]);
-
+			dfunction_t* f = const_cast<dfunction_t*>(pr_functions + i);
+			f->first_statement = LittleLong(f->first_statement);
+			f->parm_start = LittleLong(f->parm_start);
+			f->_name = string_t(pr_strings + LittleLong(f->s_name));
+			f->s_file = LittleLong(f->s_file);
+			f->numparms = LittleLong(f->numparms);
+			f->locals = LittleLong(f->locals);
+			_function_info.emplace(f->name(), f);
 		}
-		dprograms_t::functions.sort();
 	}
 	{
 		//dprograms_t::globals.clear();
-		dprograms_t::globals.alloc_hulk(progs->numglobaldefs, "gmap");
-		auto ptr = dprograms_t::globals.begin();
-		for (i = 0; i < progs->numglobaldefs; i++)
+		_global_info.clear();
+		for (size_t i = 0; i < static_cast<size_t>(progs->numglobaldefs); i++)
 		{
-			pr_globaldefs[i].type = static_cast<etype_t>(LittleShort(static_cast<uint16_t>(pr_globaldefs[i].type)));
-			pr_globaldefs[i].ofs = LittleShort(pr_globaldefs[i].ofs);
-			pr_globaldefs[i].s_name = LittleLong(pr_globaldefs[i].s_name);
-			const char* name = pr_strings + pr_globaldefs[i].s_name;
-		//	dprograms_t::globals.emplace(name, &pr_globaldefs[i]);
-			ptr[i] = std::make_pair(name, &pr_globaldefs[i]);
+			ddef_t* d = const_cast<ddef_t*>(pr_globaldefs + i);
+			d->itype = LittleShort(d->itype);
+			d->ofs = LittleShort(d->ofs);
+			d->_name = string_t(pr_strings + LittleLong(d->s_name));
+			_global_info.insert(d);
 		}
-		dprograms_t::globals.sort();
 	}
 	{
-
-		//dprograms_t::fields.clear();
-		dprograms_t::fields.alloc_hulk(progs->numfielddefs, "fimap");
-		auto ptr = dprograms_t::fields.begin();
-		for (i = 0; i < progs->numfielddefs; i++)
+		_field_info.clear();
+		for (size_t i = 0; i < static_cast<size_t>(progs->numfielddefs); i++)
 		{
-			pr_fielddefs[i].type = static_cast<etype_t>(LittleShort(static_cast<uint16_t>(pr_fielddefs[i].type)));
+			ddef_t* d = const_cast<ddef_t*>(pr_fielddefs + i);
+			d->itype = LittleShort(d->itype);
 			if (idType(pr_fielddefs[i].type).saveglobal())
 				Sys_Error("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
-			pr_fielddefs[i].ofs = LittleShort(pr_fielddefs[i].ofs);
-			pr_fielddefs[i].s_name = LittleLong(pr_fielddefs[i].s_name);
-			const char* name = pr_strings + pr_fielddefs[i].s_name;
-			//dprograms_t::fields.emplace(name, &pr_fielddefs[i]);
-			ptr[i] = std::make_pair(name, &pr_fielddefs[i]);
+			d->ofs = LittleShort(d->ofs);
+			d->_name = string_t(pr_strings + LittleLong(d->s_name));
+			_field_info.insert(d);
 		}
-		dprograms_t::fields.sort();
 	}
-	for (i=0 ; i<progs->numglobals ; i++)
+	// this...seems bad.  I mean if its a float value that global is fucked
+	for (size_t i=0 ; i<static_cast<size_t>(progs->numglobals) ; i++)
 		((int *)pr_globals)[i] = LittleLong (((int *)pr_globals)[i]);
 }
 
@@ -1164,6 +1083,10 @@ void pr_system_t::LoadProgs(void)
 PR_Init
 ===============
 */
+void StringInit() {
+	string_table::init();
+}
+
 void pr_system_t::Init(void)
 {
 	Cmd_AddCommand ("edict", ED_PrintEdict_f);
@@ -1181,6 +1104,9 @@ void pr_system_t::Init(void)
 	Cvar_RegisterVariable (&saved2);
 	Cvar_RegisterVariable (&saved3);
 	Cvar_RegisterVariable (&saved4);
+	vm.Clear();
+	// create string table
+
 }
 
 

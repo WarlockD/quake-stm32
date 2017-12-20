@@ -52,6 +52,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <iomanip>
 #include <cassert>
 
+#include <queue>
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <unordered_set>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <algorithm>
 
 #if defined(_WIN32) && !defined(WINDED)
 
@@ -275,28 +284,27 @@ struct entity_state_t
 
 struct quakeparms_t 
 {
-	const char	*basedir;
-	const char	*cachedir;		// for development over ISDN lines... humm
-	// why?  its stored in 2 places meh
-	size_t argc;
-	quake::string_view argv[MAX_PARMS];
-	size_t COM_CheckParm(const quake::string_view& arg) const {
-		for (size_t i = 1; 1 < argc; i++)
-			if (argv[i] == arg) return i;
-		return 0;
-	}
-	size_t COM_CheckParmValue(const quake::string_view& arg, quake::string_view& value) const {
-		auto ret = COM_CheckParm(arg);
-		value = quake::string_view();
-		if (ret != 0 && ((ret + 1) < argc))value = argv[ret + 1];
-		return ret;
-	}
-	const quake::string_view& COM_Arg(size_t i) const { return argv[i]; }
-	void COM_ClearArgs() { argc = 0; }
-	void COM_AddArg(const quake::string_view& arg) { assert(argc <MAX_PARMS);  argv[argc++] = arg; }
+	cstring_t basedir;
+	cstring_t cachedir;		// for development over ISDN lines... humm
 	void	*membase;
 	int		memsize;
-	quakeparms_t() : basedir(nullptr), cachedir(nullptr), argc(0) {}
+	// why?  its stored in 2 places meh
+	 ZVector<cstring_t> args;
+	size_t COM_CheckParm(cstring_t arg) const {
+		auto it = std::find(args.begin(), args.end(), arg);
+		if (it != args.end()) return std::distance(args.begin(), it);
+		return 0;
+	}
+	size_t COM_CheckParmValue(cstring_t arg, cstring_t& value) const {
+		auto ret = COM_CheckParm(arg);
+		if (ret != 0 && ((ret + 1) < args.size())) value = args[ret + 1];
+		return ret;
+	}
+	cstring_t COM_Arg(size_t i) const { return args[i]; }
+	void COM_ClearArgs() { args.clear(); }
+	void COM_AddArg(cstring_t arg) {  args.push_back(arg); }
+
+	quakeparms_t() : basedir(), cachedir() {}
 } ;
 
 
@@ -329,7 +337,7 @@ void Host_Shutdown(void);
 void Host_Error (char *error, ...);
 void Host_EndGame (char *message, ...);
 void Host_Frame (idTime time);
-void Host_Quit_f(cmd_source_t source, size_t argc, const quake::string_view args[]);
+void Host_Quit_f(cmd_source_t source, const StringArgs& args);
 void Host_ClientCommands (char *fmt, ...);
 void Host_ShutdownServer (qboolean crash);
 

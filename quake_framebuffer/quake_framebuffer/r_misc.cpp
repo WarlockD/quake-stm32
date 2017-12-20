@@ -66,7 +66,7 @@ R_TimeRefresh_f
 For program optimization
 ====================
 */
-void R_TimeRefresh_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void R_TimeRefresh_f(cmd_source_t source, const StringArgs& args)
 {
 	int			i;
 	idTime		start, stop, time;

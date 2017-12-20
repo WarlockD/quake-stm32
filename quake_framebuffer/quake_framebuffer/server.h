@@ -39,7 +39,7 @@ typedef enum {ss_loading, ss_active} server_state_t;
 struct server_t
 {
 	server_t();
-
+	void reset();
 	edict_t*	worldedict;
 	qboolean	active;				// false if only a net client
 
@@ -51,16 +51,16 @@ struct server_t
 	int			lastcheck;			// used by PF_checkclient
 	idTime		lastchecktime;      // was doube
 	
-	char		name[64];			// map name
+	string_t	name;			// map name
 #ifdef QUAKE2
 	char		startspot[64];
 #endif
-	char		modelname[64];		// maps/<name>.bsp, for model_precache[0]
+	string_t	modelname;		// maps/<name>.bsp, for model_precache[0]
 	model_t 	*worldmodel;
-	const char		*model_precache[MAX_MODELS];	// NULL terminated
+	string_t	model_precache[MAX_MODELS];	// NULL terminated
 	model_t		*models[MAX_MODELS];
-	const char		*sound_precache[MAX_SOUNDS];	// NULL terminated
-	const char*	lightstyles[MAX_LIGHTSTYLES];
+	string_t	sound_precache[MAX_SOUNDS];	// NULL terminated
+	string_t	lightstyles[MAX_LIGHTSTYLES];
 
 
 #ifdef USE_OLD_EDICT_SYSTEM
@@ -75,15 +75,9 @@ struct server_t
 
 #endif
 	server_state_t	state;			// some actions are only valid during load
-
-	sizebuf_t	datagram;
-	byte		datagram_buf[MAX_DATAGRAM];
-
-	sizebuf_t	reliable_datagram;	// copied to all clients at end of frame
-	byte		reliable_datagram_buf[MAX_DATAGRAM];
-
-	sizebuf_t	signon;
-	byte		signon_buf[8192];
+	static_sizebuf_t<MAX_DATAGRAM> datagram;
+	static_sizebuf_t<MAX_DATAGRAM> reliable_datagram; // copied to all clients at end of frame
+	static_sizebuf_t<8192> signon;
 } ;
 
 
@@ -93,8 +87,8 @@ struct qsocket_t;
 
 struct client_t
 {
-	quake::debug_t<qboolean>
-			active;				// false = client is free
+	void reset();
+	quake::debug_t<qboolean> active;				// false = client is free
 	qboolean		spawned;			// false = don't send datagrams
 	qboolean		dropasap;			// has been told to go to another level
 	qboolean		privileged;			// can execute any host command
@@ -108,11 +102,11 @@ struct client_t
 	usercmd_t		cmd;				// movement
 	vec3_t			wishdir;			// intended motion calced from cmd
 
-	sizebuf_t		message;			// can be added to at any time,
+
+	static_sizebuf_t<MAX_MSGLEN>		message;			// can be added to at any time,
 										// copied and clear once per frame
-	byte			msgbuf[MAX_MSGLEN];
 	edict_t			*edict;				// EDICT_NUM(clientnum+1)
-	char			name[32];			// for printing to other people
+	string_t		name;			// for printing to other people
 	int				colors;
 		
 	idTime			ping_times[NUM_PING_TIMES];
@@ -235,7 +229,7 @@ extern	edict_t		*sv_player;
 void SV_Init (void);
 
 void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count);
-void SV_StartSound (edict_t *entity, int channel, const char *sample, int volume,
+void SV_StartSound (edict_t *entity, int channel, cstring_t sample, int volume,
     float attenuation);
 
 void SV_DropClient (qboolean crash);
@@ -243,7 +237,7 @@ void SV_DropClient (qboolean crash);
 void SV_SendClientMessages (void);
 void SV_ClearDatagram (void);
 
-int SV_ModelIndex (char *name);
+int SV_ModelIndex (cstring_t name);
 
 void SV_SetIdealPitch (void);
 
@@ -270,7 +264,7 @@ void SV_SaveSpawnparms ();
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot);
 #else
-void SV_SpawnServer (const char *server);
+void SV_SpawnServer (cstring_t server);
 #endif
 
 #endif

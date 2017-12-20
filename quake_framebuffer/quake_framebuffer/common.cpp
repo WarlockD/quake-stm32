@@ -37,96 +37,32 @@ static quake::fixed_string<MAX_OSPATH> com_gamedir;
 
 // ustl stuff
 
-
 namespace quake {
-	const char* printf_buffer::operator()(const char* fmt, ...) {
-		va_list va;
-		va_start(va, fmt);
-		int len = Q_vsnprintf(data(), size(), fmt, va);
-		va_end(va);
-		if (len <= 0) return nullptr;
-		return c_str();
-	}
-#if 0
-	string_view::size_type string_view::to_number(float& value, size_type offset) const {
-		const char* stazrtp = _data + offset;
-		char* endp = nullptr;
-		if (offset < _size) value = strtof(stazrtp, &endp);
-		return endp == nullptr || endp == stazrtp || endp > end() ? npos : size_t(endp - _data);
-	}
-	string_view::size_type string_view::to_number(int& value, size_type offset ) const {
-		const char* stazrtp = _data + offset;
-		char* endp = nullptr;
-		if (offset < _size) value = strtol(stazrtp, &endp,0);
-		return endp == nullptr || endp == stazrtp || endp > end() ? npos : size_t(endp - _data);
-	}
-#endif
-	/// \brief Attaches the object to pointer \p p of size \p n.
-	///
-	/// If \p p is nullptr and \p n is non-zero, bad_alloc is thrown and current
-	/// state remains unchanged.
-	///
-	void cmemlink::link(const void* p, size_type n)
-	{
-		if (!p && n)
-			Sys_Error("Linking a zero argument");
-		unlink();
-		relink(p, n);
-	}
 
-	/// Compares to memory block pointed by l. Size is compared first.
-	constexpr bool cmemlink::operator== (const cmemlink& l) const noexcept
-	{
-		return l._size == _size &&
-			(l._data == _data || 0 == std::memcmp(l._data, _data, _size));
+	void zstring::release() {
+		if (_capacity) { _capacity = 0U; Z_Free(_buffer); }
+		_buffer = "";
+		_size = 0U;
 	}
+	void zstring::reserve(size_type n) { // don't have to do anything
+		if (_capacity < n) {
+			// special case
+			if (_capacity == 0 && _size > 0U) {
+				// we are on copy on write, so need to make a new buffer and copy first
+				// we have an existing buffer
+				char* p = (pointer)Z_Realloc(nullptr, n, "ztring");
+				strncpy(p, _buffer, _size);
+				_buffer = p;
+			}
+			else {
+				_buffer = (pointer)Z_Realloc(_size == 0U ? nullptr : _buffer, n, "ztring");
+			}
 
-
-	/// Fills the linked block with the given pattern.
-	/// \arg start   Offset at which to start filling the linked block
-	/// \arg p       Pointer to the pattern.
-	/// \arg elSize  Size of the pattern.
-	/// \arg elCount Number of times to write the pattern.
-	/// Total number of bytes written is \p elSize * \p elCount.
-	///
-	void memlink::fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount) noexcept
-	{
-		assert(data() || !elCount || !elSize);
-		assert(cstart >= begin() && cstart + elSize * elCount <= end());
-		iterator start = const_cast<iterator>(cstart);
-		if (elSize == 1)
-			std::fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
-		else while (elCount--)
-			start = std::copy_n(const_iterator(p), elSize, start);
+			_capacity = n;
+			assert(_buffer);
+		}
 	}
-
-
-
 }
-#ifdef USE_CUSTOM_IDTIME
-//https://stackoverflow.com/questions/4548004/how-to-correctly-and-standardly-compare-floats
-template<typename T>
-
-idTime::idTime() : _time(0.0f) {}
-idTime::idTime(float f) : _time(f) {}
-idTime::idTime(double f) : _time(static_cast<float>(f)) {}
-idTime::operator float() const { return _time; }
-idTime& idTime::operator+=(const idTime& r) { _time += r._time; return *this; }
-idTime& idTime::operator-=(const idTime& r) { _time -= r._time; return *this; }
-bool idTime::operator==(const idTime& r) const { return AreEqual(_time, r._time); }
-bool idTime::operator!=(const idTime& r) const { return !AreEqual(_time, r._time); }
-bool idTime::operator<(const idTime& r) const { return _time < r._time; }
-bool idTime::operator>(const idTime& r) const { return _time < r._time; }
-bool idTime::operator<=(const idTime& r) const { return operator==(r) || _time < r._time; }
-bool idTime::operator>=(const idTime& r) const { return operator==(r) || _time < r._time; }
-idTime& idTime::operator+=(float r) { _time += r; return *this; }
-idTime& idTime::operator-=(float r) { _time -= r; return *this; }
-idTime idTime::Seconds(int sec) { return idTime(static_cast<float>(sec)); }
-idTime idTime::MilliSeconds(int msec) { return idTime(static_cast<float>(msec) * 1000); }
-idTime idTime::UilliSeconds(int msec) { return idTime(static_cast<float>(msec) * 1000000); }
-#endif
-
-
 #define NUM_SAFE_ARGVS  7
 
 
@@ -394,7 +330,7 @@ int Q_strncmp (const char * s1, const char * s2, size_t count)
 	return -1;
 }
 #if 0
-bool Q_strncasecmp(const quake::string_view& a, const quake::string_view& b) {
+bool Q_strncasecmp(cstring_t a, cstring_t b) {
 		return a.size() == b.size() && std::equal(b.begin(), b.end(), a.begin(), [](char l, char r) { return ::tolower(l) == ::tolower(r); });
 }
 #endif
@@ -427,20 +363,15 @@ int Q_strncasecmp (const char * s1, const char * s2, size_t n)
 	
 	return -1;
 }
-int Q_strcasecmp(const quake::string_view& s1, const char * s2) {
-	int c2 = -1;
-	for(auto c1 : s1) {
-		int c2 = *s2++; ;
-		if (c2 == '\0' || std::tolower(c1) != std::tolower(c2)) return -1;
-	}
-	return *s2 == '\0' ? 0 : -1;
+int Q_strcasecmp(const std::string_view& s1, const char * s2) {
+	return Q_strncasecmp(s1.data(), s2,  s1.size());
 }
 int Q_strcasecmp (const char * s1, const char * s2)
 {
-	return Q_strncasecmp (s1, s2, 99999);
+	return Q_strncasecmp(s1, s2, 99999);
 }
-int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2) {
-	return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(), [](char c1, char c2) { return std::tolower(c1) == std::tolower(c2);  }) ? 0 : -1;
+int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2) {
+	return Q_strncasecmp(s1.data(), s2.data(), std::min(s1.size(), s2.size()));
 }
 static const char* SkipWhiteSpace(const char* data)  {
 	while (1) {
@@ -466,16 +397,20 @@ static inline int toHex(int c) {
 	else return -1; 
 }
 
-int	Q_atoi(const quake::string_view& str) {
+int	Q_atoi(cstring_t str) {
 	char* ptr = nullptr;
 	int ret = strtol(str.data(), &ptr,0);
 	assert(ptr == (str.data() + str.size())); // debug
 	return ret;
 }
-float Q_atof(const quake::string_view& str) {
+float Q_atof(cstring_t str) {
 	char* ptr;
 	float ret = strtof(str.data(), &ptr);
-	assert(ptr == (str.data() + str.size()) ); // debug
+	if (ptr == str.data()) { // not a number
+		return std::numeric_limits<float>::quiet_NaN();
+
+	}
+//	assert(ptr == (str.data() + str.size()) ); // debug
 	return ret;
 }
 int Q_atoi (const char * str)
@@ -535,7 +470,7 @@ int Q_atoi (const char * str)
 	
 	return 0;
 }
-quake::string_view COM_GameDir() {
+std::string_view COM_GameDir() {
 	return com_gamedir;
 }
 
@@ -710,34 +645,6 @@ float	sizebuf_t::ReadFloat() {
 	return -1;
 }
 
-void	sizebuf_t::ReadString(quake::string& str) {
-	str.reserve(256);
-	str.clear();
-	while (_cursize < _read_count) {
-		int c = _data[_read_count++];
-		if (c == 0 || c == -1) break;
-		if (str.size() + 1 >= str.capacity()) {
-			str.reserve(str.capacity() + 256);
-		}
-		str.push_back(c);
-	}
-}
-void	sizebuf_t::ReadStringLine(quake::string& str) {
-	str.reserve(256);
-	str.clear();
-	while (_cursize < _read_count) {
-		int c = _data[_read_count++];
-		if (c == 0 || c == -1 || c == '\n') break;
-		if (str.size() + 1 >= str.capacity()) {
-			str.reserve(str.capacity() + 256);
-		}
-		str.push_back(c);
-	}
-
-}
-
-
-
 
 //void	MSG_ReadDeltaUsercmd( struct usercmd_s *from, struct usercmd_s *cmd);
 
@@ -834,7 +741,7 @@ void sizebuf_t::WriteFloat ( float f)
 	Write (&dat.l, 4);
 }
 
-void sizebuf_t::WriteString ( const quake::string_view& s)
+void sizebuf_t::WriteString ( cstring_t s)
 {
 	if (s.empty())
 		Write ("", 1);
@@ -991,7 +898,7 @@ float MSG_ReadAngle (void)
 
 
 
-void sizebuf_t::Print(const quake::string_view& data) {
+void sizebuf_t::Print(const std::string_view&  data) {
 	size_t 	len = data.size() + 1;
 	if (back())
 		Q_memcpy(GetSpace(len), data.data(), len); // no trailing 0
@@ -1008,15 +915,22 @@ void sizebuf_t::Print(char c) {
 
 
 void sizebuf_t::Clear() { _cursize = 0; _read_count=0U; }
-void sizebuf_t::Free() { assert(_hunk_low_used); Hunk_FreeToLowMark(_hunk_low_used);  _hunk_low_used = 0; _cursize = 0; _capacity = 0;   }
+void sizebuf_t::Free() { 
+	if (_hunk_low_used) {
+		Hunk_FreeToLowMark(_hunk_low_used);
+		_hunk_low_used = 0;
+		_capacity = 0;
+		_data = nullptr;
+	}
+	Clear();
+}
 void sizebuf_t::Alloc(size_t startsize) {
 	assert(!_hunk_low_used);
 	if (startsize < 256) startsize = 256;
 	_hunk_low_used = Hunk_LowMark(); // debuging mainly
 	_data = (byte*)Hunk_AllocName(startsize, "sizebuf");
 	_capacity = startsize;
-	_cursize = 0;
-	_read_count = 0U;
+	Clear();
 }
 
 void sizebuf_t::Write(const void* data, size_t length) {
@@ -1154,12 +1068,12 @@ static constexpr const Entry lex_table_ignore_eol[][7] = {
 	// new line
 	{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				RESTART(0), },
 };
-static quake::string_view eol_token("\n");
+static std::string_view eol_token("\n");
 
 
 // switched to more state based
-bool COM_Parser::Next(quake::string_view& token, bool test_eol){
-	token = quake::string_view();
+bool COM_Parser::Next(std::string_view& token, bool test_eol){
+	token = std::string_view();
 	while (_pos >= _data.size()) return false;
 	size_t start = _pos;
 	size_t len = 0;
@@ -1296,7 +1210,7 @@ void COM_CheckRegistered (void)
 }
 
 
-void COM_Path_f(cmd_source_t source, size_t argc, const quake::string_view argv[]);
+void COM_Path_f(cmd_source_t source, const StringArgs& args);
 
 
 
@@ -1349,19 +1263,7 @@ varargs versions of all text functions.
 FIXME: make this buffer size safe someday
 ============
 */
-#if 0
-char    *va(char *format, ...)
-{
-	va_list         argptr;
-	static char             string[1024];
-	
-	va_start (argptr, format);
-	Q_vsprintf (string, format,argptr);
-	va_end (argptr);
 
-	return string;  
-}
-#endif
 
 /// just for debugging
 int     memsearch (byte *start, int count, int search)
@@ -1382,667 +1284,6 @@ QUAKE FILESYSTEM
 =============================================================================
 */
 static 	umm_stack_allocator<0xFFFF> umm_memory;
-namespace quake {
-
-	memblock::memblock(void) noexcept		: memlink(), _capacity(0) { }
-	memblock::memblock(const void* p, size_type n) : memlink(), _capacity(0) { assign(p, n); }
-	memblock::memblock(size_type n) : memlink(), _capacity(0) { resize(n); }
-	memblock::memblock(const cmemlink& b) : memlink(), _capacity(0) { assign(b); }
-	memblock::memblock(const memlink& b) : memlink(), _capacity(0) { assign(b); }
-	memblock::memblock(const memblock& b) : memlink(), _capacity(0) { assign(b); }
-	memblock::~memblock(void) noexcept { deallocate(); }
-
-	void memblock::unlink(void) noexcept
-	{
-		_capacity = 0;
-		memlink::unlink();
-	}
-
-	/// resizes the block to \p newSize bytes, reallocating if necessary.
-	void memblock::resize(size_type newSize, bool bExact)
-	{
-		if (_capacity < newSize + minimumFreeCapacity())
-			reserve(newSize, bExact);
-		memlink::resize(newSize);
-	}
-
-	/// Frees internal data.
-	void memblock::deallocate(void) noexcept
-	{
-		if (_capacity) {
-			assert(cdata() && "Internal error: space allocated, but the pointer is nullptr");
-			assert(data() && "Internal error: read-only block is marked as allocated space");
-			umm_memory.deallocate(data());
-		}
-		unlink();
-	}
-
-	/// Assumes control of the memory block \p p of size \p n.
-	/// The block assigned using this function will be freed in the destructor.
-	void memblock::manage(void* p, size_type n) noexcept
-	{
-		assert(p || !n);
-		assert(!_capacity && "Already managing something. deallocate or unlink first.");
-		link(p, n);
-		_capacity = n;
-	}
-
-	/// "Instantiate" a linked block by allocating and copying the linked data.
-	void memblock::copy_link(void)
-	{
-		const pointer p(begin());
-		const size_t sz(size());
-		if (is_linked())
-			unlink();
-		assign(p, sz);
-	}
-
-	/// Copies data from \p p, \p n.
-	void memblock::assign(const void* p, size_type n)
-	{
-		assert((p != (const void*)cdata() || size() == n) && "Self-assignment can not resize");
-		resize(n);
-		std::copy_n(const_pointer(p), n, begin());
-	}
-
-	/// \brief Reallocates internal block to hold at least \p newSize bytes.
-	///
-	/// Additional memory may be allocated, but for efficiency it is a very
-	/// good idea to call reserve before doing byte-by-byte edit operations.
-	/// The block size as returned by size() is not altered. reserve will not
-	/// reduce allocated memory. If you think you are wasting space, call
-	/// deallocate and start over. To avoid wasting space, use the block for
-	/// only one purpose, and try to get that purpose to use similar amounts
-	/// of memory on each iteration.
-	///
-	// HACK
-
-
-	void memblock::reserve(size_type newSize, bool bExact)
-	{
-		if ((newSize += minimumFreeCapacity()) <= _capacity)
-			return;
-		pointer oldBlock(is_linked() ? nullptr : data());
-		const size_t alignedSize(NextPow2(newSize));
-		if (!bExact)
-			newSize = alignedSize;
-		pointer newBlock = (pointer)umm_memory.allocate(newSize, oldBlock);
-		if (!newBlock)
-			throw std::bad_alloc();
-		if (!oldBlock & (cdata() != nullptr))
-			std::copy_n(cdata(), std::min(size() + 1, newSize), newBlock);
-		link(newBlock, size());
-		_capacity = newSize;
-	}
-
-	/// Reduces capacity to match size
-	void memblock::shrink_to_fit(void)
-	{
-		if (is_linked())
-			return;
-		pointer newBlock = (pointer)umm_memory.allocate(size(),newBlock);
-		if (!newBlock && size())
-			throw std::bad_alloc();
-		_capacity = size();
-		memlink::relink(newBlock, size());
-	}
-
-	/// Shifts the data in the linked block from \p start to \p start + \p n.
-	memblock::iterator memblock::insert(const_iterator start, size_type n)
-	{
-		const size_type ip = start - begin();
-		assert(ip <= size());
-		resize(size() + n, false);
-		memlink::insert(iat(ip), n);
-		return iat(ip);
-	}
-
-	/// Shifts the data in the linked block from \p start + \p n to \p start.
-	memblock::iterator memblock::erase(const_iterator start, size_type n)
-	{
-		const size_type ep = start - begin();
-		assert(ep + n <= size());
-		reserve(size() - n);
-		iterator iep = iat(ep);
-		memlink::erase(iep, n);
-		memlink::resize(size() - n);
-		return iep;
-	}
-
-	/// Reads the object from stream \p s
-	void memblock::read(std::istream& is)
-	{
-		assert(0);
-#if 0
-		written_size_type n = 0;
-		is >> n;
-		if (!is.verify_remaining("read", "ustl::memblock", n))
-			return;
-		resize(n);
-		is.read(data(), writable_size());
-		is.align(stream_align_of(n));
-#endif
-	}
-
-	/// Reads the entire file \p "filename".
-	void memblock::read_file(const char* filename)
-	{
-		assert(0);
-#if 0
-		fstream f;
-		f.exceptions(fstream::allbadbits);
-		f.open(filename, fstream::in);
-		const off_t fsize(f.size());
-		reserve(fsize);
-		f.read(data(), fsize);
-		f.close();
-		resize(fsize);
-#endif
-	}
-
-	memblock::size_type memblock::minimumFreeCapacity(void) const noexcept { return 0; }
-
-
-	bool symbol::operator==(const string_view& r) const {
-		if (_view.size() != r.size()) return false;
-		for (size_t i = 0; i < _view.size(); i++)
-			if (std::tolower(_view[i]) != std::tolower(r[i])) return false;
-		return true;
-	}
-	std::ostream& operator<<(std::ostream& os, const string_view& sv) {
-		os.write(sv.data(), sv.size());
-		return os;
-	}
-
-	std::ostream& operator<<(std::ostream& os, const symbol& sv) {
-		// can't just write a name, have to make sure its lowercase
-		for (auto c : sv) os << (char)std::tolower(c);
-		return os;
-	}
-#if 0
-	static  std::streambuf::pos_type STREAM_ERROR_RETURN = std::streambuf::pos_type(std::streambuf::off_type(-1)); 
-	stream_buffer::pos_type stream_buffer::_seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode) {
-			if (!_file.is_open())
-				return pos_type(off_type(-1));
-
-			off_type new_off = 0;
-			switch (dir) {
-			case std::ios_base::beg:
-				new_off = off;
-				break;
-			case std::ios_base::cur:
-				new_off += off;
-				break;
-			case std::ios_base::end:
-				new_off = _length + off;
-				break;
-			}
-
-			if (new_off < 0 || new_off >= _length) return pos_type(off_type(-1));
-			_current = _file.seek(new_off + _offset);
-			if (_mode & std::ios_base::in) {
-				setg(nullptr, nullptr, nullptr);
-			}
-			else if (_mode & std::ios_base::out) {
-				sync();
-				setp(nullptr, nullptr, nullptr);
-			}
-			else
-				return STREAM_ERROR_RETURN;
-
-			if (_offset !=   0) {
-				if (_current >= (_offset + _length)) {
-					Sys_Error("file_read_stream_buffer: past override");
-					return STREAM_ERROR_RETURN;
-				}
-				_current -= _offset;
-			}
-			return pos_type(_current);
-	}
-	stream_buffer::pos_type stream_buffer::seekpos(pos_type pos, std::ios_base::openmode which)  { return _seekoff(pos, std::ios_base::beg, which); }
-	std::streampos stream_buffer::seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which) { return _seekoff(off, way, which); }
-	bool stream_buffer::open(const char* filename, std::ios_base::openmode mode) {
-		_current = 0;
-		setg(nullptr, nullptr, nullptr); // flush buffer
-		setp(nullptr, nullptr, nullptr); // flush buffer
-		if (_file.open(filename, mode)) {
-			_length = _file.file_size();
-			return true;
-		} return false;
-	}
-	std::streamsize stream_buffer::showmanyc() {
-		return _length - _current;
-	}
-	std::streamsize stream_buffer::xsgetn(char* s, std::streamsize n) {
-		n = std::min(std::streamoff(n), std::streamoff(_length - _current));
-		n = _file.read(s, n);
-		_current += n;
-		return n;
-	}
-	stream_buffer::int_type stream_buffer::underflow() {
-		assert(0);
-		// only reason to get here is if the buffer is empty
-		if (_current >= _length) return -1;
-		size_t size = std::min(_buffer.size(), size_t(_length - _current));
-		_current += _file.read(_buffer.data(), size);
-		setg(_buffer.data(), _buffer.data(), _buffer.data() + size); // flush buffer
-		return traits_type::to_int_type(_buffer[0]);
-	}
-	void stream_buffer::close() {
-		sync();
-		_file.close();
-	}
-	int stream_buffer::sync()  {
-		if (_mode & std::ios_base::out && pptr() >  pbase()) {
-			size_t size = pptr() - pbase();
-			_current += _file.write(pbase(), size);
-			setp(_buffer.data(), _buffer.data(), _buffer.data()+ _buffer.size()); // flush buffer
-		}
-		return 0;
-	}
-	void stream_buffer::set_offset(off_type offset, off_type length) {
-		sync();
-		_offset = offset; _length = length; _current = 0;
-		_file.seek(_offset);
-		setg(nullptr, nullptr, nullptr); // flush buffer
-	}
-
-	stream_buffer::int_type stream_buffer::overflow(int_type c) {
-		sync();
-		return this->sputc(c);
-	}
-
-#endif
-
-	//----------------------------------------------------------------------
-
-	constexpr const string::pos_type string::npos;
-
-	//----------------------------------------------------------------------
-
-	/// Assigns itself the value of string \p s
-	string::string(const string& s)
-		: memblock((s.size() + 1) & (s.is_linked() - 1))	// +1 because base ctor can't call virtuals of this class
-	{
-		if (s.is_linked())
-			relink(s.c_str(), s.size());
-		else {
-			std::copy_n(s.begin(), size(), begin());
-			relink(begin(), size() - 1);	// --m_Size
-		}
-	}
-
-	/// Links to \p s
-	string::string(const_pointer s) noexcept
-		: memblock()
-	{
-		if (!s) s = "";
-		relink(s, std::strlen(s));
-	}
-
-	/// Creates a string of length \p n filled with character \p c.
-	string::string(size_type n, value_type c)
-		: memblock(n + 1)	// +1 because base ctor can't call virtuals of this class
-	{
-		relink(begin(), size() - 1);	// --m_Size
-		std::fill_n(begin(), n, c);
-		at(n) = 0;
-	}
-
-	/// Resize the string to \p n characters. New space contents is undefined.
-	void string::resize(size_type n)
-	{
-		if (!(n | memblock::capacity()))
-			return relink("", 0);
-		memblock::resize(n);
-		at(n) = 0;
-	}
-
-	/// Assigns itself the value of string \p s
-	string& string::assign(const_pointer s)
-	{
-		if (!s) s = "";
-		assign(s, std::strlen(s));
-		return *this;
-	}
-
-	/// Assigns itself the value of string \p s of length \p len.
-	string& string::assign(const_pointer s, size_type len)
-	{
-		resize(len);
-		std::copy_n(s, len, begin());
-		return *this;
-	}
-
-	/// Appends to itself the value of string \p s of length \p len.
-	string& string::append(const_pointer s)
-	{
-		if (!s) s = "";
-		append(s, strlen(s));
-		return *this;
-	}
-
-	/// Appends to itself the value of string \p s of length \p len.
-	string& string::append(const_pointer s, size_type len)
-	{
-		resize(size() + len);
-		std::copy_n(s, len, end() - len);
-		return *this;
-	}
-
-	/// Appends to itself \p n characters of value \p c.
-	string& string::append(size_type n, value_type c)
-	{
-		resize(size() + n);
-		std::fill_n(end() - n, n, c);
-		return *this;
-	}
-
-	/// Copies [start,start+n) into [p,n). The result is not null terminated.
-	string::size_type string::copy(pointer p, size_type n, pos_type start) const noexcept
-	{
-		assert(p && n && start <= size());
-		const size_type btc = std::min(n, size() - start);
-		std::copy_n(iat(start), btc, p);
-		return btc;
-	}
-
-	/// Returns comparison value regarding string \p s.
-	/// The return value is:
-	/// \li 1 if this string is greater (by value, not length) than string \p s
-	/// \li 0 if this string is equal to string \p s
-	/// \li -1 if this string is less than string \p s
-	///
-	int string::compare(const_iterator first1, const_iterator last1, const_iterator first2, const_iterator last2) noexcept // static
-	{
-		assert(first1 <= last1 && (first2 <= last2 || !last2) && "Negative ranges result in memory allocation errors.");
-		const size_type len1 = std::distance(first1, last1), len2 = std::distance(first2, last2);
-		const int rvbylen = sign(int(len1 - len2));
-		int rv = memcmp(first1, first2, std::min(len1, len2));
-		return rv ? rv : rvbylen;
-	}
-
-	/// Returns true if this string is equal to string \p s.
-	bool string::operator== (const_pointer s) const noexcept
-	{
-		if (!s) s = "";
-		return size() == std::strlen(s) && 0 == std::memcmp(c_str(), s, size());
-	}
-#if 0
-	/// Returns the beginning of character \p i.
-	string::const_iterator string::wiat(pos_type i) const noexcept
-	{
-		utf8in_iterator<string::const_iterator> cfinder(begin());
-		cfinder += i;
-		return cfinder.base();
-	}
-
-	/// Inserts wide character \p c at \p ipo \p n times as a UTF-8 string.
-	///
-	/// \p ipo is a byte position, not a character position, and is intended
-	/// to be obtained from one of the find functions. Generally you are not
-	/// able to know the character position in a localized string; different
-	/// languages will have different character counts, so use find instead.
-	///
-	string& string::insert(pos_type ipo, size_type n, wvalue_type c)
-	{
-		iterator ip(iat(ipo));
-		ip = iterator(memblock::insert(memblock::iterator(ip), n * Utf8Bytes(c)));
-		fill_n(utf8out(ip), n, c);
-		*end() = 0;
-		return *this;
-	}
-
-	/// Inserts sequence of wide characters at \p ipo (byte position from a find call)
-	string& string::insert(pos_type ipo, const wvalue_type* first, const wvalue_type* last, const size_type n)
-	{
-		iterator ip(iat(ipo));
-		size_type nti = distance(first, last), bti = 0;
-		for (size_type i = 0; i < nti; ++i)
-			bti += Utf8Bytes(first[i]);
-		ip = iterator(memblock::insert(memblock::iterator(ip), n * bti));
-		utf8out_iterator<string::iterator> uout(utf8out(ip));
-		for (size_type j = 0; j < n; ++j)
-			for (size_type k = 0; k < nti; ++k, ++uout)
-				*uout = first[k];
-		*end() = 0;
-		return *this;
-	}
-#endif
-	/// Inserts character \p c into this string at \p start.
-	string::iterator string::insert(const_iterator start, size_type n, value_type c)
-	{
-		memblock::iterator ip = memblock::insert(memblock::const_iterator(start), n);
-		std::fill_n(ip, n, c);
-		*end() = 0;
-		return iterator(ip);
-	}
-
-	/// Inserts \p count instances of string \p s at offset \p start.
-	string::iterator string::insert(const_iterator start, const_pointer s, size_type n)
-	{
-		if (!s) s = "";
-		return insert(start, s, s + strlen(s), n);
-	}
-
-	/// Inserts [first,last] \p n times.
-	string::iterator string::insert(const_iterator start, const_pointer first, const_pointer last, size_type n)
-	{
-		assert(first <= last);
-		assert(begin() <= start && end() >= start);
-		assert((first < begin() || first >= end() || size() + abs_distance(first, last) < capacity()) && "Insertion of self with autoresize is not supported");
-		memblock::iterator ip = iterator(memblock::insert(memblock::const_iterator(start), std::distance(first, last) * n));
-		fill(ip, first, std::distance(first, last), n);
-		*end() = 0;
-		return iterator(ip);
-	}
-
-	/// Erases \p size bytes at \p ep.
-	string::iterator string::erase(const_iterator ep, size_type n)
-	{
-		string::iterator rv = memblock::erase(memblock::const_iterator(ep), n);
-		*end() = 0;
-		return rv;
-	}
-
-	/// Erases \p n bytes at byte offset \p epo.
-	string& string::erase(pos_type epo, size_type n)
-	{
-		erase(iat(epo), std::min(n, size() - epo));
-		return *this;
-	}
-
-	/// Replaces range [\p start, \p start + \p len] with string \p s.
-	string& string::replace(const_iterator first, const_iterator last, const_pointer s)
-	{
-		if (!s) s = "";
-		replace(first, last, s, s + strlen(s));
-		return *this;
-	}
-
-	/// Replaces range [\p start, \p start + \p len] with \p count instances of string \p s.
-	string& string::replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n)
-	{
-		assert(first <= last);
-		assert(n || std::distance(first, last));
-		assert(first >= begin() && first <= end() && last >= first && last <= end());
-		assert((i1 < begin() || i1 >= end() || abs_distance(i1, i2) * n + size() < capacity()) && "Replacement by self can not autoresize");
-		const size_type bte = std::distance(first, last), bti = std::distance(i1, i2) * n;
-		memblock::const_iterator rp = static_cast<memblock::const_iterator>(first);
-		if (bti < bte)
-			rp = memblock::erase(rp, bte - bti);
-		else if (bte < bti)
-			rp = memblock::insert(rp, bti - bte);
-		fill(rp, i1, std::distance(i1, i2), n);
-		*end() = 0;
-		return *this;
-	}
-
-	/// Returns the offset of the first occurence of \p c after \p pos.
-	string::pos_type string::find(value_type c, pos_type pos) const noexcept
-	{
-		const_iterator found = std::find(iat(pos), end(), c);
-		return found < end() ? (pos_type)std::distance(begin(), found) : npos;
-	}
-
-	/// Returns the offset of the first occurence of substring \p s of length \p n after \p pos.
-	string::pos_type string::find(const string& s, pos_type pos) const noexcept
-	{
-		if (s.empty() || s.size() > size() - pos)
-			return npos;
-		pos_type endi = s.size() - 1;
-		value_type endchar = s[endi];
-		pos_type lastPos = endi;
-		while (lastPos-- && s[lastPos] != endchar);
-		const size_type skip = endi - lastPos;
-		const_iterator i = iat(pos) + endi;
-		for (; i < end() && (i = std::find(i, end(), endchar)) < end(); i += skip)
-			if (std::memcmp(i - endi, s.c_str(), s.size()) == 0)
-				return std::distance(begin(), i) - endi;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of character \p c before \p pos.
-	string::pos_type string::rfind(value_type c, pos_type pos) const noexcept
-	{
-		for (int i = std::min(pos, pos_type(size() - 1)); i >= 0; --i)
-			if (at(i) == c)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of substring \p s of size \p n before \p pos.
-	string::pos_type string::rfind(const string& s, pos_type pos) const noexcept
-	{
-		const_iterator d = iat(pos) - 1;
-		const_iterator sp = begin() + s.size() - 1;
-		const_iterator m = s.end() - 1;
-		for (long int i = 0; d > sp && size_type(i) < s.size(); --d)
-			for (i = 0; size_type(i) < s.size(); ++i)
-				if (m[-i] != d[-i])
-					break;
-		return d > sp ? (pos_type)std::distance(begin(), d + 2 - s.size()) : npos;
-	}
-
-	/// Returns the offset of the first occurence of one of characters in \p s of size \p n after \p pos.
-	string::pos_type string::find_first_of(const string& s, pos_type pos) const noexcept
-	{
-		for (size_type i = std::min(size_type(pos), size()); i < size(); ++i)
-			if (s.find(at(i)) != npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the first occurence of one of characters not in \p s of size \p n after \p pos.
-	string::pos_type string::find_first_not_of(const string& s, pos_type pos) const noexcept
-	{
-		for (size_type i = std::min(size_type(pos), size()); i < size(); ++i)
-			if (s.find(at(i)) == npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of one of characters in \p s of size \p n before \p pos.
-	string::pos_type string::find_last_of(const string& s, pos_type pos) const noexcept
-	{
-		for (int i = std::min(size_type(pos), size() - 1); i >= 0; --i)
-			if (s.find(at(i)) != npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of one of characters not in \p s of size \p n before \p pos.
-	string::pos_type string::find_last_not_of(const string& s, pos_type pos) const noexcept
-	{
-		for (int i = std::min(pos, pos_type(size() - 1)); i >= 0; --i)
-			if (s.find(at(i)) == npos)
-				return i;
-		return npos;
-	}
-
-	/// Equivalent to a vsprintf on the string.
-	int string::vformat(const char* fmt, va_list args)
-	{
-		va_list args2;
-		int rv = size(), wcap;
-		do {
-			va_copy(args2, args);
-			rv = vsnprintf(data(), wcap = memblock::capacity(), fmt, args2);
-			resize(rv);
-		} while (rv >= wcap);
-		return rv;
-	}
-
-	/// Equivalent to a sprintf on the string.
-	int string::format(const char* fmt, ...)
-	{
-		va_list args;
-		va_start(args, fmt);
-		const int rv = vformat(fmt, args);
-		va_end(args);
-		return rv;
-	}
-
-	/// Returns the number of bytes required to write this object to a stream.
-	size_t string::stream_size(void) const noexcept
-	{
-	//	return Utf8Bytes(size()) + size();
-		return size();
-	}
-
-	/// Reads the object from stream \p os
-	void string::read(std::istream& is)
-	{
-		assert(0);
-#if 0
-		char szbuf[8];
-		is >> szbuf[0];
-		size_t szsz(Utf8SequenceBytes(szbuf[0]) - 1), n = 0;
-		if (!is.verify_remaining("read", "ustl::string", szsz)) return;
-		is.read(szbuf + 1, szsz);
-		n = *utf8in(szbuf);
-		if (!is.verify_remaining("read", "ustl::string", n)) return;
-		resize(n);
-		is.read(data(), size());
-#endif
-	}
-
-	/// Writes the object to stream \p os
-	void string::write(std::ostream& os) const
-	{
-		assert(0);
-#if 0
-		const written_size_type sz(size());
-		assert(sz == size() && "No support for writing strings larger than 4G");
-
-		char szbuf[8];
-		utf8out_iterator<char*> szout(szbuf);
-		*szout = sz;
-		size_t szsz = distance(szbuf, szout.base());
-
-		if (!os.verify_remaining("write", "ustl::string", szsz + sz)) return;
-		os.write(szbuf, szsz);
-		os.write(cdata(), sz);
-#endif
-	}
-
-	/// Returns a hash value for [first, last)
-	hashvalue_t string::hash(const char* first, const char* last) noexcept // static
-	{
-		hashvalue_t h = 0;
-		// This has the bits flowing into each other from both sides of the number
-		for (; first < last; ++first)
-			h = *first + ((h << 7) | (h >> (BitsInType(hashvalue_t) - 7)));
-		return h;
-	}
-
-	string::size_type string::minimumFreeCapacity(void) const noexcept { return 1; }
-
-
-
-};
-
-int     com_filesize;
 
 
 //
@@ -2087,7 +1328,7 @@ struct dpackheader_t
 struct pack_t;
 struct search_value_t {
 	pack_t* pack; 
-	char filename[MAX_QPATH];
+	string_t filename;
 	int offset;
 	int length;
 	sys_file handler;
@@ -2096,9 +1337,8 @@ struct search_value_t {
 
 struct pack_t {
 	int file_count;
-	char filename[MAX_OSPATH];
+	string_t filename;
 	search_value_t files[1];
-	operator quake::string_view() const { return (const char*)filename; }
 	static void operator delete(void*) {} // itsloaded as a hunk
 };
 
@@ -2107,14 +1347,14 @@ struct pack_t {
 
 
 using pack_ptr_t = std::unique_ptr<pack_t>;
-using filename_ptr_t = std::unique_ptr<std::string>;
-using unordered_map_t = std::unordered_map<quake::string_view, std::reference_wrapper<search_value_t>>;
+
+using unordered_map_t = std::unordered_map<string_t, std::reference_wrapper<search_value_t>>;
 static unordered_map_t com_packfilesearch;
-static std::unordered_set<std::string> com_searchpaths;
+static ZVector<string_t> com_searchpaths;
 
 
-static std::unordered_map<quake::string_view, std::unique_ptr<pack_t>> com_packfiles;
-static void AddSearchPath(const quake::string_view& dir) {
+static std::unordered_map<std::string_view, std::unique_ptr<pack_t>> com_packfiles;
+static void AddSearchPath(const std::string_view& dir) {
 #if 0
 	char* cptr = (char*)Hunk_Alloc(sizeof(searchpath_t) + dir.size());
 	searchpath_t* ptr = new(cptr) searchpath_t;
@@ -2124,7 +1364,7 @@ static void AddSearchPath(const quake::string_view& dir) {
 	com_searchpaths = ptr;
 	return ptr;
 #else
-	com_searchpaths.emplace(dir.data(),dir.size());
+	com_searchpaths.emplace_back(dir);
 
 #endif
 }
@@ -2138,7 +1378,7 @@ Loads the header and directory, adding the files at the beginning
 of the list so they override previous pack files.
 =================
 */
-static bool COM_LoadPackFile(const quake::string_view& packfile)
+static bool COM_LoadPackFile(const std::string_view& packfile)
 {
 	dpackheader_t   header;
 	//dpackfile_t             info[MAX_FILES_IN_PACK];
@@ -2174,7 +1414,7 @@ static bool COM_LoadPackFile(const quake::string_view& packfile)
 	// crc the directory to check for modifications
 	CRC_Init(&crc);
 	pack_t* pack = new((pack_t*)Hunk_AllocName(sizeof(pack_t) + (numpackfiles - 1) * sizeof(search_value_t), "packfile")) pack_t;
-	packfile.copy(pack->filename, sizeof(pack->filename));
+	pack->filename = string_t::intern(packfile);
 	pack->file_count = numpackfiles;
 
 	com_packfiles.emplace(pack->filename, pack);
@@ -2186,19 +1426,17 @@ static bool COM_LoadPackFile(const quake::string_view& packfile)
 		pfile.filepos = LittleLong(pfile.filepos);
 		pfile.filelen = LittleLong(pfile.filelen);
 		assert(pfile.name[55] == 0);
-		::strncpy(psearch.filename, pfile.name, sizeof(psearch.filename) - 1);
+		psearch.filename = string_t::intern(pfile.name);
 		psearch.length = pfile.filelen;
 		psearch.offset = pfile.filepos;
 		psearch.pack = pack;
 
-		quake::string_view filename(psearch.filename);
 
-
-		if (com_packfilesearch.find(filename) != com_packfilesearch.end()) {
-			quake::con << "dup pack file: '" << filename << "'" << std::endl;
+		if (com_packfilesearch.find(psearch.filename) != com_packfilesearch.end()) {
+			quake::con << "dup pack file: '" << psearch.filename << "'" << std::endl;
 		}
 		else
-			com_packfilesearch.emplace(filename, std::ref(pack->files[i]));
+			com_packfilesearch.emplace(psearch.filename, std::ref(pack->files[i]));
 	}
 	file.close();
 	quake::con << "Added packfile " << packfile << " (" << numpackfiles << " files)" << std::endl;
@@ -2212,7 +1450,7 @@ COM_Path_f
 
 ============
 */
-void COM_Path_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void COM_Path_f(cmd_source_t source, const StringArgs& args)
 {
 	Con_Printf ("Current search path:\n");
 	for (const auto& it : com_packfilesearch) {
@@ -2227,7 +1465,7 @@ COM_WriteFile
 The filename will be prefixed by the current game directory
 ============
 */
-void COM_WriteFile (const quake::string_view& filename, const void * data, int len)
+void COM_WriteFile (const std::string_view& filename, const void * data, int len)
 {
 	quake::fixed_string_stream<MAX_OSPATH> name;
 
@@ -2293,7 +1531,7 @@ Sets com_filesize and one of handle or file
 */
 
 
-size_t COM_FindFile(const quake::string_view& filename, std::fstream& stream)
+size_t COM_FindFile(const std::string_view& filename, std::fstream& stream)
 {
 	quake::fixed_string_stream<MAX_OSPATH>   cachepath;
 	quake::fixed_string_stream<MAX_OSPATH>   netpath;
@@ -2309,8 +1547,9 @@ size_t COM_FindFile(const quake::string_view& filename, std::fstream& stream)
 	auto& it = com_packfilesearch.find(filename);
 	if (it != com_packfilesearch.end()) { // its a pack file
 		auto& pfile = it->second.get();		
+		
 	//	quake::con << "PackFile:" << pfile.handler->filename << "(" << pfile.offset << "," << pfile.length << "): " << pfile.filename << std::endl;
-		stream.open(pfile.pack->filename, std::ifstream::binary | std::ifstream::in);
+		stream.open(pfile.pack->filename.c_str(), std::ifstream::binary | std::ifstream::in);
 		stream.seekg(pfile.offset);
 		return pfile.length;
 	}
@@ -2375,14 +1614,14 @@ cache_user_t *loadcache;
 byte    *loadbuf;
 int             loadsize;
 
-static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
+static byte *COM_LoadFile (const std::string_view& path, int usehunk, size_t* file_size=nullptr)
 {
 	byte    *buf = nullptr;  // quiet compiler warning
 // look for it in the filesystem or pack files
 	std::fstream is;
 	size_t len = COM_FindFile(path, is);
 	if (!len) return nullptr;
-
+	if (file_size) *file_size = len;
 // extract the filename base name for hunk tag
 	auto base = COM_FileBase (path);
 	
@@ -2428,29 +1667,29 @@ static byte *COM_LoadFile (const quake::string_view& path, int usehunk)
 
 	return buf;
 }
-byte *COM_LoadZFile(const quake::string_view& path)
+byte *COM_LoadZFile(const std::string_view& path, size_t* file_size )
 {
 	return COM_LoadFile(path, 0);
 }
 
-byte *COM_LoadHunkFile (const quake::string_view& path)
+byte *COM_LoadHunkFile (const std::string_view& path, size_t* file_size)
 {
-	return COM_LoadFile (path, 1);
+	return COM_LoadFile (path, 1, file_size);
 }
 
-byte *COM_LoadTempFile (const quake::string_view& path)
+byte *COM_LoadTempFile (const std::string_view& path)
 {
 	return COM_LoadFile (path, 2);
 }
 
-void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu)
+void COM_LoadCacheFile (const std::string_view& path, struct cache_user_t *cu)
 {
 	loadcache = cu;
 	COM_LoadFile (path, 3);
 }
 
 // uses temp hunk if larger than bufsize
-byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize)
+byte *COM_LoadStackFile (const std::string_view& path, void *buffer, int bufsize)
 {
 	byte    *buf;
 	
@@ -2470,7 +1709,7 @@ Sets com_gamedir, adds the directory to the head of the path,
 then loads and adds pak1.pak pak2.pak ... 
 ================
 */
-static void COM_AddGameDirectory(const quake::string_view& dir)
+static void COM_AddGameDirectory(const std::string_view& dir)
 {
 	AddSearchPath(dir);
 
@@ -2498,7 +1737,7 @@ void COM_InitFilesystem(void)
 	size_t i;
 	
 	quake::fixed_string<MAX_OSPATH> basedir;
-	quake::string_view value;
+	cstring_t value;
 	//
 	// -basedir <path>
 	// Overrides the system supplied base directory (under GAMENAME)
@@ -2534,11 +1773,13 @@ void COM_InitFilesystem(void)
 	COM_AddGameDirectory(basedir);
 
 	if (host_parms.COM_CheckParm("-rogue")) {
-		basedir.erase(slash_point).append("rogue");
+		basedir.erase(slash_point);
+		basedir.append("rogue");
 		COM_AddGameDirectory(basedir);
 	}
 	if (host_parms.COM_CheckParm("-hipnotic")) {
-		basedir.erase(slash_point).append("hipnotic");
+		basedir.erase(slash_point);
+		basedir.append("hipnotic");
 		COM_AddGameDirectory(basedir);
 	}
 
@@ -2549,7 +1790,8 @@ void COM_InitFilesystem(void)
 	if (host_parms.COM_CheckParmValue("-game", value) != 0) {
 		{
 			com_modified = true;
-			basedir.erase(slash_point).append(value);
+			basedir.erase(slash_point);
+			basedir.append(value);
 			COM_AddGameDirectory(basedir);
 		}
 	}
@@ -2560,11 +1802,11 @@ void COM_InitFilesystem(void)
 	if ((i = host_parms.COM_CheckParm("-path")) != 0)
 	{
 		com_modified = true;
-		quake::string_view file_name;
-		for (size_t j = i + 1; i < host_parms.argc; i++) {
-			auto it = host_parms.argv[j];
+		std::string_view file_name;
+		for (size_t j = i + 1; i < host_parms.args.size(); i++) {
+			auto it = host_parms.args[j];
 			if (!it.empty() || it.at(0) == '+' || it.at(0) == '-') {
-				file_name = it;
+				file_name = std::string_view(it);
 				break;
 			}
 

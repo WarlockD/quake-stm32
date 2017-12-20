@@ -102,18 +102,18 @@ void R_AddDynamicLights (void)
 		
 		for (t = 0 ; t<tmax ; t++)
 		{
-			td = local[1] - t*16;
+			td = local[1] - static_cast<float>(t*16);
 			if (td < 0)
 				td = -td;
 			for (s=0 ; s<smax ; s++)
 			{
-				sd = local[0] - s*16;
+				sd = local[0] - static_cast<float>(t * 16);
 				if (sd < 0)
 					sd = -sd;
 				if (sd > td)
-					dist = sd + (td>>1);
+					dist = static_cast<float>(sd + (td>>1));
 				else
-					dist = td + (sd>>1);
+					dist = static_cast<float>(td + (sd>>1));
 				if (dist < minlight)
 #ifdef QUAKE2
 				{
@@ -131,7 +131,7 @@ void R_AddDynamicLights (void)
 					}
 				}
 #else
-					blocklights[t*smax + s] += (rad - dist)*256;
+					blocklights[t*smax + s] += static_cast<uint32_t>((rad - dist)*256);
 #endif
 			}
 		}

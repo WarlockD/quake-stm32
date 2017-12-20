@@ -55,11 +55,11 @@ kbutton_t	in_up, in_down;
 int			in_impulse;
 
 
-void KeyDown ( cmd_source_t source, size_t argc, const quake::string_view argv[], kbutton_t *b)
+void KeyDown ( cmd_source_t source, const StringArgs& args, kbutton_t *b)
 {
 	int		k;
 
-	auto c = argv[1];
+	auto c = args[1];
 	if (!c.empty())
 		k = Q_atoi(c);
 	else
@@ -83,11 +83,11 @@ void KeyDown ( cmd_source_t source, size_t argc, const quake::string_view argv[]
 	b->state |= 1 + 2;	// down + impulse down
 }
 
-void KeyUp(cmd_source_t source, size_t argc, const quake::string_view argv[], kbutton_t *b)
+void KeyUp(cmd_source_t source, const StringArgs& args, kbutton_t *b)
 {
 	int		k;
 
-	auto c = argv[1];
+	auto c = args[1];
 	if (!c.empty())
 		k = Q_atoi(c);
 	else
@@ -112,49 +112,49 @@ void KeyUp(cmd_source_t source, size_t argc, const quake::string_view argv[], kb
 	b->state |= 4; 		// impulse up
 }
 
-void IN_KLookDown (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_klook);}
-void IN_KLookUp (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_klook);}
-void IN_MLookDown (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_mlook);}
-void IN_MLookUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {
-	KeyUp(source, argc, argv, &in_mlook);
+void IN_KLookDown (cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_klook);}
+void IN_KLookUp (cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_klook);}
+void IN_MLookDown (cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_mlook);}
+void IN_MLookUp(cmd_source_t source, const StringArgs& args) {
+	KeyUp(source, args, &in_mlook);
 	if (!(in_mlook.state & 1) && lookspring.value)
 		V_StartPitchDrift();
 }
-void IN_UpDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source,argc,argv,&in_up);}
-void IN_UpUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_up);}
-void IN_DownDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_down);}
-void IN_DownUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_down);}
-void IN_LeftDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_left);}
-void IN_LeftUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_left);}
-void IN_RightDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_right);}
-void IN_RightUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_right);}
-void IN_ForwardDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_forward);}
-void IN_ForwardUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_forward);}
-void IN_BackDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_back);}
-void IN_BackUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_back);}
-void IN_LookupDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_lookup);}
-void IN_LookupUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_lookup);}
-void IN_LookdownDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_lookdown);}
-void IN_LookdownUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_lookdown);}
-void IN_MoveleftDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_moveleft);}
-void IN_MoveleftUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_moveleft);}
-void IN_MoverightDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_moveright);}
-void IN_MoverightUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_moveright);}
+void IN_UpDown(cmd_source_t source, const StringArgs& args) {KeyDown(source,args,&in_up);}
+void IN_UpUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_up);}
+void IN_DownDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_down);}
+void IN_DownUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_down);}
+void IN_LeftDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_left);}
+void IN_LeftUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_left);}
+void IN_RightDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_right);}
+void IN_RightUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_right);}
+void IN_ForwardDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_forward);}
+void IN_ForwardUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_forward);}
+void IN_BackDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_back);}
+void IN_BackUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_back);}
+void IN_LookupDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_lookup);}
+void IN_LookupUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_lookup);}
+void IN_LookdownDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_lookdown);}
+void IN_LookdownUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_lookdown);}
+void IN_MoveleftDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_moveleft);}
+void IN_MoveleftUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_moveleft);}
+void IN_MoverightDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_moveright);}
+void IN_MoverightUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_moveright);}
 
-void IN_SpeedDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_speed);}
-void IN_SpeedUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_speed);}
-void IN_StrafeDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_strafe);}
-void IN_StrafeUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_strafe);}
+void IN_SpeedDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_speed);}
+void IN_SpeedUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_speed);}
+void IN_StrafeDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_strafe);}
+void IN_StrafeUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_strafe);}
 
-void IN_AttackDown(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_attack);}
-void IN_AttackUp(cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_attack);}
+void IN_AttackDown(cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_attack);}
+void IN_AttackUp(cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_attack);}
 
-void IN_UseDown (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_use);}
-void IN_UseUp (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_use);}
-void IN_JumpDown (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyDown(source, argc, argv, &in_jump);}
-void IN_JumpUp (cmd_source_t source, size_t argc, const quake::string_view argv[]) {KeyUp(source, argc, argv, &in_jump);}
+void IN_UseDown (cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_use);}
+void IN_UseUp (cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_use);}
+void IN_JumpDown (cmd_source_t source, const StringArgs& args) {KeyDown(source, args, &in_jump);}
+void IN_JumpUp (cmd_source_t source, const StringArgs& args) {KeyUp(source, args, &in_jump);}
 
-void IN_Impulse (cmd_source_t source, size_t argc, const quake::string_view argv[]) {in_impulse=Q_atoi(argv[1]);}
+void IN_Impulse (cmd_source_t source, const StringArgs& args) {in_impulse=Q_atoi(args[1]);}
 
 /*
 ===============

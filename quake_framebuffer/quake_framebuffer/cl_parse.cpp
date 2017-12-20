@@ -151,18 +151,16 @@ void CL_KeepaliveMessage (void)
 	
 	static idTime lastmsg;
 	int		ret;
-	sizebuf_t	old(net_message); 
-	byte		olddata[8192];
+	static_sizebuf_t<8192>	old;
+
 	
 	if (sv.active)
 		return;		// no need if server is local
 	if (quake::cls.demoplayback)
 		return;
 
-	old = net_message;
-	// read messages from server, should just be nops
-	Q_memcpy (olddata, net_message.data(), net_message.size());
-	
+	old = net_message; // read messages from server, should just be nops
+
 	do
 	{
 		ret = CL_GetMessage ();
@@ -183,7 +181,6 @@ void CL_KeepaliveMessage (void)
 	} while (ret);
 
 	net_message = old;
-	Q_memcpy (net_message.data(), olddata, net_message.size());
 
 // check time
 	idTime time = Sys_FloatTime ();

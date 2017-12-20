@@ -158,7 +158,7 @@ void	Host_FindMaxClients (void)
 {
 
 	svs.maxclients = 1;
-	quake::string_view value;
+	cstring_t value;
 
 	if (host_parms.COM_CheckParmValue("-dedicated", value))
 	{
@@ -244,7 +244,7 @@ void Host_WriteConfiguration (void)
 // config.cfg cvars
 	if (host_initialized & !isDedicated)
 	{
-		quake::fixed_printf_buffer<256> va;
+		quake::va_stack<256> va;
 		quake::ofstream f(va("%s/config.cfg", COM_GameDir));
 
 		//f = fopen (va("%s/config.cfg",com_gamedir), "w");
@@ -334,9 +334,7 @@ Called when the player is getting totally kicked off the host
 if (crash = true), don't bother sending signofs
 =====================
 */
-void SV_DropClient (qboolean crash)
-{
-	int		saveSelf;
+void SV_DropClient (qboolean crash) {
 	int		i;
 	client_t *client;
 
@@ -353,10 +351,7 @@ void SV_DropClient (qboolean crash)
 		{
 		// call the prog function for removing a client
 		// this will set the body to a dead frame, among other things
-			saveSelf = vm.pr_global_struct->self;
-			vm.pr_global_struct->self = vm.EDICT_TO_PROG(host_client->edict);
-			PR_ExecuteProgram (vm.pr_global_struct->ClientDisconnect);
-			vm.pr_global_struct->self = saveSelf;
+			vm.pr_global_struct->ClientDisconnect->call(host_client->edict, nullptr);
 		}
 
 		Sys_Printf ("Client %s removed\n",host_client->name);
@@ -368,7 +363,7 @@ void SV_DropClient (qboolean crash)
 
 // free the client (the body stays around)
 	host_client->active = false;
-	host_client->name[0] = 0;
+	host_client->name = string_t();
 	host_client->old_frags = -999999;
 	net_activeconnections--;
 
@@ -447,27 +442,35 @@ void Host_ShutdownServer(qboolean crash)
 		Con_Printf("Host_ShutdownServer: NET_SendToAll failed for %u clients\n", count);
 
 	for (i=0, host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)
-		if (host_client->active)
+		if (host_client->active) {
 			SV_DropClient(crash);
+		}
+
 
 //
 // clear structures
 //
-	sv = server_t();
+	sv.reset();
 	//Q_memset (&sv, 0, sizeof(sv));
-	Q_memset (svs.clients, 0, svs.maxclientslimit*sizeof(client_t));
+	for (size_t i = 0; i < svs.maxclientslimit; i++) svs.clients[i].reset();
 }
 
 void pr_system_t::Clear() {
-	// clear eveything and reset pools
-	std::destroy_at(&pr_strings_lookup);
-	std::memset(this, 0, sizeof(pr_system_t));
-	// hacks so we can use memory set
-	new(&pr_strings_lookup) string_lookup_t;
-	new(&free_pool) edict_list_t;
-	new(&used_pool) edict_list_t;
-	new(&reserved_pool) edict_list_t;
+	progs = nullptr;
+	pr_functions = nullptr;
+	pr_xfunction = nullptr;
+	pr_xstatement = 0;
+	pr_globaldefs = nullptr;
+	pr_fielddefs = nullptr;
+	pr_statements = nullptr;
+	pr_global_struct = nullptr;
+	pr_globals = nullptr;
+	pr_edict_size = 0;
+	pr_max_edicts = 0;
 
+	ED_ClearStrings();
+	free_pool.clear();
+	used_pool.clear();
 }
 /*
 ================
@@ -486,7 +489,7 @@ void Host_ClearMemory (void)
 		Hunk_FreeToLowMark (host_hunklevel);
 
 	vm.Clear();
-	sv = server_t();
+	sv.reset();
 
 
 	quake::cl.clear();
@@ -609,7 +612,7 @@ void Host_ServerFrame (void)
 void Host_ServerFrame (void)
 {
 // run the world state	
-	vm.pr_global_struct->frametime = host_frametime;
+	vm.pr_global_struct->frametime = static_cast<float>(host_frametime);
 
 // set the time and clear the general datagram
 	SV_ClearDatagram ();
@@ -786,7 +789,7 @@ void Host_InitVCR (quakeparms_t *parms)
 
 	if (host_parms.COM_CheckParm("-playback"))
 	{
-		if (host_parms.argc != 2)
+		if (host_parms.args.size() != 2)
 			Sys_Error("No other parameters allowed with -playback\n");
 		vcrFile.open("quake.vcr", std::ios_base::in | std::ios_base::binary);
 		if (!vcrFile.is_open())
@@ -859,12 +862,13 @@ void Host_Init (quakeparms_t *parms)
 
 
 	Memory_Init (parms->membase, parms->memsize); // in main.c ugh
+
 	Cbuf_Init ();
 	Cmd_Init ();	
 	V_Init ();
 	Chase_Init ();
 	Host_InitVCR (parms);
-	COM_Init (parms->basedir);
+	COM_Init (parms->basedir.c_str());
 	Host_InitLocal ();
 	W_LoadWadFile ("gfx.wad");
 	Key_Init ();

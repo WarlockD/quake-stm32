@@ -941,7 +941,7 @@ void SZ_Print (sizebuf_t *buf, char *data)
 ================
 COM_CheckParm
 
-Returns the position (1 to argc-1) in the program's argument list
+Returns the position (1 to args.size()-1) in the program's argument list
 where the given parameter apears, or 0 if not present
 ================
 */
@@ -983,19 +983,19 @@ void COM_ClearArgv (int arg)
 COM_InitArgv
 ================
 */
-void COM_InitArgv (int argc, char **argv)
+void COM_InitArgv (int argc, char **args)
 {
 	int		i;
 
 	if (argc > MAX_NUM_ARGVS)
-		Com_Error (ERR_FATAL, "argc > MAX_NUM_ARGVS");
+		Com_Error (ERR_FATAL, "args.size() > MAX_NUM_ARGVS");
 	com_argc = argc;
-	for (i=0 ; i<argc ; i++)
+	for (i=0 ; i<argc; i++)
 	{
-		if (!argv[i] || strlen(argv[i]) >= MAX_TOKEN_CHARS )
+		if (!args[i] || strlen(args[i]) >= MAX_TOKEN_CHARS )
 			com_argv[i] = "";
 		else
-			com_argv[i] = argv[i];
+			com_argv[i] = args[i];
 	}
 }
 
@@ -1407,7 +1407,7 @@ void Com_Error_f (void)
 Qcommon_Init
 =================
 */
-void Qcommon_Init (int argc, char **argv)
+void Qcommon_Init (int argc, char **args)
 {
 	char	*s;
 
@@ -1418,7 +1418,7 @@ void Qcommon_Init (int argc, char **argv)
 
 	// prepare enough of the subsystems to handle
 	// cvar and command buffer management
-	COM_InitArgv (argc, argv);
+	COM_InitArgv (argc,args);
 
 	Swap_Init ();
 	Cbuf_Init ();

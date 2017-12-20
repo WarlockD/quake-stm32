@@ -51,7 +51,7 @@ void R_InitParticles (void)
 
 	if (i)
 	{
-		r_numparticles = Q_atoi(host_parms.argv[i+1]);
+		r_numparticles = Q_atoi(host_parms.args[i+1]);
 		if (r_numparticles < ABSOLUTE_MIN_PARTICLES)
 			r_numparticles = ABSOLUTE_MIN_PARTICLES;
 	}
@@ -193,7 +193,7 @@ void R_ClearParticles (void)
 }
 
 
-void R_ReadPointFile_f(cmd_source_t source, size_t argc, const quake::string_view argv[])
+void R_ReadPointFile_f(cmd_source_t source, const StringArgs& args)
 {
 	vec3_t	org;
 	int		r;
@@ -309,8 +309,8 @@ void R_ParticleExplosion (vec3_t org)
 			p->type = pt_explode2;
 			for (j=0 ; j<3 ; j++)
 			{
-				p->org[j] = org[j] + ((rand()%32)-16);
-				p->vel[j] = (rand()%512)-256;
+				p->org[j] = static_cast<vec_t>(org[j] + ((rand()%32)-16));
+				p->vel[j] = static_cast<vec_t>((rand()%512)-256);
 			}
 		}
 	}
@@ -378,8 +378,8 @@ void R_BlobExplosion (vec3_t org)
 			p->color = 66 + rand()%6;
 			for (j=0 ; j<3 ; j++)
 			{
-				p->org[j] = org[j] + ((rand()%32)-16);
-				p->vel[j] = (rand()%512)-256;
+				p->org[j] = static_cast<vec_t>(org[j] + ((rand()%32)-16));
+				p->vel[j] = static_cast<vec_t>((rand()%512)-256);
 			}
 		}
 		else
@@ -388,8 +388,8 @@ void R_BlobExplosion (vec3_t org)
 			p->color = 150 + rand()%6;
 			for (j=0 ; j<3 ; j++)
 			{
-				p->org[j] = org[j] + ((rand()%32)-16);
-				p->vel[j] = (rand()%512)-256;
+				p->org[j] = static_cast<vec_t>(org[j] + ((rand()%32)-16));
+				p->vel[j] = static_cast<vec_t>((rand()%512)-256);
 			}
 		}
 	}
@@ -425,8 +425,8 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 				p->type = pt_explode;
 				for (j=0 ; j<3 ; j++)
 				{
-					p->org[j] = org[j] + ((rand()%32)-16);
-					p->vel[j] = (rand()%512)-256;
+					p->org[j] = org[j] + quake::rand(-16.0f, 16.0f);// ((::rand() % 32) - 16));
+					p->vel[j] = quake::rand(-256.0f, 256.0f);
 				}
 			}
 			else
@@ -434,8 +434,8 @@ void R_RunParticleEffect (vec3_t org, vec3_t dir, int color, int count)
 				p->type = pt_explode2;
 				for (j=0 ; j<3 ; j++)
 				{
-					p->org[j] = org[j] + ((rand()%32)-16);
-					p->vel[j] = (rand()%512)-256;
+					p->org[j] = static_cast<vec_t>(org[j] + ((::rand()%32)-16));
+					p->vel[j] = static_cast<vec_t>((::rand()%512)-256);
 				}
 			}
 		}
@@ -479,7 +479,7 @@ void R_LavaSplash (vec3_t org)
 				active_particles = p;
 		
 				p->die = quake::cl.time + 2s + (20ms * (rand() & 31));
-				p->color = 224 + (rand()&7);
+				p->color = static_cast<vec_t>(224 + (rand()&7));
 				p->type = pt_slowgrav;
 				
 				dir[0] = j*8 + (rand()&7);

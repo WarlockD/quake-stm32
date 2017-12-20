@@ -166,7 +166,7 @@ struct mnode_t
 } ;
 
 // !!! if this is changed, it must be changed in asm_i386.h too !!!
-typedef struct
+struct hull_t
 {
 	dclipnode_t	*clipnodes;
 	mplane_t	*planes;
@@ -174,7 +174,7 @@ typedef struct
 	int			lastclipnode;
 	vec3_t		clip_mins;
 	vec3_t		clip_maxs;
-} hull_t;
+} ;
 
 /*
 ==============================================================================
@@ -299,7 +299,7 @@ typedef enum {mod_brush, mod_sprite, mod_alias} modtype_t;
 
 struct model_t
 {
-	char		name[MAX_QPATH];
+	string_t	name;
 	qboolean	needload;		// bmodels and sprites don't cache normally
 
 	modtype_t	type;
@@ -372,9 +372,9 @@ struct model_t
 
 void	Mod_Init (void);
 void	Mod_ClearAll (void);
-model_t *Mod_ForName (const quake::string_view& name, qboolean crash);
+model_t *Mod_ForName (cstring_t name, qboolean crash);
 void	*Mod_Extradata (model_t *mod);	// handles caching
-void	Mod_TouchModel (const quake::string_view& name);
+void	Mod_TouchModel (cstring_t name);
 
 mleaf_t *Mod_PointInLeaf (float *p, model_t *model);
 byte	*Mod_LeafPVS (mleaf_t *leaf, model_t *model);

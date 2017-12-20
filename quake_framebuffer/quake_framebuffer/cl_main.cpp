@@ -163,7 +163,7 @@ void client_static_t::disconnect(){
 	signon = 0;
 }
 
-void CL_Disconnect_f(cmd_source_t source, size_t argc, const quake::string_view args[])
+void CL_Disconnect_f(cmd_source_t source, const StringArgs& args)
 {
 	quake::cls.disconnect();
 	if (sv.active)
@@ -171,7 +171,7 @@ void CL_Disconnect_f(cmd_source_t source, size_t argc, const quake::string_view 
 }
 
 
-void client_static_t::establish_connection(const quake::string_view& host) {
+void client_static_t::establish_connection(const std::string_view& host) {
 	if (state == ca_dedicated) return;
 	if (demoplayback) return;
 
@@ -269,7 +269,7 @@ void client_static_t::next_demo(void)
 	if(demonum>= demos.size()) demonum = 0;
 		
 	quake::fixed_string_stream<256> ss;
-	ss << "playdemo " << demos[demonum].get() << std::endl;
+	ss << "playdemo " << demos[demonum] << std::endl;
 
 	Cbuf_InsertText(ss.str());
 	demonum++;
@@ -280,7 +280,7 @@ void client_static_t::next_demo(void)
 CL_PrintEntities_f
 ==============
 */
-void CL_PrintEntities_f (cmd_source_t source, size_t argc, const quake::string_view args[])
+void CL_PrintEntities_f (cmd_source_t source, const StringArgs& args)
 {
 	entity_t	*ent;
 	int			i;

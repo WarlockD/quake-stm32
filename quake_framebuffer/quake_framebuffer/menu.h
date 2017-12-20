@@ -36,7 +36,7 @@ extern	int	m_activenet;
 void M_Init (void);
 void M_Keydown (int key);
 void M_Draw (void);
-void M_ToggleMenu_f(cmd_source_t source, size_t  argc, const quake::string_view argv[]);
-inline void M_ToggleMenu(void) { M_ToggleMenu_f(src_client, 0, nullptr); }
+void M_ToggleMenu_f(cmd_source_t source, const StringArgs&args);
+inline void M_ToggleMenu(void) { M_ToggleMenu_f(src_client, *reinterpret_cast<StringArgs*>((void*) nullptr)); }
 
 #endif
