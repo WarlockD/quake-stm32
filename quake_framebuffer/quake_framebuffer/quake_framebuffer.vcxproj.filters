@@ -231,6 +231,9 @@
     <ClCompile Include="pr_print.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="ustl.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">

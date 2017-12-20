@@ -226,6 +226,7 @@
     <ClCompile Include="sv_phys.cpp" />
     <ClCompile Include="sv_user.cpp" />
     <ClCompile Include="sys_null.cpp" />
+    <ClCompile Include="ustl.cpp" />
     <ClCompile Include="vid_null.cpp" />
     <ClCompile Include="view.cpp" />
     <ClCompile Include="wad.cpp" />

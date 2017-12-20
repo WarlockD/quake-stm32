@@ -158,7 +158,6 @@ If the line width has changed, reformat the buffer.
 ================
 */
 void Con_CheckResize (void) {
-	char	tbuf[CON_TEXTSIZE];
 
 	int width = (vid.width >> 3) - 2;
 	if (width == con_linewidth) return;
@@ -184,18 +183,15 @@ void Con_CheckResize (void) {
 		if (con_linewidth < numchars)
 			numchars = con_linewidth;
 
-		Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
-		con_text.assign(' ', CON_TEXTSIZE);
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+	//	Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
+	//	con_text.assign(' ', CON_TEXTSIZE);
+	//	Q_memset (con_text, ' ', CON_TEXTSIZE);
 
 		for (int i=0 ; i<numlines ; i++)
 		{
-			for (int j=0 ; j<numchars ; j++)
-			{
-				con_text[(  - 1 - i) * con_linewidth + j] =
-						tbuf[((con_current - i + oldtotallines) %
-							  oldtotallines) * oldwidth + j];
-			}
+			auto it = con_text.begin() + (-1 - i) * con_linewidth;
+			auto nl = con_text.begin() + ((con_current - i + oldtotallines) % oldtotallines) * oldwidth;
+			con_text.replace(it, it + con_linewidth, nl, nl + oldwidth);
 		}
 
 		Con_ClearNotify ();
@@ -627,7 +623,7 @@ void Con_DrawNotify (void) {
 		time = realtime - time;
 		if (idCast<float>(time) > con_notifytime.value)
 			continue;
-		const char* text = con_text + (i % con_totallines)*con_linewidth;
+		const char* text = &con_text[(i % con_totallines)*con_linewidth];
 		
 		clearnotify = 0;
 		scr_copytop = 1;
@@ -682,7 +678,7 @@ void Con_DrawConsole (int lines, qboolean drawinput) {
 		int j = i - con_backscroll;
 		if (j<0) j = 0;
 		int linno = (j % con_totallines)*con_linewidth;
-		const char* text = con_text + linno;
+		const char* text = &con_text[linno];
 
 		for (int x=0 ; x<con_linewidth ; x++)
 			Draw_Character ( (x+1)<<3, y, text[x]);
