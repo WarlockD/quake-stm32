@@ -207,7 +207,7 @@ void	VID_Init(unsigned char *palette)
 	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	glfwSwapInterval(1);
 
-	glad_set_post_callback(glad_post_error);
+	//glad_set_post_callback(glad_post_error);
 	LoadShaderProgram();
 
 	mvp_location = glGetUniformLocation(program, "MVP");

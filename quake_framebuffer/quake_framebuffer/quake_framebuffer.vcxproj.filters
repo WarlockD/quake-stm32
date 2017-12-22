@@ -16,6 +16,15 @@
     <Filter Include="quake">
       <UniqueIdentifier>{7cc5796c-8e56-40f7-a606-f732f7ba8e4e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="glad">
+      <UniqueIdentifier>{f940efd4-9260-4233-91a1-1390457ae784}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glad\release">
+      <UniqueIdentifier>{99a4cc80-c57e-41ff-83de-bc75fb98beb2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glad\debug">
+      <UniqueIdentifier>{9b33a8b9-1eaf-4b6d-af9e-bb688dd29134}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cd_null.cpp">
@@ -233,6 +242,12 @@
     </ClCompile>
     <ClCompile Include="ustl.cpp">
       <Filter>quake</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glad\release\src\glad.c">
+      <Filter>glad\release</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glad\debug\src\glad.c">
+      <Filter>glad\debug</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -462,6 +477,18 @@
     </ClInclude>
     <ClInclude Include="ulib.h">
       <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glad\release\include\glad\glad.h">
+      <Filter>glad\release</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glad\release\include\KHR\khrplatform.h">
+      <Filter>glad\release</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glad\debug\include\glad\glad.h">
+      <Filter>glad\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glad\debug\include\KHR\khrplatform.h">
+      <Filter>glad\debug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
