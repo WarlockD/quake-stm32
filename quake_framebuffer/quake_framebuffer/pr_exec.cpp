@@ -206,10 +206,10 @@ static const char* GetGlobalOffsetName(uint16_t ofs) {
 
 	if (ofs >= locals_start && ofs < locals_end) {
 			// we ARE
-		sprintf_s(buffer, "(%i)%s_LOCAL%i", ofs, ofs - locals_start);
+		Q_sprintf(buffer, "(%i)%s_LOCAL%i", ofs, ofs - locals_start);
 	}
 	else {
-		sprintf_s(buffer, "(%i)%s", ofs, name);
+		Q_sprintf(buffer, "(%i)%s", ofs, name);
 	}
 	return buffer;
 }

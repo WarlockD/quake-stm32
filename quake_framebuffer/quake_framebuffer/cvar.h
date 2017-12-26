@@ -52,112 +52,49 @@ r_draworder 0		sets the current value to 0
 Cvars are restricted from having the same names as commands to keep this
 interface from being ambiguous.
 */
-#if 0
-class cvar_t
-{
+template<typename T = void> struct cvar_t;
+class cvar_t_base {
+protected:
+	cvar_t_base(bool archive = false, bool server = false) : archive(archive), server(server) {}
 public:
-	enum Type {
-		Null =0,
-		InitalString,
-		String,
-		Number,
-		Bool
-	};
-	cvar_t(const char* name, bool archive=false, bool server=false) : _name(name), _type(Type::Null), _inital(nullptr) , _archive(archive), _server(server) {}
-	cvar_t(const char* name, float n, bool archive = false, bool server = false) : _name(name), _type(Type::Number), _value(n), _archive(archive), _server(server) {}
-	cvar_t(const char* name, bool n, bool archive = false, bool server = false) : _name(name), _type(Type::Bool), _bool(n), _archive(archive), _server(server) {}
-	cvar_t(const char* name, const char* s, bool archive = false, bool server = false) : _name(name), _type(Type::InitalString), _inital(s), _archive(archive), _server(server) {}
-	cvar_t(const cvar_t& copy) = delete;
-	cvar_t& operator=(const cvar_t& copy) = delete;
-	inline void clear() { if (_type == Type::String) _string.~basic_string(); _type = Type::Null; }
-	cvar_t& operator=(nullptr_t) { if (_type == Type::String) _string.~basic_string(); _type = Type::Null; }
-	cvar_t& operator=(const char* v) { 
-		if (_type == Type::String)
-			_string.assign(v);
-		else {
-			_type = Type::String;
-			_string = std::move(ZString(v));
-		}
-	}
-	template<typename C, typename CT, typename CA>
-	cvar_t& operator=(const std::basic_string<C,CT,CA>& v) {
-		if (_type == Type::String)
-			_string.assign(v);
-		else {
-			_type = Type::String;
-			_string = std::move(ZString(v));
-		}
-	}
-	cvar_t& operator=(bool v) {
-		clear();
-		_bool = v;
-		_type = Type::Bool;
-		return *this;
-	}
-	cvar_t& operator=(float v) {
-		clear();
-		_value = v;
-		_type = Type::Number;
-		return *this;
-	}
-	const char* name() const { return _name; }
-	bool archive() const { return _archive; }
-	bool server() const { return _server; }
-
-	~cvar_t() { clear(); }
-private:
-	static cvar_t	*& cvar_vars() { static cvar_t* root = nullptr; return root; }
-	const char	*_name;
-	Type _type;
-	union {
-		ZString _string;
-		const char* _inital;
-		float _value;
-		bool _bool;
-	};
-	qboolean _archive;		// set to true to cause it to be saved to vars.rc
-	qboolean _server;		// notifies players when changed
-	cvar_t *next;
-} ;
-
-
-#else
-struct cvar_t {
-	cstring_t name;
-	cstring_t string;
-	float value;
-
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
 	qboolean server;		// notifies players when changed
+};
 
-	cvar_t *next;
-	cvar_t(cstring_t name, cstring_t string) : name(name), string(string), value(0.0f), archive(false), server(false) {}
-	cvar_t(cstring_t name, cstring_t string, float value,bool archive=false, bool server=false) : name(name), string(string), value(value), archive(archive), server(server) {}
-	cvar_t(cstring_t name, cstring_t string, bool value, bool archive = false, bool server = false) : name(name), string(string), value(static_cast<float>(value)), archive(archive), server(server) {}
-	
-	void set(const std::string_view& value);
-	void set(float value);
-private:
-
-	string_t _string;
+template<>
+struct cvar_t<float> : public cvar_t_base {
+	using value_type = float;
+	using refrence_type = value_type&;
+	using pointer_type = value_type* ;
+	using const_refrence_type = const value_type &;
+	using const_pointer_type = const value_type *;
+	float value;
+	cvar_t(float value, bool archive = false, bool server = false) :  value(value), cvar_t_base(archive, server) {}
 };	
-#endif
-void 	Cvar_RegisterVariable (cvar_t *variable);
+template<>
+struct cvar_t<cstring_t> : public cvar_t_base {
+	using value_type = cstring_t;
+	using refrence_type = value_type & ;
+	using pointer_type = value_type * ;
+	using const_refrence_type = const value_type &;
+	using const_pointer_type = const value_type *;
+	cstring_t value;
+	cvar_t(cstring_t value, bool archive = false, bool server = false) : value(value), cvar_t_base(archive, server) {}
+};
+
+typename 
+
+void Cvar_RegisterVariable(const std::string_view& name, cvar_t<float>& variable);
+void Cvar_RegisterVariable(const std::string_view& name, cvar_t<cstring_t>& variable);
+
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
 void 	Cvar_Set (string_t var_name, const std::string_view& value);
+void 	Cvar_Set(string_t var_name, float value);
 // equivelant to "<name> <variable>" typed at the console
 
-void	Cvar_SetValue (string_t var_name, float value);
-
-
 // expands value to a string and calls Cvar_Set
-
-float	Cvar_VariableValue (string_t var_name);
-// returns 0 if not defined or non numeric
-
-std::string_view Cvar_VariableString (string_t var_name);
 // returns an empty string if not defined
 
 std::string_view Cvar_CompleteVariable (const std::string_view& partial);
@@ -172,8 +109,8 @@ std::string_view Cvar_CompleteVariable (const std::string_view& partial);
 void 	Cvar_WriteVariables (std::ostream& f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
+template<typename T> T* Cvar_Get(string_t var_name);
 
-cvar_t *Cvar_FindVar (string_t  var_name);
 
-extern	cvar_t	registered;
+extern	cvar_t<float>		registered;
 //extern cvar_t	*cvar_vars;

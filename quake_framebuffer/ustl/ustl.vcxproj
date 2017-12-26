@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{6FF3F4C6-BF5C-4640-9229-C73305B0DA70}</ProjectGuid>
+    <RootNamespace>ustl</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="bktrace.cc" />
+    <ClCompile Include="cmemlink.cc" />
+    <ClCompile Include="fstream.cc" />
+    <ClCompile Include="memblock.cc" />
+    <ClCompile Include="memlink.cc" />
+    <ClCompile Include="mistream.cc" />
+    <ClCompile Include="ofstream.cc" />
+    <ClCompile Include="sistream.cc" />
+    <ClCompile Include="sostream.cc" />
+    <ClCompile Include="ualgobase.cc" />
+    <ClCompile Include="ubitset.cc" />
+    <ClCompile Include="uexception.cc" />
+    <ClCompile Include="umemory.cpp" />
+    <ClCompile Include="unew.cc" />
+    <ClCompile Include="ustdxept.cc" />
+    <ClCompile Include="ustring.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bktrace.h" />
+    <ClInclude Include="cmemlink.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="fstream.h" />
+    <ClInclude Include="memblock.h" />
+    <ClInclude Include="memlink.h" />
+    <ClInclude Include="metamac.h" />
+    <ClInclude Include="mistream.h" />
+    <ClInclude Include="mostream.h" />
+    <ClInclude Include="ofstream.h" />
+    <ClInclude Include="simd.h" />
+    <ClInclude Include="sistream.h" />
+    <ClInclude Include="sostream.h" />
+    <ClInclude Include="strmsize.h" />
+    <ClInclude Include="traits.h" />
+    <ClInclude Include="typeinfo.h" />
+    <ClInclude Include="typelist.h" />
+    <ClInclude Include="typet.h" />
+    <ClInclude Include="ualgo.h" />
+    <ClInclude Include="ualgobase.h" />
+    <ClInclude Include="uarray.h" />
+    <ClInclude Include="uatomic.h" />
+    <ClInclude Include="ubitset.h" />
+    <ClInclude Include="uchrono.h" />
+    <ClInclude Include="uctralgo.h" />
+    <ClInclude Include="uctrstrm.h" />
+    <ClInclude Include="uerror.h" />
+    <ClInclude Include="uexception.h" />
+    <ClInclude Include="ufunction.h" />
+    <ClInclude Include="uheap.h" />
+    <ClInclude Include="uios.h" />
+    <ClInclude Include="uiosfunc.h" />
+    <ClInclude Include="uiterator.h" />
+    <ClInclude Include="ulimits.h" />
+    <ClInclude Include="ulist.h" />
+    <ClInclude Include="umap.h" />
+    <ClInclude Include="umemory.h" />
+    <ClInclude Include="umultimap.h" />
+    <ClInclude Include="umultiset.h" />
+    <ClInclude Include="unew.h" />
+    <ClInclude Include="unumeric.h" />
+    <ClInclude Include="upair.h" />
+    <ClInclude Include="upredalgo.h" />
+    <ClInclude Include="uqueue.h" />
+    <ClInclude Include="uratio.h" />
+    <ClInclude Include="uset.h" />
+    <ClInclude Include="uspecial.h" />
+    <ClInclude Include="ustack.h" />
+    <ClInclude Include="ustdxept.h" />
+    <ClInclude Include="ustl.h" />
+    <ClInclude Include="ustring.h" />
+    <ClInclude Include="utf8.h" />
+    <ClInclude Include="uttraits.h" />
+    <ClInclude Include="utypes.h" />
+    <ClInclude Include="uutility.h" />
+    <ClInclude Include="uvector.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

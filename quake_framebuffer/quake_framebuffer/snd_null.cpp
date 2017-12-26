@@ -21,8 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // no sound code whatsoever
 #include "icommon.h"
 
-cvar_t bgmvolume = {"bgmvolume", "1", true};
-cvar_t volume = {"volume", "0.7", true};
+cvar_t<float> bgmvolume = { 1.0f, true} ;
+cvar_t<float> volume = { 0.7f, true} ;
 
  
 void S_Init (void)

@@ -56,17 +56,17 @@ int				pr_edict_size;	// in bytes
 qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& value);
 qboolean	ED_ParseEpair(edict_t *base, const ddef_t *key, const std::string_view& value);
 
-cvar_t	nomonsters = {"nomonsters", "0"};
-cvar_t	gamecfg = {"gamecfg", "0"};
-cvar_t	scratch1 = {"scratch1", "0"};
-cvar_t	scratch2 = {"scratch2", "0"};
-cvar_t	scratch3 = {"scratch3", "0"};
-cvar_t	scratch4 = {"scratch4", "0"};
-cvar_t	savedgamecfg = {"savedgamecfg", "0", true};
-cvar_t	saved1 = {"saved1", "0", true};
-cvar_t	saved2 = {"saved2", "0", true};
-cvar_t	saved3 = {"saved3", "0", true};
-cvar_t	saved4 = {"saved4", "0", true};
+cvar_t<float> nomonsters = { 0.0f} ;
+cvar_t<float> gamecfg = { 0.0f} ;
+cvar_t<float> scratch1 = { 0.0f} ;
+cvar_t<float> scratch2 = { 0.0f} ;
+cvar_t<float> scratch3 = { 0.0f} ;
+cvar_t<float> scratch4 = { 0.0f} ;
+cvar_t<float> savedgamecfg = { 0.0f, true} ;
+cvar_t<float> saved1 = { 0.0f, true} ;
+cvar_t<float> saved2 = { 0.0f, true} ;
+cvar_t<float> saved3 = { 0.0f, true} ;
+cvar_t<float> saved4 = { 0.0f, true} ;
 
 
 edict_t::edict_t(int num, int offset) : num(num) , offset(offset),free(false), vars(vm._field_info,&v) {
@@ -387,7 +387,7 @@ void ED_Count(cmd_source_t source, const StringArgs& args)
 		active++;
 		if (ent->v.solid)
 			solid++;
-		if (ent->v.model) {
+		if (!ent->v.model.empty()) {
 			models++;
 			//assert(ent.vars->find("model") != ent.vars.end());
 
@@ -523,11 +523,11 @@ namespace string_table {
 	static void hulk_revert(char* s) {  hunk_strings_current = s - sizeof(uint16_t); }
 	struct istring_equal {
 		bool operator()(const char* l, const char* r) const {
-			return l == r || (get_size(l) == get_size(r)  && cstring_t::str_cmp(get_str(l), get_str(l)+get_size(l) ,  get_str(r), get_str(r)+get_size(r)));
+			return l == r || (get_size(l) == get_size(r)  && util::util::str_cmp(get_str(l), get_str(l)+get_size(l) ,  get_str(r), get_str(r)+get_size(r))==0);
 		}
 	};
 	struct istring_hash {
-		size_t operator()(const char* l) const { return cstring_t::hasher(get_str(l), get_size(l)); }
+		size_t operator()(const char* l) const { return util::util::hasher(get_str(l), get_size(l)); }
 	};
 	using string_lookup_t = std::unordered_set<const char*, istring_hash, istring_equal>; // allocated on hulk
 	static string_lookup_t stringtable_lookup;
@@ -569,9 +569,13 @@ namespace string_table {
 		if (s == "" || len == 0) return "";
 		char* ns = push_string(s, len); // create zero length string	
 		auto it = stringtable_lookup.emplace(ns);
-		if (it.second) return ns;
-		hulk_revert(ns);
-		return *it.first;
+		if (it.second) 
+			return ns;
+		else {
+			hulk_revert(ns);
+			return *it.first;
+		}
+
 	}
 	static const char* intern(const std::string_view&  s) {
 		return intern(s.data(), s.size());
@@ -851,7 +855,7 @@ edict_t * ED_ParseEdict(COM_Parser& parser, edict_t *ent) {
 	}
 
 
-	assert(init->v.classname);
+	assert(!init->v.classname.empty());
 	if (init) {
 		loaded_edicts[init->v.classname] = init;
 		return init;
@@ -922,7 +926,7 @@ void ED_LoadFromFile (const std::string_view& data)
 //
 // immediately call spawn function
 //
-		if (!ent->v.classname)
+		if (ent->v.classname.empty())
 		{
 			Con_Printf ("No classname for:\n");
 			ent->Print ();
@@ -1093,17 +1097,17 @@ void pr_system_t::Init(void)
 	Cmd_AddCommand ("edicts", (xcommand_t)ED_PrintEdicts);
 	Cmd_AddCommand ("edictcount", ED_Count);
 	Cmd_AddCommand ("profile", PR_Profile_f);
-	Cvar_RegisterVariable (&nomonsters);
-	Cvar_RegisterVariable (&gamecfg);
-	Cvar_RegisterVariable (&scratch1);
-	Cvar_RegisterVariable (&scratch2);
-	Cvar_RegisterVariable (&scratch3);
-	Cvar_RegisterVariable (&scratch4);
-	Cvar_RegisterVariable (&savedgamecfg);
-	Cvar_RegisterVariable (&saved1);
-	Cvar_RegisterVariable (&saved2);
-	Cvar_RegisterVariable (&saved3);
-	Cvar_RegisterVariable (&saved4);
+	Cvar_RegisterVariable("nomonsters",nomonsters);
+	Cvar_RegisterVariable("gamecfg",gamecfg);
+	Cvar_RegisterVariable("scratch1",scratch1);
+	Cvar_RegisterVariable("scratch2",scratch2);
+	Cvar_RegisterVariable("scratch3",scratch3);
+	Cvar_RegisterVariable("scratch4",scratch4);
+	Cvar_RegisterVariable("savedgamecfg",savedgamecfg);
+	Cvar_RegisterVariable("saved1",saved1);
+	Cvar_RegisterVariable("saved2",saved2);
+	Cvar_RegisterVariable("saved3",saved3);
+	Cvar_RegisterVariable("saved4",saved4);
 	vm.Clear();
 	// create string table
 

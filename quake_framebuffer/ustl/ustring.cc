@@ -1,7 +1,14 @@
-#include "icommon.h"
+// This file is part of the uSTL library, an STL implementation.
+//
+// Copyright (c) 2005 by Mike Sharov <msharov@users.sourceforge.net>
+// This file is free software, distributed under the MIT License.
 
-#include "ulib.h"
-#if 0
+#include "ustring.h"
+#include "mistream.h"
+#include "mostream.h"
+#include "ualgo.h"
+#include <stdio.h>	// for vsnprintf (in string::format)
+
 namespace ustl {
 
 	//----------------------------------------------------------------------
@@ -12,7 +19,7 @@ namespace ustl {
 
 	/// Assigns itself the value of string \p s
 	string::string(const string& s)
-		: memblock((s.size() + 1) & (s.is_linked() - 1))	// +1 because base ctor can't call virtuals of this class
+		: helper((s.size() + 1) & (s.is_linked() - 1))	// +1 because base ctor can't call virtuals of this class
 	{
 		if (s.is_linked())
 			relink(s.c_str(), s.size());
@@ -24,7 +31,7 @@ namespace ustl {
 
 	/// Links to \p s
 	string::string(const_pointer s) noexcept
-		: memblock()
+		: helper()
 	{
 		if (!s) s = "";
 		relink(s, strlen(s));
@@ -32,7 +39,7 @@ namespace ustl {
 
 	/// Creates a string of length \p n filled with character \p c.
 	string::string(size_type n, value_type c)
-		: memblock(n + 1)	// +1 because base ctor can't call virtuals of this class
+		: helper(n + 1)	// +1 because base ctor can't call virtuals of this class
 	{
 		relink(begin(), size() - 1);	// --m_Size
 		fill_n(begin(), n, c);
@@ -97,35 +104,11 @@ namespace ustl {
 		return btc;
 	}
 
-	/// Returns comparison value regarding string \p s.
-	/// The return value is:
-	/// \li 1 if this string is greater (by value, not length) than string \p s
-	/// \li 0 if this string is equal to string \p s
-	/// \li -1 if this string is less than string \p s
-	///
-	int string::compare(const_iterator first1, const_iterator last1, const_iterator first2, const_iterator last2) noexcept // static
-	{
-		assert(first1 <= last1 && (first2 <= last2 || !last2) && "Negative ranges result in memory allocation errors.");
-		const size_type len1 = distance(first1, last1), len2 = distance(first2, last2);
-		const int rvbylen = sign(int(len1 - len2));
-		int rv = memcmp(first1, first2, min(len1, len2));
-		return rv ? rv : rvbylen;
-	}
 
-	/// Returns true if this string is equal to string \p s.
-	bool string::operator== (const_pointer s) const noexcept
-	{
-		if (!s) s = "";
-		return size() == strlen(s) && 0 == memcmp(c_str(), s, size());
-	}
 
-	/// Returns the beginning of character \p i.
-	string::const_iterator string::wiat(pos_type i) const noexcept
-	{
-		utf8in_iterator<string::const_iterator> cfinder(begin());
-		cfinder += i;
-		return cfinder.base();
-	}
+
+
+
 
 	/// Inserts wide character \p c at \p ipo \p n times as a UTF-8 string.
 	///
@@ -228,87 +211,7 @@ namespace ustl {
 		return *this;
 	}
 
-	/// Returns the offset of the first occurence of \p c after \p pos.
-	string::pos_type string::find(value_type c, pos_type pos) const noexcept
-	{
-		const_iterator found = ::ustl::find(iat(pos), end(), c);
-		return found < end() ? (pos_type)distance(begin(), found) : npos;
-	}
 
-	/// Returns the offset of the first occurence of substring \p s of length \p n after \p pos.
-	string::pos_type string::find(const string& s, pos_type pos) const noexcept
-	{
-		if (s.empty() || s.size() > size() - pos)
-			return npos;
-		pos_type endi = s.size() - 1;
-		value_type endchar = s[endi];
-		pos_type lastPos = endi;
-		while (lastPos-- && s[lastPos] != endchar);
-		const size_type skip = endi - lastPos;
-		const_iterator i = iat(pos) + endi;
-		for (; i < end() && (i = ::ustl::find(i, end(), endchar)) < end(); i += skip)
-			if (memcmp(i - endi, s.c_str(), s.size()) == 0)
-				return distance(begin(), i) - endi;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of character \p c before \p pos.
-	string::pos_type string::rfind(value_type c, pos_type pos) const noexcept
-	{
-		for (int i = min(pos, pos_type(size() - 1)); i >= 0; --i)
-			if (at(i) == c)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of substring \p s of size \p n before \p pos.
-	string::pos_type string::rfind(const string& s, pos_type pos) const noexcept
-	{
-		const_iterator d = iat(pos) - 1;
-		const_iterator sp = begin() + s.size() - 1;
-		const_iterator m = s.end() - 1;
-		for (long int i = 0; d > sp && size_type(i) < s.size(); --d)
-			for (i = 0; size_type(i) < s.size(); ++i)
-				if (m[-i] != d[-i])
-					break;
-		return d > sp ? (pos_type)distance(begin(), d + 2 - s.size()) : npos;
-	}
-
-	/// Returns the offset of the first occurence of one of characters in \p s of size \p n after \p pos.
-	string::pos_type string::find_first_of(const string& s, pos_type pos) const noexcept
-	{
-		for (size_type i = min(size_type(pos), size()); i < size(); ++i)
-			if (s.find(at(i)) != npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the first occurence of one of characters not in \p s of size \p n after \p pos.
-	string::pos_type string::find_first_not_of(const string& s, pos_type pos) const noexcept
-	{
-		for (size_type i = min(size_type(pos), size()); i < size(); ++i)
-			if (s.find(at(i)) == npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of one of characters in \p s of size \p n before \p pos.
-	string::pos_type string::find_last_of(const string& s, pos_type pos) const noexcept
-	{
-		for (int i = min(size_type(pos), size() - 1); i >= 0; --i)
-			if (s.find(at(i)) != npos)
-				return i;
-		return npos;
-	}
-
-	/// Returns the offset of the last occurence of one of characters not in \p s of size \p n before \p pos.
-	string::pos_type string::find_last_not_of(const string& s, pos_type pos) const noexcept
-	{
-		for (int i = min(pos, pos_type(size() - 1)); i >= 0; --i)
-			if (s.find(at(i)) == npos)
-				return i;
-		return npos;
-	}
 
 	/// Equivalent to a vsprintf on the string.
 	int string::vformat(const char* fmt, va_list args)
@@ -375,19 +278,94 @@ namespace ustl {
 		os.write(cdata(), sz);
 	}
 
-	/// Returns a hash value for [first, last)
-	hashvalue_t string::hash(const char* first, const char* last) noexcept // static
-	{
-		hashvalue_t h = 0;
-		// This has the bits flowing into each other from both sides of the number
-		for (; first < last; ++first)
-			h = *first + ((h << 7) | (h >> (BitsInType(hashvalue_t) - 7)));
-		return h;
-	}
+
+
 
 	string::size_type string::minimumFreeCapacity(void) const noexcept { return 1; }
 
+	//utility functions
+	namespace util {
+		/// Returns a hash value for [first, last)
+		hashvalue_t str_hash(const char* first, const char* last) noexcept // static
+		{
+			hashvalue_t h = 0;
+			// This has the bits flowing into each other from both sides of the number
+			for (; first < last; ++first)
+				h = *first + ((h << 7) | (h >> (BitsInType(hashvalue_t) - 7)));
+			return h;
+		}
+		/// Returns comparison value regarding string \p s.
+		/// The return value is:
+		/// \li 1 if this string is greater (by value, not length) than string \p s
+		/// \li 0 if this string is equal to string \p s
+		/// \li -1 if this string is less than string \p s
+		///
+		int str_compare(const char* first1, const char* last1, const char* first2, const char* last2) noexcept // static
+		{
+			assert(first1 <= last1 && (first2 <= last2 || !last2) && "Negative ranges result in memory allocation errors.");
+			const size_type len1 = distance(first1, last1), len2 = distance(first2, last2);
+			const int rvbylen = sign(int(len1 - len2));
+			int rv = ::memcmp(first1, first2, min(len1, len2));
+			return rv ? rv : rvbylen;
+		}
 
 
+		/// Returns the offset of the first occurence of \p c after \p pos.
+		pos_type str_find(const cmemlink&  hay, char c, pos_type pos)  noexcept {
+			auto found = ::ustl::find(hay.iat(pos), hay.end(), c);
+			return found < hay.end() ? (size_t)distance(hay.begin(), found) : size_t(-1);
+		}
+		pos_type str_find(const cmemlink&  hay, const cmemlink&  needle, pos_type pos) noexcept {
+			size_t endi = needle.size() - 1;
+			char endchar = needle.data()[endi];
+			size_t lastPos = endi;
+			while (lastPos-- && needle.data()[lastPos] != endchar);
+			const size_t skip = endi - lastPos;
+			auto i = hay.iat(pos) + endi;
+			for (; i < hay.end() && (i = ::ustl::find(i, hay.end(), endchar)) < hay.end(); i += skip)
+				if (memcmp(i - endi, needle.data(), needle.size()) == 0)
+					return distance(hay.begin(), i) - endi;
+			return size_t(-1);
+		}
+		pos_type str_rfind(const cmemlink&  hay, char c, pos_type pos)  noexcept {
+			for (pos_type i = min(pos, pos_type(hay.size() - 1)); i >= 0; --i)
+				if (hay.data()[i] == c) return i;
+			return npos;
+		}
+		pos_type str_rfind(const cmemlink&  hay, const cmemlink& s, pos_type pos)  noexcept {
+			auto d = hay.iat(pos) - 1;
+			auto sp = hay.begin() + s.size() - 1;
+			auto m = s.end() - 1;
+			for (long int i = 0; d > sp && size_type(i) < s.size(); --d)
+				for (i = 0; size_type(i) < s.size(); ++i)
+					if (m[-i] != d[-i])
+						break;
+			return d > sp ? (pos_type)distance(hay.begin(), d + 2 - s.size()) : npos;
+		}
+		pos_type str_find_first_of(const cmemlink&  hay, const cmemlink& s, pos_type pos)  noexcept {
+			for (size_type i = min(size_type(pos), hay.size()); i < hay.size(); ++i)
+				if (str_find(s, hay.data()[i]) != npos)
+					return i;
+			return npos;
+		}
+		pos_type str_find_last_of(const cmemlink&  hay, const cmemlink& s, pos_type pos )  noexcept {
+			for (pos_type i = min(size_type(pos), hay.size() - 1); i >= 0; --i)
+				if (str_find(s, hay.data()[i]) != npos)
+					return i;
+			return npos;
+		}
+		pos_type str_find_last_not_of(const cmemlink&  hay, const cmemlink& s, pos_type pos)  noexcept {
+			for (pos_type i = min(pos, pos_type(hay.size() - 1)); i >= 0; --i)
+				if (str_find(s, hay.data()[i]) == npos)
+					return i;
+			return npos;
+		}
+		pos_type str_find_first_not_of(const cmemlink&  hay, const cmemlink& s, pos_type pos )  noexcept {
+			for (size_type i = min(size_type(pos), hay.size()); i < hay.size(); ++i)
+				if (str_find(s, hay.data()[i]) == npos)
+					return i;
+			return npos;
+		}
+
+	}
 }
-#endif

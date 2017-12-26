@@ -25,18 +25,19 @@ typedef struct
 } memzone_t;
 
 // cmd.c private
+#if 0
 #define	MAX_ALIAS_NAME	32
 
 struct cmdalias_t
 {
 private:
-	cmdalias_t(const char* name, const char* value) : next(nullptr), name(name), value(value) {}
+	cmdalias_t(string_t name, const char* value) : next(nullptr), name(name), value(value) {}
 public:
-	cmdalias_t	*next;
-	const char* name;
-	const char* value;
-	static void operator delete(void *ptr);
-	static cmdalias_t* create(const std::string_view& name, const std::string_view& value);
+	//cmdalias_t	*next;
+	//const char* name;
+	//const char* value;
+	//static void operator delete(void *ptr);
+	//static cmdalias_t* create(const std::string_view& name, const std::string_view& value);
 	//char	name[MAX_ALIAS_NAME];
 	//quake::fixed_string<256> value; // this can be a script.. humm
 } ;
@@ -48,7 +49,7 @@ struct cmd_function_t
 	xcommand_t		function;
 	string_t name;
 } ;
-
+#endif
 
 
 // common.c private

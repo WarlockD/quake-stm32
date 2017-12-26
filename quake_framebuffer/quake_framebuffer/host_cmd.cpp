@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "icommon.h"
 #include "cmd.h"
-extern cvar_t	pausable;
+extern cvar_t<float> 	pausable;
 
 int	current_skill;
 
@@ -74,7 +74,7 @@ void Host_Status_f(cmd_source_t source, const StringArgs& args)
 	else
 		print = SV_ClientPrintf;
 
-	print ("host:    %s\n", Cvar_VariableString ("hostname"));
+	print ("host:    %s\n", *Cvar_Get<cstring_t>("hostname")->c_str());
 	print ("version: %4.2f\n", VERSION);
 	if (tcpipAvailable)
 		print ("tcp/ip:  %s\n", my_tcpip_address);
@@ -513,7 +513,7 @@ void Host_Savegame_f(cmd_source_t source, const StringArgs& args)
 
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
-		if (sv.lightstyles[i])
+		if (!sv.lightstyles[i].empty())
 			f << sv.lightstyles[i] << std::endl;
 		else
 			f << 'm' << std::endl;
@@ -595,12 +595,12 @@ void Host_Loadgame_f(cmd_source_t source, const StringArgs& args)
 // this silliness is so we can load 1.06 save files, which have float skill values
 	fscanf (f, "%f\n", &tfloat);
 	current_skill = (int)(tfloat + 0.1);
-	Cvar_SetValue ("skill", (float)current_skill);
+	Cvar_Set ("skill", (float)current_skill);
 
 #ifdef QUAKE2
-	Cvar_SetValue ("deathmatch", 0);
-	Cvar_SetValue ("coop", 0);
-	Cvar_SetValue ("teamplay", 0);
+	Cvar_Set ("deathmatch", 0);
+	Cvar_Set ("coop", 0);
+	Cvar_Set ("teamplay", 0);
 #endif
 
 	fscanf (f, "%s\n",mapname);
@@ -782,7 +782,7 @@ int LoadGamestate(char *level, char *startspot)
 //	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
 //		fscanf (f, "%f\n", &spawn_parms[i]);
 	fscanf (f, "%f\n", &sk);
-	Cvar_SetValue ("skill", sk);
+	Cvar_Set ("skill", sk);
 
 	fscanf (f, "%s\n",mapname);
 	fscanf (f, "%f\n",&time);
@@ -903,7 +903,7 @@ void Host_Name_f(cmd_source_t source, const StringArgs& args)
 	
 	if (args.size()  == 1)
 	{
-		quake::con << "\"name\" is \"" << cl_name.string << '"' << std::endl;
+		quake::con << "\"name\" is \"" << cl_name.value << '"' << std::endl;
 		return;
 	}
 	if (args.size() == 2)
@@ -913,7 +913,7 @@ void Host_Name_f(cmd_source_t source, const StringArgs& args)
 
 	if (source == src_command)
 	{
-		if (cl_name.string == newName.str())
+		if (cl_name.value.c_str() == newName.str())
 			return;
 		Cvar_Set ("_cl_name", newName.str().c_str());
 		if (quake::cls.state == ca_connected)
@@ -1140,7 +1140,7 @@ void Host_Color_f(cmd_source_t source, const StringArgs& args)
 
 	if (source == src_command)
 	{
-		Cvar_SetValue ("_cl_color", playercolor);
+		Cvar_Set ("_cl_color", playercolor);
 		if (quake::cls.state == ca_connected)
 			Cmd_ForwardToServer (source, args);
 		return;
@@ -1437,7 +1437,7 @@ void Host_Kick_f (cmd_source_t source, const StringArgs& args)
 			if (quake::cls.state == ca_dedicated)
 				who = "Console";
 			else
-				who = cl_name.string;
+				who = cl_name.value.c_str();
 		else
 			who = save->name.c_str();
 

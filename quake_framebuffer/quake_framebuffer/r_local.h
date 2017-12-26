@@ -53,24 +53,24 @@ typedef struct {
 
 //===========================================================================
 
-extern cvar_t	r_draworder;
-extern cvar_t	r_speeds;
-extern cvar_t	r_timegraph;
-extern cvar_t	r_graphheight;
-extern cvar_t	r_clearcolor;
-extern cvar_t	r_waterwarp;
-extern cvar_t	r_fullbright;
-extern cvar_t	r_drawentities;
-extern cvar_t	r_aliasstats;
-extern cvar_t	r_dspeeds;
-extern cvar_t	r_drawflat;
-extern cvar_t	r_ambient;
-extern cvar_t	r_reportsurfout;
-extern cvar_t	r_maxsurfs;
-extern cvar_t	r_numsurfs;
-extern cvar_t	r_reportedgeout;
-extern cvar_t	r_maxedges;
-extern cvar_t	r_numedges;
+extern cvar_t<float>		r_draworder;
+extern cvar_t<float>		r_speeds;
+extern cvar_t<float>		r_timegraph;
+extern cvar_t<float>		r_graphheight;
+extern cvar_t<float>		r_clearcolor;
+extern cvar_t<float>		r_waterwarp;
+extern cvar_t<float>		r_fullbright;
+extern cvar_t<float>		r_drawentities;
+extern cvar_t<float>		r_aliasstats;
+extern cvar_t<float>		r_dspeeds;
+extern cvar_t<float>		r_drawflat;
+extern cvar_t<float>		r_ambient;
+extern cvar_t<float>		r_reportsurfout;
+extern cvar_t<float>		r_maxsurfs;
+extern cvar_t<float>		r_numsurfs;
+extern cvar_t<float>		r_reportedgeout;
+extern cvar_t<float>		r_maxedges;
+extern cvar_t<float>		r_numedges;
 
 #define XCENTERING	(1.0f / 2.0f)
 #define YCENTERING	(1.0f / 2.0f)
@@ -184,7 +184,7 @@ extern	model_t		*cl_worldmodel;
 extern int		*pfrustum_indexes[4];
 
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
-#define	NEAR_CLIP	0.01
+#define	NEAR_CLIP	0.01f
 
 extern int			ubasestep, errorterm, erroradjustup, erroradjustdown;
 extern int			vstartscan;

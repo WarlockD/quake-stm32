@@ -803,7 +803,7 @@ void PF_cvar (void)
 {
 	cstring_t str = vm.G_STRING(OFS_PARM0);
 	
-	vm.G_FLOAT(OFS_RETURN) = Cvar_VariableValue (str);
+	vm.G_FLOAT(OFS_RETURN) = *Cvar_Get<float>(str);
 }
 
 /*
@@ -980,7 +980,7 @@ void PF_Find (void)
 	e = vm.G_EDICTNUM(OFS_PARM0);
 	f = vm.G_INT(OFS_PARM1);
 	cstring_t s = vm.G_STRING(OFS_PARM2);
-	if (!s)
+	if (s.empty())
 		PR_RunError ("PF_Find: bad search string");
 		
 	for (e++ ; e < vm.used_edicts(); e++)
@@ -989,7 +989,7 @@ void PF_Find (void)
 		if (vm.is_edict_free(ed))
 			continue;
 		cstring_t t = ed->E_STRING(f);
-		if (!t)
+		if (t.empty())
 			continue;
 		if (t==s)
 		{
@@ -1026,7 +1026,7 @@ void PF_precache_sound (void)
 	
 	for (i=0 ; i<MAX_SOUNDS ; i++)
 	{
-		if (!sv.sound_precache[i])
+		if (sv.sound_precache[i].empty())
 		{
 			sv.sound_precache[i] = s;
 			return;
@@ -1050,7 +1050,7 @@ void PF_precache_model (void)
 
 	for (i=0 ; i<MAX_MODELS ; i++)
 	{
-		if (!sv.model_precache[i])
+		if (sv.model_precache[i].empty())
 		{
 			sv.model_precache[i] = s;
 			sv.models[i] = Mod_ForName (s, true);
@@ -1260,7 +1260,7 @@ Pick a vector for the player to shoot along
 vector aim(entity, missilespeed)
 =============
 */
-cvar_t	sv_aim = {"sv_aim", "0.93"};
+cvar_t<float> sv_aim = { 0.93f} ;
 void PF_aim (void)
 {
 	edict_t	*ent;

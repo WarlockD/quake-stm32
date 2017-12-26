@@ -30,14 +30,14 @@ float		scr_con_current;
 float		scr_conlines;		// lines of console to display
 
 float		oldscreensize, oldfov;
-cvar_t		scr_viewsize = {"viewsize","100", true};
-cvar_t		scr_fov = {"fov","90"};	// 10 - 170
-cvar_t		scr_conspeed = {"scr_conspeed","300"};
-cvar_t		scr_centertime = {"scr_centertime","2"};
-cvar_t		scr_showram = {"showram","1"};
-cvar_t		scr_showturtle = {"showturtle","0"};
-cvar_t		scr_showpause = {"showpause","1"};
-cvar_t		scr_printspeed = {"scr_printspeed","8"};
+cvar_t<float> scr_viewsize = { 100.0f, true} ;
+cvar_t<float> scr_fov = { 90.0f} ;	// 10 - 170
+cvar_t<float> scr_conspeed = { 300.0f} ;
+cvar_t<float> scr_centertime = { 2.0f} ;
+cvar_t<float> scr_showram = { 1.0f} ;
+cvar_t<float> scr_showturtle = { 0.0f} ;
+cvar_t<float> scr_showpause = { 1.0f} ;
+cvar_t<float> scr_printspeed = { 8.0f} ;
 
 qboolean	scr_initialized;		// ready to draw
 
@@ -90,7 +90,7 @@ for a few moments
 void SCR_CenterPrint (char *str)
 {
 	Q_strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
-	scr_centertime_off = idCast<idTime>(scr_centertime.value);
+	scr_centertime_off = idCast<idTime>(static_cast<float>(scr_centertime.value));
 	scr_centertime_start = quake::cl.time;
 
 // count the number of lines for centering
@@ -286,7 +286,7 @@ Keybinding command
 */
 void SCR_SizeUp_f(cmd_source_t source, const StringArgs& args)
 {
-	Cvar_SetValue ("viewsize",scr_viewsize.value+10);
+	Cvar_Set ("viewsize",scr_viewsize.value+10);
 	vid.recalc_refdef = 1;
 }
 
@@ -299,7 +299,7 @@ Keybinding command
 =================
 */
 void SCR_SizeDown_f(cmd_source_t source, const StringArgs& args){
-	Cvar_SetValue ("viewsize",scr_viewsize.value-10);
+	Cvar_Set("viewsize",scr_viewsize.value-10);
 	vid.recalc_refdef = 1;
 }
 
@@ -312,14 +312,14 @@ SCR_Init
 */
 void SCR_Init (void)
 {
-	Cvar_RegisterVariable (&scr_fov);
-	Cvar_RegisterVariable (&scr_viewsize);
-	Cvar_RegisterVariable (&scr_conspeed);
-	Cvar_RegisterVariable (&scr_showram);
-	Cvar_RegisterVariable (&scr_showturtle);
-	Cvar_RegisterVariable (&scr_showpause);
-	Cvar_RegisterVariable (&scr_centertime);
-	Cvar_RegisterVariable (&scr_printspeed);
+	Cvar_RegisterVariable("scr_fov",scr_fov);
+	Cvar_RegisterVariable("scr_viewsize",scr_viewsize);
+	Cvar_RegisterVariable("scr_conspeed",scr_conspeed);
+	Cvar_RegisterVariable("scr_showram",scr_showram);
+	Cvar_RegisterVariable("scr_showturtle",scr_showturtle);
+	Cvar_RegisterVariable("scr_showpause",scr_showpause);
+	Cvar_RegisterVariable("scr_centertime",scr_centertime);
+	Cvar_RegisterVariable("scr_printspeed",scr_printspeed);
 
 //
 // register our commands

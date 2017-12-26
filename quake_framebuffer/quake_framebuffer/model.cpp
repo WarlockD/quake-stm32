@@ -35,8 +35,11 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash);
 
 byte	mod_novis[MAX_MAP_LEAFS/8];
 
-model_t	mod_known[MAX_MOD_KNOWN];
-int		mod_numknown;
+//model_t	mod_known[MAX_MOD_KNOWN];
+//int		mod_numknown;
+static std::unordered_map<string_t, std::unique_ptr<model_t>> mod_known;
+
+
 
 // values for model_t's needload
 #define NL_PRESENT		0
@@ -50,7 +53,7 @@ Mod_Init
 */
 void Mod_Init (void)
 {
-	memset (mod_novis, 0xff, sizeof(mod_novis));
+	std::memset (mod_novis, 0xff, sizeof(mod_novis));
 }
 
 /*
@@ -163,17 +166,8 @@ byte *Mod_LeafPVS (mleaf_t *leaf, model_t *model)
 Mod_ClearAll
 ===================
 */
-void Mod_ClearAll (void)
-{
-	int		i;
-	model_t	*mod;
-
-
-	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++) {
-		mod->needload = NL_UNREFERENCED;
-//FIX FOR CACHE_ALLOC ERRORS:
-		if (mod->type == mod_sprite) mod->cache.data = NULL;
-	}
+void Mod_ClearAll (void){
+	mod_known.clear();
 }
 
 /*
@@ -182,47 +176,30 @@ Mod_FindName
 
 ==================
 */
-static model_t *Mod_FindName (cstring_t name)
+static model_t *Mod_FindName (const std::string_view& name)
 {
 	int		i;
-	model_t	*mod;
-	model_t	*avail = NULL;
-
+	model_t* mod = nullptr;
 	if (name.empty())
 		Sys_Error ("Mod_ForName: NULL name");
 		
 //
 // search the currently loaded models
 //
-	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
-	{
-		if (name == mod->name)
-			break;
-		if (mod->needload == NL_UNREFERENCED)
-			if (!avail || mod->type != mod_alias)
-				avail = mod;
+	auto it = mod_known.find(name);
+	if (it != mod_known.end()) {
+		mod = it->second.get();
 	}
-			
-	if (i == mod_numknown)
-	{
-		if (mod_numknown == MAX_MOD_KNOWN)
-		{
-			if (avail)
-			{
-				mod = avail;
-				if (mod->type == mod_alias)
-					if (Cache_Check (&mod->cache))
-						Cache_Free (&mod->cache);
-			}
-			else
-				Sys_Error ("mod_numknown == MAX_MOD_KNOWN");
-		}
-		else
-			mod_numknown++;
+	else {
+		mod = new model_t;
 		mod->name = string_t::intern(name);
 		mod->needload = NL_NEEDS_LOADED;
+		mod->type = mod_brush;
+		mod->cache.data = nullptr;
+		mod_known.emplace(mod->name, mod);
 	}
-
+//	Sys_Error("mod_numknown == MAX_MOD_KNOWN");
+			
 	return mod;
 }
 
@@ -232,7 +209,7 @@ Mod_TouchModel
 
 ==================
 */
-void Mod_TouchModel (cstring_t name)
+void Mod_TouchModel (const std::string_view&  name)
 {
 	model_t	*mod;
 	
@@ -346,7 +323,7 @@ Mod_ForName
 Loads in a model for the given name
 ==================
 */
-model_t *Mod_ForName (cstring_t name, qboolean crash)
+model_t *Mod_ForName (const std::string_view&  name, qboolean crash)
 {
 	model_t	*mod;
 
@@ -1876,18 +1853,12 @@ Mod_Print
 */
 void Mod_Print(cmd_source_t source, const StringArgs& args)
 {
-	int		i;
-	model_t	*mod;
-
-	Con_Printf ("Cached models:\n");
-	for (i=0, mod=mod_known ; i < mod_numknown ; i++, mod++)
-	{
-		Con_Printf ("%8p : %s",mod->cache.data, mod->name);
-		if (mod->needload & NL_UNREFERENCED)
-			Con_Printf (" (!R)");
-		if (mod->needload & NL_NEEDS_LOADED)
-			Con_Printf (" (!P)");
-		Con_Printf ("\n");
+	quake::con << "Cached models:" << std::endl;
+	for (auto & m : mod_known) {
+		auto mod = m.second.get();
+		quake::con << (size_t)mod->cache.data << " : " << mod->name;
+		if (mod->needload & NL_UNREFERENCED) 	quake::con << " (!R)";
+		if (mod->needload & NL_NEEDS_LOADED) quake::con << " (!P)";
 	}
 }
 

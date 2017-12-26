@@ -115,29 +115,29 @@ idTime	se_time1, se_time2, de_time1, de_time2, dv_time1, dv_time2;
 
 void R_MarkLeaves (void);
 
-cvar_t	r_draworder = {"r_draworder","0"};
-cvar_t	r_speeds = {"r_speeds","0"};
-cvar_t	r_timegraph = {"r_timegraph","0"};
-cvar_t	r_graphheight = {"r_graphheight","10"};
-cvar_t	r_clearcolor = {"r_clearcolor","2"};
-cvar_t	r_waterwarp = {"r_waterwarp","1"};
-cvar_t	r_fullbright = {"r_fullbright","0"};
-cvar_t	r_drawentities = {"r_drawentities","1"};
-cvar_t	r_drawviewmodel = {"r_drawviewmodel","1"};
-cvar_t	r_aliasstats = {"r_polymodelstats","0"};
-cvar_t	r_dspeeds = {"r_dspeeds","0"};
-cvar_t	r_drawflat = {"r_drawflat", "0"};
-cvar_t	r_ambient = {"r_ambient", "0"};
-cvar_t	r_reportsurfout = {"r_reportsurfout", "0"};
-cvar_t	r_maxsurfs = {"r_maxsurfs", "0"};
-cvar_t	r_numsurfs = {"r_numsurfs", "0"};
-cvar_t	r_reportedgeout = {"r_reportedgeout", "0"};
-cvar_t	r_maxedges = {"r_maxedges", "0"};
-cvar_t	r_numedges = {"r_numedges", "0"};
-cvar_t	r_aliastransbase = {"r_aliastransbase", "200"};
-cvar_t	r_aliastransadj = {"r_aliastransadj", "100"};
+cvar_t<float> r_draworder = { 0.0f} ;
+cvar_t<float> r_speeds = { 0.0f} ;
+cvar_t<float> r_timegraph = { 0.0f} ;
+cvar_t<float> r_graphheight = { 10.0f} ;
+cvar_t<float> r_clearcolor = { 2.0f} ;
+cvar_t<float> r_waterwarp = { 1.0f} ;
+cvar_t<float> r_fullbright = { 0.0f} ;
+cvar_t<float> r_drawentities = { 1.0f} ;
+cvar_t<float> r_drawviewmodel = { 1.0f} ;
+cvar_t<float> r_aliasstats = { 0.0f} ;
+cvar_t<float> r_dspeeds = { 0.0f} ;
+cvar_t<float> r_drawflat = { 0.0f} ;
+cvar_t<float> r_ambient = { 0.0f} ;
+cvar_t<float> r_reportsurfout = { 0.0f} ;
+cvar_t<float> r_maxsurfs = { 0.0f} ;
+cvar_t<float> r_numsurfs = { 0.0f} ;
+cvar_t<float> r_reportedgeout = { 0.0f} ;
+cvar_t<float> r_maxedges = { 0.0f} ;
+cvar_t<float> r_numedges = { 0.0f} ;
+cvar_t<float> r_aliastransbase = { 200.0f} ;
+cvar_t<float> r_aliastransadj = { 100.0f} ;
 
-extern cvar_t	scr_fov;
+extern cvar_t<float>	scr_fov;
 
 void CreatePassages (void);
 void SetVisibilityByPassages (void);
@@ -192,30 +192,30 @@ void R_Init (void)
 	Cmd_AddCommand ("timerefresh", R_TimeRefresh_f);	
 	Cmd_AddCommand ("pointfile", R_ReadPointFile_f);	
 
-	Cvar_RegisterVariable (&r_draworder);
-	Cvar_RegisterVariable (&r_speeds);
-	Cvar_RegisterVariable (&r_timegraph);
-	Cvar_RegisterVariable (&r_graphheight);
-	Cvar_RegisterVariable (&r_drawflat);
-	Cvar_RegisterVariable (&r_ambient);
-	Cvar_RegisterVariable (&r_clearcolor);
-	Cvar_RegisterVariable (&r_waterwarp);
-	Cvar_RegisterVariable (&r_fullbright);
-	Cvar_RegisterVariable (&r_drawentities);
-	Cvar_RegisterVariable (&r_drawviewmodel);
-	Cvar_RegisterVariable (&r_aliasstats);
-	Cvar_RegisterVariable (&r_dspeeds);
-	Cvar_RegisterVariable (&r_reportsurfout);
-	Cvar_RegisterVariable (&r_maxsurfs);
-	Cvar_RegisterVariable (&r_numsurfs);
-	Cvar_RegisterVariable (&r_reportedgeout);
-	Cvar_RegisterVariable (&r_maxedges);
-	Cvar_RegisterVariable (&r_numedges);
-	Cvar_RegisterVariable (&r_aliastransbase);
-	Cvar_RegisterVariable (&r_aliastransadj);
+	Cvar_RegisterVariable("r_draworder",r_draworder);
+	Cvar_RegisterVariable("r_speeds",r_speeds);
+	Cvar_RegisterVariable("r_timegraph",r_timegraph);
+	Cvar_RegisterVariable("r_graphheight",r_graphheight);
+	Cvar_RegisterVariable("r_drawflat",r_drawflat);
+	Cvar_RegisterVariable("r_ambient",r_ambient);
+	Cvar_RegisterVariable("r_clearcolor",r_clearcolor);
+	Cvar_RegisterVariable("r_waterwarp",r_waterwarp);
+	Cvar_RegisterVariable("r_fullbright",r_fullbright);
+	Cvar_RegisterVariable("r_drawentities",r_drawentities);
+	Cvar_RegisterVariable("r_drawviewmodel",r_drawviewmodel);
+	Cvar_RegisterVariable("r_aliasstats",r_aliasstats);
+	Cvar_RegisterVariable("r_dspeeds",r_dspeeds);
+	Cvar_RegisterVariable("r_reportsurfout",r_reportsurfout);
+	Cvar_RegisterVariable("r_maxsurfs",r_maxsurfs);
+	Cvar_RegisterVariable("r_numsurfs",r_numsurfs);
+	Cvar_RegisterVariable("r_reportedgeout",r_reportedgeout);
+	Cvar_RegisterVariable("r_maxedges",r_maxedges);
+	Cvar_RegisterVariable("r_numedges",r_numedges);
+	Cvar_RegisterVariable("r_aliastransbase",r_aliastransbase);
+	Cvar_RegisterVariable("r_aliastransadj",r_aliastransadj);
 
-	Cvar_SetValue ("r_maxedges", (float)NUMSTACKEDGES);
-	Cvar_SetValue ("r_maxsurfs", (float)NUMSTACKSURFACES);
+	Cvar_Set ("r_maxedges", (float)NUMSTACKEDGES);
+	Cvar_Set ("r_maxsurfs", (float)NUMSTACKSURFACES);
 
 	view_clipplanes[0].leftedge = true;
 	view_clipplanes[1].rightedge = true;
@@ -363,7 +363,7 @@ void R_ViewChanged (vrect_t *pvrect, int lineadj, float aspect)
 
 	R_SetVrect (pvrect, &r_refdef.vrect, lineadj);
 
-	r_refdef.horizontalFieldOfView = 2.0f * Q_tan (r_refdef.fov_x/360.0f*M_PI);
+	r_refdef.horizontalFieldOfView = 2.0f * Q_tan (r_refdef.fov_x/ static_cast<float>(360.0f*M_PI));
 	r_refdef.fvrectx = (float)r_refdef.vrect.x;
 	r_refdef.fvrectx_adj = (float)r_refdef.vrect.x - 0.5f;
 	r_refdef.vrect_x_adj_shift20 = (r_refdef.vrect.x<<20) + (1<<19) - 1;

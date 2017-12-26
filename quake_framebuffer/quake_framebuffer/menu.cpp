@@ -737,8 +737,8 @@ void M_Menu_Setup_f(cmd_source_t source, const StringArgs& args)
 	key_dest = key_menu;
 	m_state = m_setup;
 	m_entersound = true;
-	Q_strcpy(setup_myname, cl_name.string.c_str());
-	Q_strcpy(setup_hostname, hostname.string.c_str());
+	Q_strcpy(setup_myname, cl_name.value.c_str());
+	Q_strcpy(setup_hostname, hostname.value.c_str());
 	setup_top = setup_oldtop = ((int)cl_color.value) >> 4;
 	setup_bottom = setup_oldbottom = ((int)cl_color.value) & 15;
 }
@@ -834,9 +834,9 @@ forward:
 			goto forward;
 
 		// setup_cursor == 4 (OK)
-		if (Q_strcmp(cl_name.string, setup_myname) != 0)
+		if (Q_strcmp(cl_name.value.c_str(), setup_myname) != 0)
 			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname));
-		if (Q_strcmp(hostname.string, setup_hostname) != 0)
+		if (Q_strcmp(hostname.value.c_str(), setup_hostname) != 0)
 			Cvar_Set("hostname", setup_hostname);
 		if (setup_top != setup_oldtop || setup_bottom != setup_oldbottom)
 			Cbuf_AddText( va ("color %i %i\n", setup_top, setup_bottom));
@@ -1114,15 +1114,15 @@ void M_AdjustSliders (int dir)
 			scr_viewsize.value = 30;
 		if (scr_viewsize.value > 120)
 			scr_viewsize.value = 120;
-		Cvar_SetValue ("viewsize", scr_viewsize.value);
+		Cvar_Set ("viewsize", scr_viewsize.value);
 		break;
 	case 4:	// gamma
 		v_gamma.value -= dir * 0.05;
-		if (v_gamma.value < 0.5)
-			v_gamma.value = 0.5;
+		if (v_gamma.value < 0.5f)
+			v_gamma.value = 0.5f;
 		if (v_gamma.value > 1)
 			v_gamma.value = 1;
-		Cvar_SetValue ("gamma", v_gamma.value);
+		Cvar_Set ("gamma", v_gamma.value);
 		break;
 	case 5:	// mouse speed
 		sensitivity.value += dir * 0.5;
@@ -1130,7 +1130,7 @@ void M_AdjustSliders (int dir)
 			sensitivity.value = 1;
 		if (sensitivity.value > 11)
 			sensitivity.value = 11;
-		Cvar_SetValue ("sensitivity", sensitivity.value);
+		Cvar_Set ("sensitivity", sensitivity.value);
 		break;
 	case 6:	// music volume
 #ifdef MENU_ENABLED_WIN32
@@ -1142,7 +1142,7 @@ void M_AdjustSliders (int dir)
 			bgmvolume.value = 0;
 		if (bgmvolume.value > 1)
 			bgmvolume.value = 1;
-		Cvar_SetValue ("bgmvolume", bgmvolume.value);
+		Cvar_Set ("bgmvolume", bgmvolume.value);
 		break;
 	case 7:	// sfx volume
 		volume.value += dir * 0.1;
@@ -1150,37 +1150,37 @@ void M_AdjustSliders (int dir)
 			volume.value = 0;
 		if (volume.value > 1)
 			volume.value = 1;
-		Cvar_SetValue ("volume", volume.value);
+		Cvar_Set ("volume", volume.value);
 		break;
 
 	case 8:	// allways run
 		if (cl_forwardspeed.value > 200)
 		{
-			Cvar_SetValue ("cl_forwardspeed", 200);
-			Cvar_SetValue ("cl_backspeed", 200);
+			Cvar_Set ("cl_forwardspeed", 200);
+			Cvar_Set ("cl_backspeed", 200);
 		}
 		else
 		{
-			Cvar_SetValue ("cl_forwardspeed", 400);
-			Cvar_SetValue ("cl_backspeed", 400);
+			Cvar_Set ("cl_forwardspeed", 400);
+			Cvar_Set ("cl_backspeed", 400);
 		}
 		break;
 
 	case 9:	// invert mouse
-		Cvar_SetValue ("m_pitch", -m_pitch.value);
+		Cvar_Set ("m_pitch", -m_pitch.value);
 		break;
 
 	case 10:	// lookspring
-		Cvar_SetValue ("lookspring", !lookspring.value);
+		Cvar_Set ("lookspring", !lookspring.value);
 		break;
 
 	case 11:	// lookstrafe
-		Cvar_SetValue ("lookstrafe", !lookstrafe.value);
+		Cvar_Set ("lookstrafe", !lookstrafe.value);
 		break;
 
 #ifdef MENU_ENABLED_WIN32
 	case 13:	// _windowed_mouse
-		Cvar_SetValue ("_windowed_mouse", !_windowed_mouse.value);
+		Cvar_Set ("_windowed_mouse", !_windowed_mouse.value);
 		break;
 #endif
 	}
@@ -2718,7 +2718,7 @@ void M_NetStart_Change (int dir)
 		break;
 
 	case 2:
-		Cvar_SetValue ("coop", coop.value ? 0 : 1);
+		Cvar_Set ("coop", coop.value ? 0 : 1);
 		break;
 
 	case 3:
@@ -2727,35 +2727,35 @@ void M_NetStart_Change (int dir)
 		else
 			count = 2;
 
-		Cvar_SetValue ("teamplay", teamplay.value + dir);
+		Cvar_Set ("teamplay", teamplay.value + dir);
 		if (teamplay.value > count)
-			Cvar_SetValue ("teamplay", 0);
+			Cvar_Set ("teamplay", 0);
 		else if (teamplay.value < 0)
-			Cvar_SetValue ("teamplay", count);
+			Cvar_Set ("teamplay", count);
 		break;
 
 	case 4:
-		Cvar_SetValue ("skill", skill.value + dir);
+		Cvar_Set ("skill", skill.value + dir);
 		if (skill.value > 3)
-			Cvar_SetValue ("skill", 0);
+			Cvar_Set ("skill", 0);
 		if (skill.value < 0)
-			Cvar_SetValue ("skill", 3);
+			Cvar_Set ("skill", 3);
 		break;
 
 	case 5:
-		Cvar_SetValue ("fraglimit", fraglimit.value + dir*10);
+		Cvar_Set ("fraglimit", fraglimit.value + dir*10);
 		if (fraglimit.value > 100)
-			Cvar_SetValue ("fraglimit", 0);
+			Cvar_Set ("fraglimit", 0);
 		if (fraglimit.value < 0)
-			Cvar_SetValue ("fraglimit", 100);
+			Cvar_Set ("fraglimit", 100);
 		break;
 
 	case 6:
-		Cvar_SetValue ("timelimit", timelimit.value + dir*5);
+		Cvar_Set ("timelimit", timelimit.value + dir*5);
 		if (timelimit.value > 60)
-			Cvar_SetValue ("timelimit", 0);
+			Cvar_Set ("timelimit", 0);
 		if (timelimit.value < 0)
-			Cvar_SetValue ("timelimit", 60);
+			Cvar_Set ("timelimit", 60);
 		break;
 
 	case 7:

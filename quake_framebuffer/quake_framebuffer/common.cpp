@@ -69,8 +69,8 @@ namespace quake {
 static char     *safeargvs[NUM_SAFE_ARGVS] =
 	{"-stdvid", "-nolan", "-nosound", "-nocdaudio", "-nojoy", "-nomouse", "-dibonly"};
 
-cvar_t  registered = {"registered","0"};
-cvar_t  cmdline = {"cmdline","0", false, true};
+cvar_t<float> registered = { 0.0f } ;
+cvar_t<cstring_t> cmdline = {  "",  false, true} ;
 static char _com_gamedir[MAX_QPATH];
 qboolean        com_modified;   // set true if using non-id files
 
@@ -396,11 +396,26 @@ static inline int toHex(int c) {
 		return  c - 'A' + 10;
 	else return -1; 
 }
-
+int	Q_atoi(const std::string_view& str) {
+	char* ptr = nullptr;
+	int ret = strtol(str.data(), &ptr, 0);
+	assert(ptr == (str.data() + str.size())); // debug
+	return ret;
+}
 int	Q_atoi(cstring_t str) {
 	char* ptr = nullptr;
 	int ret = strtol(str.data(), &ptr,0);
 	assert(ptr == (str.data() + str.size())); // debug
+	return ret;
+}
+float	Q_atof(const std::string_view& str) {
+	char* ptr;
+	float ret = strtof(str.data(), &ptr);
+	if (ptr == str.data()) { // not a number
+		return std::numeric_limits<float>::quiet_NaN();
+
+	}
+	//	assert(ptr == (str.data() + str.size()) ); // debug
 	return ret;
 }
 float Q_atof(cstring_t str) {
@@ -1245,8 +1260,8 @@ void COM_Init (const char *basedir)
 		LittleFloat = FloatSwap;
 	}
 
-	Cvar_RegisterVariable (&registered);
-	Cvar_RegisterVariable (&cmdline);
+	Cvar_RegisterVariable("registered",registered);
+	Cvar_RegisterVariable("cmdline",cmdline);
 	Cmd_AddCommand ("path", COM_Path_f);
 
 	COM_InitFilesystem ();
@@ -1760,7 +1775,7 @@ void COM_InitFilesystem(void)
 		if (!value.empty() && value[0] != '-')
 			com_cachedir = value;
 	}
-	else if (host_parms.cachedir)
+	else if (!host_parms.cachedir.empty())
 		com_cachedir = host_parms.cachedir;
 	//
 	// start up with GAMENAME by default (id1)

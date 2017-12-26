@@ -54,32 +54,32 @@ jmp_buf 	host_abortserver;
 byte		*host_basepal;
 byte		*host_colormap;
 
-cvar_t	host_framerate = {"host_framerate","0"};	// set for slow motion
-cvar_t	host_speeds = {"host_speeds","0"};			// set for running times
+cvar_t<float> host_framerate = { 0.0f} ;	// set for slow motion
+cvar_t<float>  host_speeds = {  0.0f} ;			// set for running times
 
-cvar_t	sys_ticrate = {"sys_ticrate","0.05"};
-cvar_t	serverprofile = {"serverprofile","0"};
+cvar_t<float> sys_ticrate = { 0.05f} ;
+cvar_t<float> serverprofile = { 0.0f} ;
 
-cvar_t	fraglimit = {"fraglimit","0",false,true};
-cvar_t	timelimit = {"timelimit","0",false,true};
-cvar_t	teamplay = {"teamplay","0",false,true};
+cvar_t<float> fraglimit = { 0.0f,false,true} ;
+cvar_t<float> timelimit = { 0.0f,false,true} ;
+cvar_t<float> teamplay = { 0.0f,false,true} ;
 
-cvar_t	samelevel = {"samelevel","0"};
-cvar_t	noexit = {"noexit","0",false,true};
+cvar_t<float> samelevel = { 0.0f} ;
+cvar_t<float> noexit = { 0.0f,false,true} ;
 
 #ifdef QUAKE2
-cvar_t	developer = {"developer","1"};	// should be 0 for release!
+cvar_t<float> developer = { 1.0f} ;	// should be 0 for release!
 #else
-cvar_t	developer = {"developer","1"};
+cvar_t<float> developer = { 1.0f} ;
 #endif
 
-cvar_t	skill = {"skill","1"};						// 0 - 3
-cvar_t	deathmatch = {"deathmatch","0"};			// 0, 1, or 2
-cvar_t	coop = {"coop","0"};			// 0 or 1
+cvar_t<float> skill = { 1.0f} ;						// 0 - 3
+cvar_t<float> deathmatch = { 0.0f} ;			// 0, 1, or 2
+cvar_t<float> coop = { 0.0f} ;			// 0 or 1
 
-cvar_t	pausable = {"pausable","1"};
+cvar_t<float> pausable = { 1.0f} ;
 
-cvar_t	temp1 = {"temp1","0"};
+cvar_t<float> temp1 = { 0.0f} ;
 
 
 /*
@@ -190,9 +190,9 @@ void	Host_FindMaxClients (void)
 	svs.clients = (client_t*)Hunk_AllocName (svs.maxclientslimit*sizeof(client_t), "clients");
 
 	if (svs.maxclients > 1)
-		Cvar_SetValue ("deathmatch", 1.0);
+		Cvar_Set ("deathmatch", 1.0);
 	else
-		Cvar_SetValue ("deathmatch", 0.0);
+		Cvar_Set ("deathmatch", 0.0);
 }
 
 
@@ -205,25 +205,25 @@ void Host_InitLocal (void)
 {
 	Host_InitCommands ();
 	
-	Cvar_RegisterVariable (&host_framerate);
-	Cvar_RegisterVariable (&host_speeds);
+	Cvar_RegisterVariable("host_framerate",host_framerate);
+	Cvar_RegisterVariable("host_speeds",host_speeds);
 
-	Cvar_RegisterVariable (&sys_ticrate);
-	Cvar_RegisterVariable (&serverprofile);
+	Cvar_RegisterVariable("sys_ticrate",sys_ticrate);
+	Cvar_RegisterVariable("serverprofile",serverprofile);
 
-	Cvar_RegisterVariable (&fraglimit);
-	Cvar_RegisterVariable (&timelimit);
-	Cvar_RegisterVariable (&teamplay);
-	Cvar_RegisterVariable (&samelevel);
-	Cvar_RegisterVariable (&noexit);
-	Cvar_RegisterVariable (&skill);
-	Cvar_RegisterVariable (&developer);
-	Cvar_RegisterVariable (&deathmatch);
-	Cvar_RegisterVariable (&coop);
+	Cvar_RegisterVariable("fraglimit",fraglimit);
+	Cvar_RegisterVariable("timelimit",timelimit);
+	Cvar_RegisterVariable("teamplay",teamplay);
+	Cvar_RegisterVariable("samelevel",samelevel);
+	Cvar_RegisterVariable("noexit",noexit);
+	Cvar_RegisterVariable("skill",skill);
+	Cvar_RegisterVariable("developer",developer);
+	Cvar_RegisterVariable("deathmatch",deathmatch);
+	Cvar_RegisterVariable("coop",coop);
 
-	Cvar_RegisterVariable (&pausable);
+	Cvar_RegisterVariable("pausable",pausable);
 
-	Cvar_RegisterVariable (&temp1);
+	Cvar_RegisterVariable("temp1",temp1);
 
 	Host_FindMaxClients ();
 	
@@ -289,7 +289,7 @@ SV_BroadcastPrintf
 Sends text to all active clients
 =================
 */
-void SV_BroadcastPrintf (char *fmt, ...)
+void SV_BroadcastPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
 	char		string[1024];
@@ -521,7 +521,7 @@ qboolean Host_FilterTime (idTime time)
 	oldrealtime = realtime;
 
 	if (host_framerate.value > 0)
-		host_frametime = idCast<idTime>(host_framerate.value);
+		host_frametime = idCast<idTime>(static_cast<float>(host_framerate.value));
 	else
 	{	// don't allow really long or short frames
 		if (host_frametime > 100ms)
@@ -726,12 +726,16 @@ void _Host_Frame (idTime time)
 
 	if (host_speeds.value)
 	{
+		idTime time3 = Sys_FloatTime();
 		idTime pass1 = (time1 - time3);
-		time3 = Sys_FloatTime ();
 		idTime pass2 = (time2 - time1);
 		idTime pass3 = (time3 - time2);
-		Con_Printf ("%3i tot %3i server %3i gfx %3i snd\n",
-					(pass1+pass2+pass3).count(), pass1.count(), pass2.count(), pass3.count());
+
+		quake::con << " total=" << std::setw(7) << (pass1 + pass2 + pass3);
+		quake::con << " server=" << std::setw(7) << pass1;
+		quake::con << " gfx=" << std::setw(7) << pass2;
+		quake::con << " snd=" << std::setw(7) << pass3;
+		quake::con << std::endl;
 	}
 	
 	host_framecount++;

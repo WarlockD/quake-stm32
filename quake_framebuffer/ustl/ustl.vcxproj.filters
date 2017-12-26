@@ -1,0 +1,237 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="bktrace.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cmemlink.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fstream.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="memblock.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="memlink.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mistream.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ofstream.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sistream.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sostream.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ualgobase.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ubitset.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="uexception.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="unew.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ustdxept.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ustring.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="umemory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bktrace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cmemlink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fstream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="memblock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="memlink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="metamac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mistream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mostream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ofstream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="simd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sistream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sostream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="strmsize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="traits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="typeinfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="typelist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="typet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ualgo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ualgobase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uarray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uatomic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ubitset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uchrono.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uctralgo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uctrstrm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uerror.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uexception.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ufunction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uheap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uios.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uiosfunc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uiterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ulimits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ulist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="umap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="umemory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="umultimap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="umultiset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="unew.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="unumeric.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="upair.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="upredalgo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uqueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uratio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uspecial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ustack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ustdxept.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ustl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ustring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utf8.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uttraits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uutility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uvector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

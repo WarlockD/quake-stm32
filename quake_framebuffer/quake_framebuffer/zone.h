@@ -662,7 +662,7 @@ using SStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator
 template<typename T>
 using ZVector = std::vector<T, UAllocator<T>>;
 
-using StringArgs = ZVector<string_t>;
+using StringArgs = ZVector<std::string_view>;
 
 
 #endif

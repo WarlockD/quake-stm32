@@ -64,21 +64,21 @@ int unreliableMessagesSent = 0;
 int unreliableMessagesReceived = 0;
 
 extern sys_file vcrFile;
-cvar_t	net_messagetimeout = {"net_messagetimeout","300"};
-cvar_t	hostname = {"hostname", "UNNAMED"};
+cvar_t<float> net_messagetimeout = { 300.0f} ;
+cvar_t<cstring_t> hostname = {   "UNNAMED"} ;
 
 qboolean	configRestored = false;
-cvar_t	config_com_port = {"_config_com_port", "0x3f8", true};
-cvar_t	config_com_irq = {"_config_com_irq", "4", true};
-cvar_t	config_com_baud = {"_config_com_baud", "57600", true};
-cvar_t	config_com_modem = {"_config_com_modem", "1", true};
-cvar_t	config_modem_dialtype = {"_config_modem_dialtype", "T", true};
-cvar_t	config_modem_clear = {"_config_modem_clear", "ATZ", true};
-cvar_t	config_modem_init = {"_config_modem_init", "", true};
-cvar_t	config_modem_hangup = {"_config_modem_hangup", "AT H", true};
+cvar_t<float> config_com_port = {   static_cast<float>(0x3f8), true} ;
+cvar_t<float> config_com_irq = { 4.0f, true} ;
+cvar_t<float> config_com_baud = { 57600.0f, true} ;
+cvar_t<float> config_com_modem = { 1.0f, true} ;
+cvar_t<cstring_t> config_modem_dialtype = {   "T", true} ;
+cvar_t<cstring_t> config_modem_clear = {   "ATZ", true} ;
+cvar_t<cstring_t> config_modem_init = {   "", true} ;
+cvar_t<cstring_t> config_modem_hangup = {   "AT H", true} ;
 
 #ifdef IDGODS
-cvar_t	idgods = {"idgods", "0"};
+cvar_t<float> idgods = { 0.0f} ;
 #endif
 
 
@@ -560,7 +560,7 @@ int	NET_GetMessage (qsocket_t *sock)
 	// see if this connection has timed out
 	if (ret == 0 && sock->driver)
 	{
-		if (net_time - sock->lastMessageTime > idCast<idTime>(net_messagetimeout.value))
+		if (net_time - sock->lastMessageTime > idCast<idTime>(static_cast<float>(net_messagetimeout.value)))
 		{
 			NET_Close(sock);
 			return -1;
@@ -854,18 +854,18 @@ void NET_Init (void)
 	// allocate space for network message buffer
 	net_message.Alloc (NET_MAXMESSAGE);
 
-	Cvar_RegisterVariable (&net_messagetimeout);
-	Cvar_RegisterVariable (&hostname);
-	Cvar_RegisterVariable (&config_com_port);
-	Cvar_RegisterVariable (&config_com_irq);
-	Cvar_RegisterVariable (&config_com_baud);
-	Cvar_RegisterVariable (&config_com_modem);
-	Cvar_RegisterVariable (&config_modem_dialtype);
-	Cvar_RegisterVariable (&config_modem_clear);
-	Cvar_RegisterVariable (&config_modem_init);
-	Cvar_RegisterVariable (&config_modem_hangup);
+	Cvar_RegisterVariable("net_messagetimeout",net_messagetimeout);
+	Cvar_RegisterVariable("hostname",hostname);
+	Cvar_RegisterVariable("config_com_port",config_com_port);
+	Cvar_RegisterVariable("config_com_irq",config_com_irq);
+	Cvar_RegisterVariable("config_com_baud",config_com_baud);
+	Cvar_RegisterVariable("config_com_modem",config_com_modem);
+	Cvar_RegisterVariable("config_modem_dialtype",config_modem_dialtype);
+	Cvar_RegisterVariable("config_modem_clear",config_modem_clear);
+	Cvar_RegisterVariable("config_modem_init",config_modem_init);
+	Cvar_RegisterVariable("config_modem_hangup",config_modem_hangup);
 #ifdef IDGODS
-	Cvar_RegisterVariable (&idgods);
+	Cvar_RegisterVariable("idgods",idgods);
 #endif
 
 	Cmd_AddCommand ("slist", NET_Slist_f);
@@ -942,7 +942,7 @@ void NET_Poll(void)
 			else
 				useModem = false;
 			SetComPortConfig (0, (int)config_com_port.value, (int)config_com_irq.value, (int)config_com_baud.value, useModem);
-			SetModemConfig (0, config_modem_dialtype.string.c_str(), config_modem_clear.string.c_str(), config_modem_init.string.c_str(), config_modem_hangup.string.c_str());
+			SetModemConfig (0, config_modem_dialtype.value.c_str(), config_modem_clear.value.c_str(), config_modem_init.value.c_str(), config_modem_hangup.value.c_str());
 		}
 		configRestored = true;
 	}

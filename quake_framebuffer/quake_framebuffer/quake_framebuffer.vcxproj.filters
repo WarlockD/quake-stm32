@@ -240,9 +240,6 @@
     <ClCompile Include="pr_print.cpp">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="ustl.cpp">
-      <Filter>quake</Filter>
-    </ClCompile>
     <ClCompile Include="..\glad\release\src\glad.c">
       <Filter>glad\release</Filter>
     </ClCompile>
@@ -473,9 +470,6 @@
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="cx_util.h">
-      <Filter>quake</Filter>
-    </ClInclude>
-    <ClInclude Include="ulib.h">
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="..\glad\release\include\glad\glad.h">

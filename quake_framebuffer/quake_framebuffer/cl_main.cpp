@@ -26,21 +26,21 @@ using namespace std::chrono;
 // references them even when on a unix system.
 
 // these two are not intended to be set directly
-cvar_t	cl_name = {"_cl_name", "player", true};
-cvar_t	cl_color = {"_cl_color", "0", true};
+cvar_t<cstring_t> cl_name = {   "player", true} ;
+cvar_t<float> cl_color = { 0.0f, true} ;
 
-//cvar_t	cl_shownet = {"cl_shownet","0"};	// can be 0, 1, or 2
-cvar_t	cl_shownet = { "cl_shownet","0" };	// can be 0, 1, or 2
-cvar_t	cl_nolerp = {"cl_nolerp","0"};
+//cvar_t<float> cl_shownet = { 0.0f} ;	// can be 0, 1, or 2
+cvar_t<float> cl_shownet = { 0.0f } ;	// can be 0, 1, or 2
+cvar_t<float> cl_nolerp = { 0.0f} ;
 
-cvar_t	lookspring = {"lookspring","0", true};
-cvar_t	lookstrafe = {"lookstrafe","0", true};
-cvar_t	sensitivity = {"sensitivity","3", true};
+cvar_t<float> lookspring = { 0.0f, true} ;
+cvar_t<float> lookstrafe = { 0.0f, true} ;
+cvar_t<float> sensitivity = { 3.0f, true} ;
 
-cvar_t	m_pitch = {"m_pitch","0.022", true};
-cvar_t	m_yaw = {"m_yaw","0.022", true};
-cvar_t	m_forward = {"m_forward","1", true};
-cvar_t	m_side = {"m_side","0.8", true};
+cvar_t<float> m_pitch = { 0.022f, true} ;
+cvar_t<float> m_yaw = { 0.022f, true} ;
+cvar_t<float> m_forward = { 1.0f, true} ;
+cvar_t<float> m_side = { 0.8f, true} ;
 
 namespace quake {
 	client_static_t	cls;
@@ -216,7 +216,7 @@ void client_static_t::signon_reply(void)
 
 		message.WriteByte(clc_stringcmd);
 		ss.rdbuf()->clear();
-		ss << "name \"" << cl_name.string << std::endl;
+		ss << "name \"" << cl_name.value << std::endl;
 		message.WriteString(ss.str().c_str());
 
 		message.WriteByte(clc_stringcmd);
@@ -760,28 +760,28 @@ void CL_Init (void)
 //
 // register our commands
 //
-	Cvar_RegisterVariable (&cl_name);
-	Cvar_RegisterVariable (&cl_color);
-	Cvar_RegisterVariable (&cl_upspeed);
-	Cvar_RegisterVariable (&cl_forwardspeed);
-	Cvar_RegisterVariable (&cl_backspeed);
-	Cvar_RegisterVariable (&cl_sidespeed);
-	Cvar_RegisterVariable (&cl_movespeedkey);
-	Cvar_RegisterVariable (&cl_yawspeed);
-	Cvar_RegisterVariable (&cl_pitchspeed);
-	Cvar_RegisterVariable (&cl_anglespeedkey);
-	Cvar_RegisterVariable (&cl_shownet);
-	Cvar_RegisterVariable (&cl_nolerp);
-	Cvar_RegisterVariable (&lookspring);
-	Cvar_RegisterVariable (&lookstrafe);
-	Cvar_RegisterVariable (&sensitivity);
+	Cvar_RegisterVariable("cl_name",cl_name);
+	Cvar_RegisterVariable("cl_color",cl_color);
+	Cvar_RegisterVariable("cl_upspeed",cl_upspeed);
+	Cvar_RegisterVariable("cl_forwardspeed",cl_forwardspeed);
+	Cvar_RegisterVariable("cl_backspeed",cl_backspeed);
+	Cvar_RegisterVariable("cl_sidespeed",cl_sidespeed);
+	Cvar_RegisterVariable("cl_movespeedkey",cl_movespeedkey);
+	Cvar_RegisterVariable("cl_yawspeed",cl_yawspeed);
+	Cvar_RegisterVariable("cl_pitchspeed",cl_pitchspeed);
+	Cvar_RegisterVariable("cl_anglespeedkey",cl_anglespeedkey);
+	Cvar_RegisterVariable("cl_shownet",cl_shownet);
+	Cvar_RegisterVariable("cl_nolerp",cl_nolerp);
+	Cvar_RegisterVariable("lookspring",lookspring);
+	Cvar_RegisterVariable("lookstrafe",lookstrafe);
+	Cvar_RegisterVariable("sensitivity",sensitivity);
 
-	Cvar_RegisterVariable (&m_pitch);
-	Cvar_RegisterVariable (&m_yaw);
-	Cvar_RegisterVariable (&m_forward);
-	Cvar_RegisterVariable (&m_side);
+	Cvar_RegisterVariable("m_pitch",m_pitch);
+	Cvar_RegisterVariable("m_yaw",m_yaw);
+	Cvar_RegisterVariable("m_forward",m_forward);
+	Cvar_RegisterVariable("m_side",m_side);
 
-//	Cvar_RegisterVariable (&cl_autofire);
+//	Cvar_RegisterVariable("cl_autofire",cl_autofire);
 	
 	Cmd_AddCommand ("entities", CL_PrintEntities_f);
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);

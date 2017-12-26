@@ -96,27 +96,27 @@ SV_Init
 void SV_Init (void)
 {
 	int		i;
-	extern	cvar_t	sv_maxvelocity;
-	extern	cvar_t	sv_gravity;
-	extern	cvar_t	sv_nostep;
-	extern	cvar_t	sv_friction;
-	extern	cvar_t	sv_edgefriction;
-	extern	cvar_t	sv_stopspeed;
-	extern	cvar_t	sv_maxspeed;
-	extern	cvar_t	sv_accelerate;
-	extern	cvar_t	sv_idealpitchscale;
-	extern	cvar_t	sv_aim;
+	extern	cvar_t<float>	sv_maxvelocity;
+	extern	cvar_t<float>	sv_gravity;
+	extern	cvar_t<float>	sv_nostep;
+	extern	cvar_t<float>	sv_friction;
+	extern	cvar_t<float>	sv_edgefriction;
+	extern	cvar_t<float>	sv_stopspeed;
+	extern	cvar_t<float>	sv_maxspeed;
+	extern	cvar_t<float>	sv_accelerate;
+	extern	cvar_t<float>	sv_idealpitchscale;
+	extern	cvar_t<float>	sv_aim;
 
-	Cvar_RegisterVariable (&sv_maxvelocity);
-	Cvar_RegisterVariable (&sv_gravity);
-	Cvar_RegisterVariable (&sv_friction);
-	Cvar_RegisterVariable (&sv_edgefriction);
-	Cvar_RegisterVariable (&sv_stopspeed);
-	Cvar_RegisterVariable (&sv_maxspeed);
-	Cvar_RegisterVariable (&sv_accelerate);
-	Cvar_RegisterVariable (&sv_idealpitchscale);
-	Cvar_RegisterVariable (&sv_aim);
-	Cvar_RegisterVariable (&sv_nostep);
+	Cvar_RegisterVariable ("sv_maxvelocity", sv_maxvelocity);
+	Cvar_RegisterVariable ("sv_gravity", sv_gravity);
+	Cvar_RegisterVariable ("sv_friction", sv_friction);
+	Cvar_RegisterVariable ("sv_edgefriction", sv_edgefriction);
+	Cvar_RegisterVariable ("sv_stopspeed", sv_stopspeed);
+	Cvar_RegisterVariable ("sv_maxspeed", sv_maxspeed);
+	Cvar_RegisterVariable ("sv_accelerate", sv_accelerate);
+	Cvar_RegisterVariable ("sv_idealpitchscale", sv_idealpitchscale);
+	Cvar_RegisterVariable ("sv_aim", sv_aim);
+	Cvar_RegisterVariable ("sv_nostep", sv_nostep);
 
 }
 
@@ -195,11 +195,11 @@ void SV_StartSound (edict_t *entity, int channel, cstring_t sample, int volume,
 
 // find precache number for sound
     for (sound_num=1 ; sound_num<MAX_SOUNDS
-        && sv.sound_precache[sound_num] ; sound_num++)
+        && sv.sound_precache[sound_num].empty() ; sound_num++)
         if (sample == sv.sound_precache[sound_num])
             break;
     
-    if ( sound_num == MAX_SOUNDS || !sv.sound_precache[sound_num] )
+    if ( sound_num == MAX_SOUNDS || sv.sound_precache[sound_num].empty() )
     {
         Con_Printf ("SV_StartSound: %s not precacheed\n", sample.c_str());
         return;
@@ -959,10 +959,10 @@ int SV_ModelIndex (cstring_t name)
 	if (name.empty())
 		return 0;
 
-	for (i=0 ; i<MAX_MODELS && sv.model_precache[i] ; i++)
+	for (i=0 ; i<MAX_MODELS && !sv.model_precache[i].empty() ; i++)
 		if (name == sv.model_precache[i])
 			return i;
-	if (i==MAX_MODELS || !sv.model_precache[i])
+	if (i==MAX_MODELS || !sv.model_precache[i].empty())
 		Sys_Error ("SV_ModelIndex: model %s not precached", name);
 	return i;
 }
@@ -1102,7 +1102,7 @@ void SV_SpawnServer (cstring_t server)
 	int			i;
 
 	// let's not have any servers with no name
-	if (hostname.string[0] == 0)
+	if (hostname.value.empty())
 		Cvar_Set ("hostname", "UNNAMED");
 	scr_centertime_off = idTime::zero();
 
@@ -1117,14 +1117,14 @@ void SV_SpawnServer (cstring_t server)
 // make cvars consistant
 //
 	if (coop.value)
-		Cvar_SetValue ("deathmatch", 0);
+		Cvar_Set ("deathmatch", 0);
 	current_skill = (int)(skill.value + 0.5);
 	if (current_skill < 0)
 		current_skill = 0;
 	if (current_skill > 3)
 		current_skill = 3;
 
-	Cvar_SetValue ("skill", (float)current_skill);
+	Cvar_Set("skill", (float)current_skill);
 	
 //
 // set up the new server

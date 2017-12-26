@@ -1111,7 +1111,6 @@ namespace quake {
 		std::string DecompileGlobalStringNoContents(gofs_t ofs) { return DecompileGlobalString(ofs, false); }
 		void DecompilePrintStatement(std::ostream& os, const dstatement_t * s)
 		{
-			int i;
 			std::stringstream line;
 			line << std::setw(4) << (int)(s - vm.pr_statements) << " : " << pr_opcodes[s->op].opname;
 			os << std::setw(10) << line.str();

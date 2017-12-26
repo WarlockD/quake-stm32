@@ -106,7 +106,7 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 		if (transformed[2] < NEAR_CLIP)
 			transformed[2] = NEAR_CLIP;
 	
-		lzi0 = 1.0 / transformed[2];
+		lzi0 = 1.0f / transformed[2];
 	
 	// FIXME: build x/yscale into transform?
 		scale = xscale * lzi0;
@@ -212,8 +212,8 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 		u = r_u1 + ((float)v - r_v1) * u_step;
 	}
 
-	edge->u_step = u_step*0x100000;
-	edge->u = u*0x100000 + 0xFFFFF;
+	edge->u_step = u_step*static_cast<float>(0x100000);
+	edge->u = u* static_cast<float>(0x100000 + 0xFFFFF);
 
 // we need to do this to avoid stepping off the edges if a very nearly
 // horizontal edge is less than epsilon above a scan, and numeric error causes

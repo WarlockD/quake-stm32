@@ -23,7 +23,7 @@
     <ProjectGuid>{91702CCD-7BEA-4E89-AA07-22A5363E4572}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>quake_framebuffer</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -72,7 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\include;..\glad\debug\include;$(IncludePath)</IncludePath>
+    <IncludePath>..\include;..\glad\debug\include;..\ustl;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -156,13 +156,18 @@
     <ProjectReference Include="..\glfw3\glfw3.vcxproj">
       <Project>{ebd2796f-27b4-4891-80d6-d38878655f42}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\ustl\ustl.vcxproj">
+      <Project>{6ff3f4c6-bf5c-4640-9229-c73305b0da70}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\glad\debug\src\glad.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\glad\release\src\glad.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="cd_null.cpp" />
     <ClCompile Include="chase.cpp" />
@@ -172,7 +177,9 @@
     <ClCompile Include="cl_parse.cpp" />
     <ClCompile Include="cl_tent.cpp" />
     <ClCompile Include="cmd.cpp" />
-    <ClCompile Include="common.cpp" />
+    <ClCompile Include="common.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="conproc.cpp" />
     <ClCompile Include="console.cpp" />
     <ClCompile Include="crc.cpp" />
@@ -233,7 +240,6 @@
     <ClCompile Include="sv_phys.cpp" />
     <ClCompile Include="sv_user.cpp" />
     <ClCompile Include="sys_null.cpp" />
-    <ClCompile Include="ustl.cpp" />
     <ClCompile Include="vid_null.cpp" />
     <ClCompile Include="view.cpp" />
     <ClCompile Include="wad.cpp" />
@@ -312,7 +318,6 @@
     <ClInclude Include="spritegn.h" />
     <ClInclude Include="sys.h" />
     <ClInclude Include="tailq.hpp" />
-    <ClInclude Include="ulib.h" />
     <ClInclude Include="vgamodes.h" />
     <ClInclude Include="vid.h" />
     <ClInclude Include="vid_dos.h" />

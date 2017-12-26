@@ -404,7 +404,7 @@ void R_SetupFrame (void)
 		r_refdef.ambientlight = 0;
 
 	if (!sv.active)
-		r_draworder.value = 0;	// don't let cheaters look behind walls
+		r_draworder.value = 0.0f;	// don't let cheaters look behind walls
 		
 	R_CheckVariables ();
 	

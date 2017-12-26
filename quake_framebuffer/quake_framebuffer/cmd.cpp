@@ -26,9 +26,19 @@ void Cmd_ForwardToServer(cmd_source_t source, const StringArgs& args);
 
 
 
-static	cmd_function_t	*cmd_functions;		// possible commands to execute
+//static	cmd_function_t	*cmd_functions;		// possible commands to execute
+//cmdalias_t	*cmd_alias;
+struct func_equal_compare {
+	bool operator()(const string_t& l, const string_t&r) const { return util::util::str_casecmp(l.begin(), l.end(), r.begin(), r.end())==0; }
+};
+struct func_hash_compare {
+	size_t operator()(const string_t& l) const { return util::util::case_hasher(l.data(), l.length()); }
+};
 
-cmdalias_t	*cmd_alias;
+static std::unordered_map<string_t, xcommand_t, func_hash_compare, func_equal_compare> cmd_functions;
+static std::unordered_map<string_t, ZString, func_hash_compare, func_equal_compare> cmd_alias;
+
+
 
 int trashtest;
 int *trashspot;
@@ -79,6 +89,7 @@ public:
 		_list = ParseArgs(_text.get());
 	}
 	SafeArgs(const SafeArgs& copy) = delete;
+	SafeArgs& operator=(const SafeArgs& copy) = delete;
 	SafeArgs(SafeArgs&& move) :_text(std::move(move._text)),  _list(std::move(move._list)) {}
 
 	SafeArgs& operator=(SafeArgs&& move) {
@@ -97,13 +108,13 @@ UList<StringArgs> SafeArgs::ParseArgs(const std::string_view&  text) {
 	while (parser.Next(token, true)) {
 		if (token[0] == '\n') {
 			if (!args.empty()) {
-				list.push_back(args);
-				args.clear();
+				list.emplace_back(std::move(args));
+				args = StringArgs();
 			}
 		}
-		else args.emplace_back(string_t::intern(token.data()));
+		else args.emplace_back(token);
 	};
-	if (!args.empty()) list.push_back(args);
+	if (!args.empty()) list.emplace_back(std::move(args));
 	return std::move(list);
 }
 static std::deque<SafeArgs> _parsed_commands;
@@ -168,8 +179,9 @@ void Cbuf_Execute (void)
 
 		while (!list.empty()) {
 			auto args = std::move(list.front());
-			execute_args(args, src_command);
 			list.pop_front();
+			execute_args(args, src_command);
+
 			if (cmd_wait)
 			{	// skip out while text still remains in buffer, leaving it
 				// for next frame
@@ -296,7 +308,7 @@ Cmd_Alias_f
 Creates a new command that executes a command string (possibly ; seperated)
 ===============
 */
-
+#if 0
 void cmdalias_t::operator delete(void *ptr) { Z_Free(ptr); }
 cmdalias_t* cmdalias_t::create(const std::string_view&  name, const std::string_view&  value) {
 	char* ptr = (char*)Z_Malloc(value.size() + name.size() + sizeof(cmdalias_t) + 2);
@@ -306,56 +318,31 @@ cmdalias_t* cmdalias_t::create(const std::string_view&  name, const std::string_
 	::memcpy(n_value, value.data(), value.size()); n_value[value.size()] = 0;
 	return new(ptr) cmdalias_t(n_name, n_value);
 }
-
+#endif
 
 void Cmd_Alias_f (cmd_source_t source, const StringArgs& args)
 {
 	
-	cmdalias_t	*a,*p;
+	//cmdalias_t	*a,*p;
 
 
 	if (args.size() == 1)
 	{
-		Con_Printf ("Current alias commands:\n");
-		for (a = cmd_alias ; a ; a=a->next)
-			Con_Printf ("%s : %s\n", a->name, a->value);
+		quake::con << "Current alias commands:" << std::endl;
+		for (const auto& a : cmd_alias)
+			quake::con << a.first << " : " << a.second << std::endl;
 		return;
 	}
-
-	cstring_t s = args[1];
-	if (s.size() >= MAX_ALIAS_NAME)
-	{
-		Con_Printf ("Alias name is too long\n");
-		return;
-	}
-
-
-	// if the alias allready exists, reuse it
-	for (a = cmd_alias, p = nullptr ; a ; p =a, a=a->next)
-	{
-		if (s == a->name)
-		{
-			if (p) p->next = a->next;
-			else cmd_alias = a->next;
-			delete a;
-			break;
-		}
-	}
-
-
-	std::stringstream ss;
-		ZStringStream zs;
-// copy the rest of the command line
-	for (size_t i=2 ; i< args.size() ; i++)
+	string_t s = string_t::intern(args[1]);
+	ZStringStream zs;
+	// copy the rest of the command line
+	for (size_t i = 2; i< args.size(); i++)
 	{
 		if (i != 2)zs << ' ';
 		zs << args[i];
-
 	}
 	zs << std::endl;
-	a = cmdalias_t::create(args[1].c_str(), zs.str());
-	a->next = cmd_alias;
-	cmd_alias = a;
+	cmd_alias[s] = std::move(zs.str());
 }
 
 /*
@@ -410,33 +397,27 @@ Cmd_AddCommand
 */
 void	Cmd_AddCommand (string_t cmd_name, xcommand_t function)
 {
-	cmd_function_t	*cmd;
+	//cmd_function_t	*cmd;
 
 	if (host_initialized)	// because hunk allocation would get stomped
 		Sys_Error ("Cmd_AddCommand after host_initialized");
 		
 // fail if the command is a variable name
-	if (!Cvar_VariableString(cmd_name).empty())
+
+	if (Cvar_Get<float>(cmd_name) != nullptr || Cvar_Get<cstring_t>(cmd_name) != nullptr)
 	{
+		
 		Con_Printf ("Cmd_AddCommand: %s already defined as a var\n", cmd_name);
 		return;
 	}
 	
 // fail if the command already exists
-	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
-	{
-		if (cmd_name == cmd->name)
-		{
-			Con_Printf ("Cmd_AddCommand: %s already defined\n", cmd_name);
-			return;
-		}
+	auto it = cmd_functions.find(cmd_name);
+	if (it != cmd_functions.end()) {
+		quake::con << "Cmd_AddCommand: " << cmd_name << " already defined" << std::endl;
+		return;
 	}
-
-	cmd = (cmd_function_t*)Hunk_AllocName(sizeof(cmd_function_t),"cmd_function_t");
-	cmd->name = cmd_name;
-	cmd->function = function;
-	cmd->next = cmd_functions;
-	cmd_functions = cmd;
+	cmd_functions.emplace(cmd_name, function);
 }
 
 /*
@@ -446,15 +427,8 @@ Cmd_Exists
 */
 qboolean	Cmd_Exists (string_t cmd_name)
 {
-	cmd_function_t	*cmd;
-
-	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
-	{
-		if (cmd_name == cmd->name)
-			return true;
-	}
-
-	return false;
+	auto it = cmd_functions.find(cmd_name);
+	return it != cmd_functions.end();
 }
 
 
@@ -466,15 +440,16 @@ Cmd_CompleteCommand
 */
 std::string_view Cmd_CompleteCommand (const std::string_view&  partial)
 {
-	cmd_function_t	*cmd;
+	//cmd_function_t	*cmd;
 	
 	if (partial.empty())
 		return nullptr;
 		
 // check functions
-	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
-		if (!Q_strncmp (partial.data(),cmd->name.c_str(), partial.size()))
-			return cmd->name;
+	for (auto it = cmd_functions.begin(); it != cmd_functions.end(); it++) {
+		if (!Q_strncmp(partial.data(), it->first.c_str(), partial.size()))
+			return it->first;
+	}
 
 	return std::string_view();
 }
@@ -515,42 +490,33 @@ void Cmd_ForwardToServer(cmd_source_t source, const StringArgs& args)
 
 
 void execute_args(const StringArgs& args, cmd_source_t src) {
-	cmd_function_t	*cmd;
-	cmdalias_t		*a;
+
 
 	// execute the command line
 	if (args.size() == 0)
 		return;		// no tokens
-	symbol_t lower = args[0];
+	string_t lower = string_t::intern(args[0]);
 	// FIX, replace with array
 
 	// check functions
-	for (cmd = cmd_functions; cmd; cmd = cmd->next)
-	{
-		if (lower == std::string_view(cmd->name)) {
-			cmd->function(src, args);
+	auto cmd = cmd_functions.find(lower);
+	if (cmd != cmd_functions.end()) {
+		cmd->second(src, args);
 #ifdef DEBUG_ARGS
-			quake::debug << "CALL: " << lower << '(';
-			for (size_t i = 1; i < args.size(); i++) {
-				if (i != 1) quake::debug << ',';
-				quake::debug << args[i];
-			}
-			quake::debug << ")" << std::endl;
+		quake::debug << "CALL: " << lower << '(';
+		for (size_t i = 1; i < args.size(); i++) {
+			if (i != 1) quake::debug << ',';
+			quake::debug << args[i];
+		}
+		quake::debug << ")" << std::endl;
 #endif
-			return;
-		}
+		return;
 	}
-
-	// check alias
-	for (a = cmd_alias; a; a = a->next)
-	{
-		if (lower == a->name)
-		{
-			Cbuf_InsertText(a->value);
-			return;
-		}
+	auto a = cmd_alias.find(lower);
+	if (a != cmd_alias.end()) {
+		Cbuf_InsertText(a->second);
+		return;
 	}
-
 	// check cvars
 	if (!Cvar_Command(args)) {
 		quake::con << "Unknown command \"" << lower << "\"" << std::endl;
@@ -558,7 +524,14 @@ void execute_args(const StringArgs& args, cmd_source_t src) {
 	else {
 #ifdef DEBUG_ARGS
 		if (args.size() > 1) {
-			quake::debug << "SET: " << lower << " = " << args[1] << std::endl;
+			float* v = Cvar_Get<float>(lower);
+			if(v) quake::debug << "SET: " << lower << " = " << *v << std::endl;
+			else {
+				cstring_t* s = Cvar_Get<cstring_t>(lower);
+				assert(s);
+				quake::debug << "SET: " << lower << " = " << *s << std::endl;
+			}
+			
 		}
 #endif
 	}

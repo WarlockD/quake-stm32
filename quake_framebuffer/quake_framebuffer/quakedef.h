@@ -61,7 +61,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <type_traits>
 #include <utility>
 #include <algorithm>
-
+#include <ustl.h>
+#include <ustring.h>
+#include <uvector.h>
 #if defined(_WIN32) && !defined(WINDED)
 
 #if defined(_M_IX86)
@@ -317,9 +319,9 @@ extern qboolean noclip_anglehack;
 //
 extern	quakeparms_t host_parms;
 
-extern	cvar_t		sys_ticrate;
-extern	cvar_t		sys_nostdout;
-extern	cvar_t		developer;
+extern	cvar_t<float>			sys_ticrate;
+extern	cvar_t<float>			sys_nostdout;
+extern	cvar_t<float>			developer;
 
 extern	qboolean	host_initialized;		// true if into command execution
 extern	idTime		host_frametime;
@@ -354,7 +356,7 @@ extern int			minimum_memory;
 //
 // chase
 //
-extern	cvar_t	chase_active;
+extern	cvar_t<float>		chase_active;
 
 void Chase_Init (void);
 void Chase_Reset (void);

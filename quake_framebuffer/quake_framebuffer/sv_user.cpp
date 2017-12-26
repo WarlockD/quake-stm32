@@ -22,9 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 edict_t	*sv_player;
 
-extern	cvar_t	sv_friction;
-cvar_t	sv_edgefriction = {"edgefriction", "2"};
-extern	cvar_t	sv_stopspeed;
+extern	cvar_t<float>	sv_friction;
+cvar_t<float> sv_edgefriction = { 2.0f} ;
+extern	cvar_t<float>	sv_stopspeed;
 
 static	vec3_t		forward, right, up;
 
@@ -40,7 +40,7 @@ qboolean	onground;
 
 usercmd_t	cmd;
 
-cvar_t	sv_idealpitchscale = {"sv_idealpitchscale","0.8"};
+cvar_t<float> sv_idealpitchscale = { 0.8f} ;
 
 
 /*
@@ -166,8 +166,8 @@ void SV_UserFriction (void)
 SV_Accelerate
 ==============
 */
-cvar_t	sv_maxspeed = {"sv_maxspeed", "320", false, true};
-cvar_t	sv_accelerate = {"sv_accelerate", "10"};
+cvar_t<float> sv_maxspeed = { 320.0f, false, true} ;
+cvar_t<float> sv_accelerate = { 10.0f} ;
 #if 0
 void SV_Accelerate (vec3_t wishvel)
 {

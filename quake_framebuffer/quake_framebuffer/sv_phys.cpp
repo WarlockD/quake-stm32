@@ -38,11 +38,11 @@ solid_edge items only clip against bsp models.
 
 */
 
-cvar_t	sv_friction = {"sv_friction","4",false,true};
-cvar_t	sv_stopspeed = {"sv_stopspeed","100"};
-cvar_t	sv_gravity = {"sv_gravity","800",false,true};
-cvar_t	sv_maxvelocity = {"sv_maxvelocity","2000"};
-cvar_t	sv_nostep = {"sv_nostep","0"};
+cvar_t<float> sv_friction = { 4.0f,false,true} ;
+cvar_t<float> sv_stopspeed = { 100.0f} ;
+cvar_t<float> sv_gravity = { 800.0f,false,true} ;
+cvar_t<float> sv_maxvelocity = { 2000.0f} ;
+cvar_t<float> sv_nostep = { 0.0f} ;
 
 #ifdef QUAKE2
 static	vec3_t	vec_origin = {0.0, 0.0, 0.0};
@@ -952,7 +952,7 @@ void SV_WalkMove (edict_t *ent)
 	if (ent->v.movetype != MOVETYPE_WALK)
 		return;		// gibbed by a trigger
 	
-	if (sv_nostep.value)
+	if (sv_nostep.value!=0.0f)
 		return;
 	
 	if ( (int)sv_player->v.flags & FL_WATERJUMP )

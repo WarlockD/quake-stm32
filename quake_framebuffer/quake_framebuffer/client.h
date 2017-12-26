@@ -235,7 +235,7 @@ struct client_state_t
 	int			gametype;
 
 // refresh related state
-	quake::debug_t<model_t	*> worldmodel;	// cl_entitites[0].model
+	model_t*  worldmodel;	// cl_entitites[0].model
 	efrag_t	*free_efrags;
 	int			num_entities;	// held in cl_entities array
 	int			num_statics;	// held in cl_staticentities array
@@ -263,35 +263,35 @@ namespace quake {
 //
 // cvars
 //
-extern	cvar_t	cl_name;
-extern	cvar_t	cl_color;
+extern	cvar_t<ustl::string>	cl_name;
+extern	cvar_t<float>	cl_color;
 
-extern	cvar_t	cl_upspeed;
-extern	cvar_t	cl_forwardspeed;
-extern	cvar_t	cl_backspeed;
-extern	cvar_t	cl_sidespeed;
+extern	cvar_t<float>		cl_upspeed;
+extern	cvar_t<float>		cl_forwardspeed;
+extern	cvar_t<float>		cl_backspeed;
+extern	cvar_t<float>		cl_sidespeed;
 
-extern	cvar_t	cl_movespeedkey;
+extern	cvar_t<float>		cl_movespeedkey;
 
-extern	cvar_t	cl_yawspeed;
-extern	cvar_t	cl_pitchspeed;
+extern	cvar_t<float>		cl_yawspeed;
+extern	cvar_t<float>		cl_pitchspeed;
 
-extern	cvar_t	cl_anglespeedkey;
+extern	cvar_t<float>		cl_anglespeedkey;
 
-extern	cvar_t	cl_autofire;
+extern	cvar_t<float>		cl_autofire;
 
-extern	cvar_t	cl_shownet;
-extern	cvar_t	cl_nolerp;
+extern	cvar_t<float>		cl_shownet;
+extern	cvar_t<float>		cl_nolerp;
 
-extern	cvar_t	cl_pitchdriftspeed;
-extern	cvar_t	lookspring;
-extern	cvar_t	lookstrafe;
-extern	cvar_t	sensitivity;
+extern	cvar_t<float>		cl_pitchdriftspeed;
+extern	cvar_t<float>	lookspring;
+extern	cvar_t<float>		lookstrafe;
+extern	cvar_t<float>		sensitivity;
 
-extern	cvar_t	m_pitch;
-extern	cvar_t	m_yaw;
-extern	cvar_t	m_forward;
-extern	cvar_t	m_side;
+extern	cvar_t<float>		m_pitch;
+extern	cvar_t<float>		m_yaw;
+extern	cvar_t<float>		m_forward;
+extern	cvar_t<float>		m_side;
 
 
 #define	MAX_TEMP_ENTITIES	64			// lightning bolts, etc

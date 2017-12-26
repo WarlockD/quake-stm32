@@ -206,12 +206,12 @@ struct client_t
 
 //============================================================================
 
-extern	cvar_t	teamplay;
-extern	cvar_t	skill;
-extern	cvar_t	deathmatch;
-extern	cvar_t	coop;
-extern	cvar_t	fraglimit;
-extern	cvar_t	timelimit;
+extern	cvar_t<float>		teamplay;
+extern	cvar_t<float>		skill;
+extern	cvar_t<float>		deathmatch;
+extern	cvar_t<float>		coop;
+extern	cvar_t<float>		fraglimit;
+extern	cvar_t<float>		timelimit;
 
 extern	server_static_t	svs;				// persistant server info
 extern	server_t		sv;					// local server
@@ -247,7 +247,7 @@ void SV_ClientThink (void);
 void SV_AddClientToServer (qsocket_t	*ret);
 
 void SV_ClientPrintf (const char *fmt, ...);
-void SV_BroadcastPrintf (char *fmt, ...);
+void SV_BroadcastPrintf (const char *fmt, ...);
 
 void SV_Physics (void);
 

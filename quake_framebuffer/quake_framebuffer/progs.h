@@ -456,10 +456,10 @@ struct pr_system_t {
 
 
 extern pr_system_t vm;
-value_t edict_t::operator[](ptrdiff_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
-const_value_t edict_t::operator[](ptrdiff_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
-value_t edict_t::operator[](cstring_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
-const_value_t edict_t::operator[](cstring_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
+inline value_t edict_t::operator[](ptrdiff_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
+inline const_value_t edict_t::operator[](ptrdiff_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
+inline value_t edict_t::operator[](cstring_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
+inline const_value_t edict_t::operator[](cstring_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
 
 
 inline cstring_t field_t::name() const {

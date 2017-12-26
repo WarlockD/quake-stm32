@@ -47,7 +47,7 @@ int			con_x;				// offset in current line for next print
 
 static quake::string_buffer con_text;
 
-cvar_t		con_notifytime = {"con_notifytime","3"};		//seconds
+cvar_t<float> con_notifytime = { 3.0f} ;		//seconds
 
 #define	NUM_CON_TIMES 4
 idTime		con_times[NUM_CON_TIMES];	// realtime time the line was generated
@@ -105,7 +105,7 @@ Con_Clear_f
 */
 void Con_Clear_f(cmd_source_t source, const StringArgs& args)
 {
-	if (con_text) con_text.assign(' ', CON_TEXTSIZE);
+	if (!con_text.empty()) con_text.assign(' ', CON_TEXTSIZE);
 	con_backscroll = 0; //johnfitz -- if console is empty, being scrolled up is confusing
 }
 
@@ -220,7 +220,7 @@ void Con_Init (void)
 			temp << COM_GameDir << '/' << t2;
 			unlink (temp.str().c_str());
 	}
-	con_text = quake::string_buffer((char*)Hunk_AllocName(CON_TEXTSIZE, "context"), CON_TEXTSIZE+1);
+	con_text = quake::string_buffer((char*)Hunk_AllocName(CON_TEXTSIZE+1, "context"), CON_TEXTSIZE+1);
 	con_text.assign(' ', CON_TEXTSIZE);
 	//con_text =;
 	//Q_memset (con_text, ' ', CON_TEXTSIZE);
@@ -232,7 +232,7 @@ void Con_Init (void)
 //
 // register our commands
 //
-	Cvar_RegisterVariable (&con_notifytime);
+	Cvar_RegisterVariable("con_notifytime",con_notifytime);
 
 	Cmd_AddCommand ("toggleconsole", Con_ToggleConsole_f);
 	Cmd_AddCommand ("messagemode", Con_MessageMode_f);
@@ -251,9 +251,11 @@ void Con_Linefeed (void)
 {
 	con_x = 0;
 	con_current++;
-	if (con_text) {
-		Q_memset(&con_text[(con_current%con_totallines)*con_linewidth]
-			, ' ', con_linewidth);
+	if (!con_text.empty()) {
+		char* p = con_text.data() + (con_current%con_totallines)*con_linewidth;
+		for (size_t i = 0; i < con_linewidth; i++) {
+			p[i] = ' ';
+		}  
 	}
 
 }
@@ -269,7 +271,7 @@ If no console is visible, the notify window will pop up.
 */
 void Con_Print (const char *txt)
 {
-	if (!con_text) return; // sanity?
+	if (con_text.capacity() == 0) return; // sanity?
 	int		y;
 	int		c, l;
 	static int	cr;
@@ -344,7 +346,7 @@ void Con_Print (const char *txt)
 	}
 }
 void Con_Print(const char *txt, size_t size) {
-	if (!con_text) return; // sanity?
+	if (con_text.capacity()==0) return; // sanity?
 	int		y;
 	int		c, l;
 	static int	cr;

@@ -25,9 +25,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 
-cvar_t	d_subdiv16 = {"d_subdiv16", "1"};
-cvar_t	d_mipcap = {"d_mipcap", "0"};
-cvar_t	d_mipscale = {"d_mipscale", "1"};
+cvar_t<float> d_subdiv16 = { 1.0f} ;
+cvar_t<float> d_mipcap = { 0.0f} ;
+cvar_t<float> d_mipscale = { 1.0f} ;
 
 surfcache_t		*d_initial_rover;
 qboolean		d_roverwrapped;
@@ -51,9 +51,9 @@ void D_Init (void)
 
 	r_skydirect = 1;
 
-	Cvar_RegisterVariable (&d_subdiv16);
-	Cvar_RegisterVariable (&d_mipcap);
-	Cvar_RegisterVariable (&d_mipscale);
+	Cvar_RegisterVariable("d_subdiv16",d_subdiv16);
+	Cvar_RegisterVariable("d_mipcap",d_mipcap);
+	Cvar_RegisterVariable("d_mipscale",d_mipscale);
 
 	r_drawpolys = false;
 	r_worldpolysbacktofront = false;

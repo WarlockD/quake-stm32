@@ -59,42 +59,52 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //using idTime = std::chrono::milliseconds;
 class idTime  {
 public:
-	
 	using time_t = std::chrono::milliseconds;
-	
 	using timef_t = std::chrono::duration<float, std::milli>;
+	static constexpr idTime zero() { return idTime(time_t::zero()); }
+	constexpr inline static time_t cast_from_float(const float f) { return time_t(static_cast<time_t::rep>(f * 1000.0)); }
+	constexpr inline static float cast_to_float(const time_t& t) { return static_cast<float>(t.count()) / 1000.0f; }
 	constexpr idTime() :_time(time_t::zero()) {}
-	constexpr idTime(float f) : _time(std::chrono::duration_cast<time_t>(timef_t(f)*1000.0f)) {}
-	//constexpr idTime(double f) : _time(std::chrono::duration_cast<time_t>(timef_t(static_cast<float>(f))*1000.0f)) {}
-
-	inline static time_t cast_float(float f) { return time_t(time_t::rep(f * 1000.0)); }
-
+	constexpr idTime(float f) : _time(cast_from_float(f)) {}
 	template<typename T, typename R>
 	constexpr idTime(const std::chrono::duration<T, R>& f) : _time(std::chrono::duration_cast<time_t>(f)) {}
+	constexpr const time_t& time() const { return _time; }
 	constexpr time_t::rep  count() const { return _time.count(); }
-	constexpr int seconds() const { return (int)std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
-	
-//	explicit constexpr operator time_t&()  { return _time; }
-//	explicit constexpr operator const time_t&() const { return _time; }
-	explicit constexpr operator float() const { return std::chrono::duration_cast<timef_t>(_time).count() / 1000.0f; }
-	static constexpr idTime zero() { return idTime(); }
-
-	constexpr time_t::rep compare(time_t t) const { return _time.count() - t.count(); }
-	constexpr time_t::rep compare(const idTime& t) const { return _time.count() - t.count(); }
-	constexpr time_t::rep compare(float f) const { return compare(cast_float(f)); }
+	constexpr auto seconds() const { return std::chrono::duration_cast<std::chrono::seconds>(_time).count(); }
 
 
-	idTime& operator+=(const idTime& other) { _time += other._time; return *this; }
-	idTime& operator+=(time_t other) { _time += other; return *this; }
-	idTime& operator+=(float other) { _time += cast_float(other); return *this; }
+	explicit constexpr operator float() const { return cast_to_float(_time); }
 
-	idTime& operator-=(const idTime& other) { _time -= other._time; return *this; }
-	idTime& operator-=(time_t other) { _time -= other; return *this; }
-	idTime& operator-=(float other) { _time -= cast_float(other); return *this; }
+	template<typename T>
+	constexpr time_t::rep  compare(const T& other) const {
+		static_assert(std::is_constructible<idTime, decltype(other)>::value, "Wrong type?");
+		return _time.count() - idTime(other).count();
+	}
+	template<typename T>
+	idTime& operator+=(const T& other) {
+		static_assert(std::is_constructible<idTime, decltype(other)>::value, "Wrong type?");
+		_time += idTime(other).time(); 
+		return *this; 
+	}
+	template<typename T>
+	idTime& operator-=(const T& other) {
+		static_assert(std::is_constructible<idTime, decltype(other)>::value, "Wrong type?");
+		_time -= idTime(other).time();
+		return *this;
+	}
 
 private:
 	time_t _time;
 };
+
+static inline std::ostream& operator<<(std::ostream& os, const idTime& s) {
+	//os << std::right << (s.count() / 1000) << '.' << std::setfill('0') << std::setw(4) << std::abs(s.count() % 1000);
+	auto pre = os.precision();
+	os.precision(4);
+	os << idTime::cast_to_float(s.time());
+	os.precision(pre);
+	return os;
+}
 constexpr static inline bool operator==(const idTime& s1, const idTime&  s2) { return s1.compare(s2) == 0; }
 constexpr static inline bool operator!=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) != 0; }
 constexpr static inline bool operator<(const idTime& s1, const idTime&  s2) { return s1.compare(s2) < 0; }
@@ -102,17 +112,9 @@ constexpr static inline bool operator>(const idTime& s1, const idTime&  s2) { re
 constexpr static inline bool operator<=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) <= 0; }
 constexpr static inline bool operator>=(const idTime& s1, const idTime&  s2) { return s1.compare(s2) >= 0; }
 
-constexpr static inline idTime operator+(const idTime& s1, const idTime& s2) { return idTime(s1.count() + s2.count());  }
-constexpr static inline idTime operator+(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) + s2.count()); }
-constexpr static inline idTime operator+(const idTime& s1, float s2) { return idTime(s1.count() + idTime::cast_float(s2)); }
-
-constexpr static inline idTime operator-(const idTime& s1, const idTime& s2) { return idTime(s1.count() - s2.count()); }
-constexpr static inline idTime operator-(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) - s2.count()); }
-constexpr static inline idTime operator-(const idTime& s1, float s2) { return idTime(s1.count() - idTime::cast_float(s2)); }
-
-constexpr static inline idTime operator*(const idTime& s1, const idTime& s2) { return idTime(s1.count() * s2.count()); }
-constexpr static inline idTime operator*(float s1, const idTime& s2) { return idTime(idTime::cast_float(s1) * s2.count()); }
-constexpr static inline idTime operator*(const idTime& s1, float s2) { return idTime(s1.count() * idTime::cast_float(s2)); }
+constexpr static inline idTime operator+(const idTime& s1, const idTime& s2) { return idTime(s1.time() + s2.time());  }
+constexpr static inline idTime operator-(const idTime& s1, const idTime& s2) { return idTime(s1.time() - s2.time()); }
+constexpr static inline idTime operator*(const idTime& s1, const idTime& s2) { return idTime(s1.time() * s2.time()); }
 
 
 
@@ -124,675 +126,30 @@ typedef uint8_t 		byte;
 using qboolean = bool;
 
 
-namespace util {
-
-
-	// functions that have all the stuff that a string_view has but we can give to anyuone
-	//https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
-	// base class to make something into an array
-	template<typename BASE, typename T>
-	class data_helper {
-	public:
-		using base_type = BASE;
-		using value_type = T;
-		using pointer = value_type*;
-		using reference = value_type&;
-		using const_pointer = const value_type*;
-		using const_reference = const value_type&;
-		using iterator = pointer;
-		using const_iterator = const_pointer;
-		using reverse_iterator = ::std::reverse_iterator<iterator>;
-		using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
-		using difference_type = ptrdiff_t;
-		using size_type = size_t;
-
-		constexpr inline const_pointer data() const { return static_cast<const base_type*>(this)->data(); }
-		constexpr inline size_t size() const { return static_cast<const base_type*>(this)->size(); }
-		constexpr inline const_iterator begin() const noexcept { return data(); }
-		constexpr inline const_iterator end() const noexcept { return data() + size(); }
-		constexpr inline const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
-		constexpr inline const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
-
-		constexpr inline const_reference back() const noexcept { return *begin(); }
-		constexpr inline const_reference front() const noexcept { return *(end() - 1); }
-		constexpr inline bool empty() const noexcept { return size() == 0; }
-		inline operator bool() const noexcept { return !empty(); }
-		constexpr inline const_reference operator[](size_t i) const { return data()[i]; }
-		constexpr inline const_reference at(size_t i) const { return data()[i]; }
-		constexpr inline const_iterator	iat(size_type i) const { return begin() + i; }
-		constexpr data_helper() {}
-	};
-
-	template<typename BASE, typename T>
-	class data_builder : public data_helper<BASE, T> {
-	public:
-		using base_type = BASE;
-		using value_type = T;
-		using pointer = value_type*;
-		using reference = value_type&;
-		using const_pointer = const value_type*;
-		using const_reference = const value_type&;
-		using iterator = pointer;
-		using const_iterator = const_pointer;
-		using reverse_iterator = ::std::reverse_iterator<iterator>;
-		using const_reverse_iterator = ::std::reverse_iterator<const_iterator>;
-		using difference_type = ptrdiff_t;
-		using size_type = size_t;
-		using helper = data_helper<BASE, T>;
-		// const interface
-		constexpr inline const_pointer data() const { return  helper::data(); }
-		constexpr inline size_t size() const { return helper::size(); }
-
-		constexpr inline const_iterator begin() const noexcept { return helper::data(); }
-		constexpr inline const_iterator end() const noexcept { return helper::end(); }
-		constexpr inline const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
-		constexpr inline const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
-
-		constexpr inline const_reference back() const noexcept { return *begin(); }
-		constexpr inline const_reference front() const noexcept { return *(end() - 1); }
-		constexpr inline bool empty() const noexcept { return size() == 0; }
-		inline operator bool() const noexcept { return !empty(); }
-		constexpr inline const_reference operator[](size_t i) const { return data()[i]; }
-		constexpr inline const_reference at(size_t i) const { return data()[i]; }
-		constexpr inline const_iterator	iat(size_type i) const { return begin() + i; }
-
-		// non const interface
-		constexpr inline size_t capacity() const { return static_cast<const base_type*>(this)->capacity(); }
-		constexpr inline size_t max_size() const { return static_cast<const base_type*>(this)->max_size(); }
-
-		constexpr inline void reserve(size_t s) { static_cast<base_type*>(this)->reserve(s); }
-		constexpr inline void resize(size_t s) {
-			if (capacity() < s) reserve(s);
-			static_cast<base_type*>(this)->resize(s);
-		}
-
-		constexpr inline pointer data() { return static_cast<base_type*>(this)->data(); }
-		constexpr inline iterator begin() { return data(); }
-		constexpr inline iterator end() { return data() + length(); }
-		constexpr inline reverse_iterator rbegin()  noexcept { return reverse_iterator(begin()); }
-		constexpr inline reverse_iterator rend()  noexcept { return reverse_iterator(end()); }
-
-		constexpr inline reference back() noexcept { return *begin(); }
-		constexpr inline reference front() noexcept { return *(end() - 1); }
-		constexpr inline reference operator[](size_type i) { return data()[i]; }
-		constexpr inline reference at(size_type i) { return data()[i]; }
-		constexpr inline iterator iat(size_type i) { return begin() + i; } // helper, index of iterator
-	private:
-		// makes space for insert and erases
-		inline void insert_space(const_iterator cstart, size_type n)
-		{
-			assert(data() || !n);
-			assert(cmemlink::begin() || !n);
-			assert(cstart >= begin() && cstart + n <= end());
-			iterator start = const_cast<iterator>(cstart);
-			std::rotate(start, end() - n, end());
-		}
-
-		/// Shifts the data in the linked block from \p start + \p n to \p start.
-		/// The contents of the uncovered bytes is undefined.
-		inline void erase_hole(const_iterator cstart, size_type n)
-		{
-			assert(data() || !n);
-			assert(cmemlink::begin() || !n);
-			assert(cstart >= begin() && cstart + n <= end());
-			iterator start = const_cast<iterator>(cstart);
-			std::rotate(start, start + n, end());
-		}
-
-		iterator append_hole(size_type n) { resize(_data.size() + n); return end() - n; }
-		void clear(std::true_type) { resize(0); }
-		void clear(std::false_type) {
-			for (auto a : *this) std::destroy_at(&a);
-			resize(0);
-		}
-		/// Shifts the data in the linked block from \p start to \p start + \p n.
-		iterator insert_hole(const_iterator start, size_type n) {
-			const difference_type ip = start - begin();
-			assert(ip <= size());
-			resize(size() + n);
-			_insert_hole(iat(ip), n);
-			return iat(ip);
-		}
-		/// Shifts the data in the linked block from \p start to \p start + \p n.
-		iterator erase_hole(const_iterator start, size_type n) {
-			const difference_type ep = start - begin();
-			assert(ep + n <= size());
-			reserve(size() - n);
-			iterator iep = iat(ep);
-			_erase_hole(iep, n);
-			resize(size() - n);
-			return iep;
-		}
-	public:
-		// interface it self
-		void clear() { clear(std::is_trivially_destrutable_t<value_type>{}); }
-
-		void assign(const_iterator i1, const_iterator i2) { assert(i1 <= i2); resize(std::distance(i1, i2)); std::copy(i1, i2, begin()); }
-		void assign(size_type n, const_reference v) { resize(n);   std::fill(begin(), end(), v); }
-		void fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount) noexcept
-		{
-			assert(data() || !elCount || !elSize);
-			assert(cstart >= begin() && cstart + elSize * elCount <= end());
-			iterator start = const_cast<iterator>(cstart);
-			if (elSize == 1)
-				std::fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
-			else while (elCount--)
-				start = std::copy_n(const_iterator(p), elSize, start);
-		}
-
-	};
-	namespace util {
-		enum class Endian { Little, Big };
-		constexpr Endian native_byte_order = Endian::Little;
-		/// Returns the number of bits in the given type
-		template<typename T> static constexpr size_t  BitsInType() { return	sizeof(T) * CHAR_BIT; }
-		template<typename T> static constexpr size_t  BitsInType(T v) { return BitsInType<T>(); }
-
-		/// Indexes into a static array with bounds limit
-		template <typename T, size_t N>
-		inline constexpr T& VectorElement(T(&v)[N], size_t i) { return v[min(i, N - 1)]; }
-
-		/// The alignment performed by default.
-		constexpr static  size_t c_DefaultAlignment = sizeof(void*);
-
-		/// \brief Rounds \p n up to be divisible by \p grain
-		template <typename T> inline constexpr T AlignDown(T n, size_t grain = c_DefaultAlignment) { return n - n % grain; }
-		template <typename T> inline constexpr T Align(T n, size_t grain = c_DefaultAlignment) { return AlignDown(n + grain - 1, grain); }
-
-
-		template <typename T, bool IsSigned> struct __is_negative { inline constexpr bool operator()(const T& v) const { return v < 0; } };
-		template <typename T> struct __is_negative<T, false> { inline constexpr bool operator()(const T&) const { return false; } };
-		template <typename T> inline constexpr bool is_negative(const T& v) { return __is_negative<T, std::numeric_limits<T>::is_signed>()(v); }
-		template <typename T> inline constexpr T absv(T v) { return is_negative(v) ? -v : v; }
-		template <typename T> inline constexpr T sign(T v) { return (0 < v) - is_negative(v); }
-		template <typename T1, typename T2> inline constexpr size_t abs_distance(const T1& i1, const T2& i2) { return absv(std::distance(i1, i2)); }
-		template <typename T> inline constexpr size_t size_of_elements(size_t n, const T*) { return n * sizeof(T); }
-
-		template <typename T> constexpr T gcd(T a, T b) { return b ? gcd(b, a%b) : absv(a); }
-		template <typename T> constexpr T lcm(T a, T b) { return a / gcd(a, b)*b; }
-		constexpr inline uint16_t bswap_16(uint16_t v) { return v << 8 | v >> 8; }
-		constexpr inline uint32_t bswap_32(uint32_t v) { return v << 24 | (v & 0xFF00) << 8 | ((v >> 8) & 0xFF00) | v >> 24; }
-		constexpr inline uint64_t bswap_32(uint64_t v) { return (uint64_t(bswap_32(v)) << 32) | bswap_32(v >> 32); }
-		/// \brief Swaps the byteorder of \p v.
-		template <typename T>
-		inline   T bswap(const T& v)
-		{
-			return T(BitsInType<T>() == 16 ?
-				bswap_16(uint16_t(v)) : BitsInType<T>() == 32 ?
-				bswap_32(uint32_t(v)) : BitsInType<T>() == 64 ?
-				bswap_64(uint64_t(v)) : throw std::invalid_argument(), v); // not sure how this happened
-		}
-		template <typename T> constexpr inline T le_to_native(const T& v) { return native_byte_order == Endian::Little ? v : bswap(v); }
-		template <typename T> constexpr inline T be_to_native(const T& v) { return native_byte_order == Endian::Big ? v : bswap(v); }
-		template <typename T> constexpr inline T native_to_le(const T& v) { return native_byte_order == Endian::Little ? v : bswap(v); }
-		template <typename T>constexpr  inline T native_to_be(const T& v) { return native_byte_order == Endian::Big ? v : bswap(v); }
-
-		template <typename T, size_t N> static constexpr size_t  VectorSize(const T(&v)[N]) { return sizeof(v) / size_of_elements(1, v); }
-		/// Packs \p s multiple times into \p b. Useful for loop unrolling.
-		template <typename TSmall, typename TBig>
-		inline void pack_type(TSmall s, TBig& b)
-		{
-			b = s;
-			for (unsigned h = BitsInType(TSmall); h < BitsInType(TBig); h *= 2)
-				b = (b << h) | b;
-		}
-		/// \brief Divides \p n1 by \p n2 and rounds the result up.
-		/// This is in contrast to regular division, which rounds down.
-		template <typename T1, typename T2>
-		inline T1 DivRU(T1 n1, T2 n2)
-		{
-			T2 adj = n2 - 1;
-			if (is_negative(n1))
-				adj = -adj;
-			return (n1 + adj) / n2;
-		}
-	}
-	template<typename BASE>
-	class string_helper : public data_helper<BASE, char> {
-		static constexpr size_t hasher_seed = 5381;
-		//https ://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
-		static constexpr size_t _hasher(const char* s, size_t hash) {
-			return *s == '\0' ? hash : _hasher(s + 1, ((hash << 5) + hash) + *s); /* hash * 33 + c */
-		}
-		static constexpr size_t _hasher(const char* s, size_t len, size_t hash) {
-			return len == 0 ? hash : _hasher(s + 1, len - 1, ((hash << 5) + hash) + *s); /* hash * 33 + c */
-		}
-	public:
-		using uvalue_type = unsigned char;
-		using pos_type = size_t;
-		static constexpr const char* empty_c_string = "";
-		constexpr string_helper() {}
-
-		static constexpr bool is_empty_string(const char* s) { return s == nullptr || s == empty_c_string; }
-		constexpr static size_type npos = size_type(-1);
-		constexpr const char* c_str() const { return data(); }
-		size_t length() const { return size(); }
-		// some constexpr functions
-		static constexpr bool is_char_number(int c) { return c >= '0' && c <= '9'; }
-		template<size_t N>
-		static constexpr size_t strlen(const char(&s)[N]) { return N - 1; }
-		static constexpr size_t strlen(const char* s) { return *s == '\0' ? 0 : 1 + strlen(s + 1); }
-
-		/// Returns the number of bits in the given type
-		template<typename T> static constexpr size_t  BitsInType() { return	sizeof(T) * CHAR_BIT; }
-		template<typename T> static constexpr size_t  BitsInType(T v) { return BitsInType<T>(); }
-
-
-
-		static constexpr size_t hasher(const char* s) { return _hasher(s, hasher_seed); }
-		static constexpr size_t hasher(const char* s, size_t len) { return _hasher(s, len, hasher_seed); }
-		static constexpr int str_cmp(const char* begin1, const char* end1, const char* begin2, const char* end2) {
-			while (begin1 != end1 && begin2 != end2) {
-				if (*begin1 != *begin2)
-					return static_cast<uint8_t>(*begin1) - static_cast<uint8_t>(*begin2);
-				++begin1; ++begin2;
-			}
-			return 0;
-		}
-		static constexpr int str_casecmp(const char* begin1, const char* end1, const char* begin2, const char* end2) {
-			while (begin1 != end1 && begin2 != end2) {
-				if (::to_lower(*begin1) != ::to_lower(*begin2))
-					return static_cast<uint8_t>(::to_lower(*begin1)) - static_cast<uint8_t>(::to_lower(*begin2));
-				++begin1; ++begin2;
-			}
-			return 0;
-		}
-		static constexpr size_t str_find(const char* begin, const char* end, const char* dbegin, const char* dend) {
-			if (begin < end) {
-				auto  p = std::search(begin, end, dbegin, dend);
-				if (p != end) return std::distance(begin, p);
-			}
-			return npos;
-		}
-
-		static constexpr size_t str_rfind(const char* begin, const char* end, const char* dbegin, const char*dend) {
-			if (begin < end) {
-				auto  p = std::find_end(begin, end, dbegin, dend);
-				if (p != end) return std::distance(begin, p);
-			}
-			return npos;
-		}
-		constexpr size_t hash() const { return hasher(c_str(), size()); }
-		constexpr operator std::string_view() const { return std::string_view(c_str(), size()); }
-
-		constexpr int compare(const char* s, size_t size) const noexcept { return str_cmp(begin(), end(), s, s + size); }
-		constexpr int compare(const char* s) const noexcept { return str_cmp(begin(), end(), s, s + ::strlen(s)); }
-		template<size_t N>
-		constexpr int compare(const char(&s)[N]) const noexcept { return str_cmp(begin(), end(), s, s + N - 1); }
-		template<typename U>
-		constexpr int compare(const string_helper<U>& s) const noexcept { return str_cmp(begin(), end(), s.begin(), s.end()); }
-
-		// search
-
-		inline constexpr size_type find(const std::string_view& what, size_type offset = 0) const { return str_find(begin() + offset, end(), what.begin(), what.end()); }
-		inline constexpr size_type find(char what, size_type offset = 0)  const { return str_find(begin() + offset, end(), &what, &what + 1); }
-		inline constexpr size_type find(const char* what, size_type offset, size_type count) const { return str_find(begin() + offset, end(), what, what + count); }
-		inline constexpr size_type find(const char* what, size_type offset = 0)  const { return find(what, offset, strlen(what)); }
-
-		template<typename U>
-		inline constexpr size_type find(const string_helper<U>& what, size_type offset = 0) const { return str_find(begin() + offset, end(), what.begin(), what.end()); }
-
-		inline constexpr size_type rfind(const std::string_view& what, size_type offset = 0) const { return str_rfind(begin() + offset, end(), what.begin(), what.end()); }
-		inline constexpr size_type rfind(char what, size_type offset = 0)  const { return str_rfind(begin() + offset, end(), &what, &what + 1); }
-		inline constexpr size_type rfind(const char* what, size_type offset = 0)  const { return str_rfind(begin() + offset, end(), what, what + strlen(what)); }
-		inline constexpr size_type rfind(const char* what, size_type offset, size_type count) const { return str_rfind(begin() + offset, end(), what, what + count); }
-		template<typename U>
-		inline constexpr size_type rfind(const string_helper<U>& what, size_type offset = 0) const { return str_rfind(begin() + offset, end(), what.begin(), what.end()); }
-
-		inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const {
-			auto it = std::find_first_of(begin() + pos, end(), p, p + count);
-			return it == end() ? npos : std::distance(begin(), it);
-		}
-		inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const {
-			auto it = std::find_first_of(begin() + pos, end(), p, p + count, [](const char a, const char b) { return a != b; });
-			return it == end() ? npos : std::distance(begin(), it);
-		}
-
-		inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const {
-			auto it = std::find_end(begin() + pos, end(), p, p + count);
-			return it == end() ? npos : std::distance(begin(), it);
-		}
-		inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const {
-			auto it = std::find_end(begin() + pos, end(), p, p + count, [](const char a, const char b) { return a != b; });
-			return it == end() ? npos : std::distance(begin(), it);
-		}
-
-		// just filler, some of these are not very effecent:P
-		inline pos_type		find_first_of(value_type c, pos_type pos = 0) const { return find_first_of(&c, pos, 1); }
-		inline pos_type		find_first_of(uvalue_type c, pos_type pos = 0) const { return find_first_of(value_type(c), pos); }
-		inline pos_type		find_first_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
-
-		inline pos_type		find_first_not_of(value_type c, pos_type pos = 0) const { return find_first_not_of(&c, pos, 1); }
-		inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = 0) const { return find_first_not_of(value_type(c), pos); }
-		inline pos_type		find_first_not_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
-
-		inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { return find_last_of(&c, pos, 1); }
-		inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
-		inline pos_type		find_last_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
-
-		inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { return find_last_not_of(&c, pos, 1); }
-		inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
-		inline pos_type		find_last_not_of(const std::string_view& s, pos_type pos = 0) const noexcept { return find_first_of(s.data(), pos, s.size()); }
-
-		constexpr std::string_view substr(size_type pos = 0, size_type count = npos) const {
-			return (pos > size())
-				? (throw std::out_of_range("data_helpers::split"), std::string_view())
-				: std::string_view(data() + pos, std::min(count, size() - pos));
-		}
-		constexpr bool is_number() const { return !empty() && (is_char_number(at(0)) || ((at(0) == '+' || at(0) == '-') && is_char_number(at(1)))); }
-
-		const_iterator to_number(float& v) const {
-			char* str;
-			v = strtof(data(), &str);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		const_iterator to_number(int32_t& f, int base = 0) const {
-			char* str;
-			v = strtol(data(), &str, base);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		const_iterator to_number(int64_t& f, int base = 0) const {
-			char* str;
-			v = strtoll(data(), &str, base);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		constexpr std::string_view remove_prefix(size_type n) const {
-			return (n > size())
-				? (throw std::out_of_range("data_helpers::remove_prefix"), std::string_view())
-				: std::string_view(data() + n, size() - n);
-		}
-		constexpr std::string_view remove_suffix(size_type n) const {
-			return (n > size())
-				? (throw std::out_of_range("data_helpers::remove_suffix"), std::string_view())
-				: std::string_view(data(), size() - n);
-		}
-
-	};
-
-	template<typename T1> constexpr static inline bool operator==(const string_helper<T1>& l, const char* r) { return l.compare(r) == 0; }
-	template<typename T1> constexpr static inline bool operator==(const char* r, const string_helper<T1>& l) { return l.compare(r) == 0; }
-	template<typename T1> constexpr static inline bool operator!=(const string_helper<T1>& l, const char* r) { return l.compare(r) != 0; }
-	template<typename T1> constexpr static inline bool operator!=(const char* r, const string_helper<T1>& l) { return l.compare(r) != 0; }
-
-
-	template<typename T1, typename T2> constexpr static inline bool operator==(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) == 0; }
-	template<typename T1, typename T2> constexpr static inline bool operator!=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) != 0; }
-	template<typename T1, typename T2> constexpr static inline bool operator<(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) < 0; }
-	template<typename T1, typename T2> constexpr static inline bool operator>(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) > 0; }
-	template<typename T1, typename T2> constexpr static inline bool operator<=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) <= 0; }
-	template<typename T1, typename T2> constexpr static inline bool operator>=(const string_helper<T1>& l, const string_helper<T2>& r) { return l.compare(r) >= 0; }
-
-	template<typename T>
-	static inline std::ostream& operator<<(std::ostream& os, const string_helper<T>& sv) { os.write(sv.data(), sv.size());  return os; }
-
-	template<typename BASE>
-	class string_builder : public string_helper<BASE> {
-	public:
-		using base_type = BASE;
-		using value_type = typename string_helper::value_type;
-		using pointer = typename string_helper::pointer;
-		using reference = typename string_helper::reference;
-		using const_pointer = typename string_helper::const_pointer;
-		using const_reference = typename string_helper::const_reference;
-		using iterator = typename string_helper::iterator;
-		using const_iterator = typename string_helper::const_iterator;
-		using reverse_iterator = typename string_helper::reverse_iterator;
-		using const_reverse_iterator = typename string_helper::const_reverse_iterator;
-		using difference_type = typename string_helper::difference_type;
-		using size_type = typename string_helper::size_type;
-		using helper = string_helper<BASE>;
-		constexpr string_builder() : helper() {}
-		// from type
-		constexpr inline const_pointer data() const { return static_cast<const base_type*>(this)->data(); }
-		constexpr inline size_t size() const { return static_cast<const base_type*>(this)->size(); }
-		// return what the current real size that data() is
-		constexpr inline size_t capacity() const { return static_cast<const base_type*>(this)->capacity(); }
-		// resizes data() for size()
-		// returns the max capacity that data() can ever be
-		constexpr inline size_t max_size() const { return static_cast<const base_type*>(this)->max_size(); }
-		constexpr inline void reserve(size_t s) { static_cast<base_type*>(this)->reserve(s); }
-		constexpr inline void resize(size_t s) {
-			if (capacity() < s) reserve(s);
-			static_cast<base_type*>(this)->resize(s);
-		}
-		// non const interface
-		constexpr inline pointer data() { return static_cast<base_type*>(this)->data(); }
-		constexpr inline iterator begin() { return data(); }
-		constexpr inline iterator end() { return data() + size(); }
-		constexpr inline reverse_iterator rbegin()  noexcept { return reverse_iterator(begin()); }
-		constexpr inline reverse_iterator rend()  noexcept { return reverse_iterator(end()); }
-
-		constexpr inline reference back() noexcept { return *begin(); }
-		constexpr inline reference front() noexcept { return *(end() - 1); }
-		constexpr inline reference operator[](size_type i) { return data()[i]; }
-		constexpr inline reference at(size_type i) { return data()[i]; }
-		constexpr inline iterator iat(size_type i) { return begin() + i; }
-
-
-		iterator append_hole(size_type n) { resize(_data.size() + n); return end() - n; }
-		void clear() { resize(0); if (!is_empty_string(data())) *end() = '\0'; }
-		/// Shifts the data in the linked block from \p start to \p start + \p n.
-		iterator insert_hole(const_iterator cstart, size_type n) {
-			const difference_type ip = cstart - begin();
-			assert(ip <= size());
-			resize(size() + n);
-			iterator start = const_cast<iterator>(iat(ip));
-			std::rotate(start, end() - n, end());
-			*end() = '\0';
-			return iat(ip);
-		}
-		/// Shifts the data in the linked block from \p start to \p start + \p n.
-		iterator erase_hole(const_iterator cstart, size_type n) {
-			const difference_type ep = cstart - begin();
-			assert(ep + n <= size());
-			reserve(size() - n);
-			iterator iep = iat(ep);
-			iterator start = const_cast<iterator>(cstart);
-			std::rotate(start, start + n, end());
-			resize(size() - n);
-			*end() = '\0';
-			return iep;
-		}
-		template<typename ITR1>
-		void assign(const ITR1 i1, const ITR1 i2) {
-			assert(i1 <= i2);
-			resize(std::distance(i1, i2));
-			std::uninitialized_copy(i1, i2, begin());
-			*end() = '\0';
-		}
-		void assign(size_type n, const_reference v) { resize(n);   std::fill(begin(), end(), v); }
-
-		void assign(const std::string_view& str) { assign(str.begin(), str.end()); *end() = '\0'; }
-		inline void assign(const char* str) { assign(std::string_view(str)); }
-		inline void assign(const char* str, size_type len) { assign(std::string_view(str, len)); }
-
-
-
-		iterator insert(const_iterator ip, char c) {
-			iterator d = insert_hole(ip, 1);
-			*d = c;
-			*end() = '\0';
-			return d;
-		}
-
-		iterator erase(const_iterator ep, size_type n) {
-			return erase_hole(const_cast<iterator>(ep), n);
-		}
-		iterator erase(const_iterator ep1, const_iterator ep2) {
-			assert(ep1 <= ep2);
-			const size_type len = sstd::distance(ep1, ep2);
-			if (ep1 > begin())
-				return erase_hole(ep1, len);
-			resize(len);  // simple optimiztion on resize
-			return end();
-		}
-		iterator erase(size_type pos = 0, size_type len = npos) {
-			len = std::min(size() - pos, len);
-			if (pos > 0)
-				return erase(begin() + pos, len);
-			resize(len);  // simple optimiztion on resize
-			return end();
-		}
-
-		void		fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount = 1) noexcept {
-			assert(data() || !elCount || !elSize);
-			assert(cstart >= begin() && cstart + elSize * elCount <= end());
-			iterator start = const_cast<iterator>(cstart);
-			if (elSize == 1)
-				std::fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
-			else while (elCount--)
-				start = std::copy_n(const_iterator(p), elSize, start);
-		}
-		template<typename ITR1, typename ITR2>
-		iterator insert(const_iterator ip, const ITR1& i1, const ITR2& i2) {
-			assert(i1 <= i2);
-			iterator d = insert_hole(ip, std::distance(i1, i2));
-			std::uninitialized_copy(i1, i2, d);
-			return d;
-		}
-		void push_back(char c) {
-			assert((size() + 1) < max_size());
-			iterator d = insert_hole(end(), 1);
-			*d = c;
-		}
-		void pop_back() { if (size() > 0) { resize(size() - 1); *end() = '\0'; } }
-
-		template<typename ITR1, typename ITR2>
-		base_type& append(const ITR1& i1, const ITR2& i2) {
-			assert(i1 <= i2);
-			iterator d = insert_hole(end(), std::distance(i1, i2));
-			std::uninitialized_copy(i1, i2, d);
-			return *static_cast<base_type*>(this);
-		}
-		base_type& append(const_pointer p, size_type s) {
-			iterator d = insert_hole(end(), s);
-			std::uninitialized_copy(p, p + s, d);
-			return *static_cast<base_type*>(this);
-		}
-		base_type& append(const_pointer p) {
-			return append(p, strlen(p));
-		}
-		base_type& append(const std::string_view&  str) {
-			return append(str.begin(), str.end());
-		}
-		template<typename B>
-		base_type& append(const string_helper<B>& str) {
-			return append(str.begin(), str.end());
-		}
-		base_type& append(char c, size_t count = 1U) {
-			reserve(size() + count + 1);
-			std::fill(end(), end() + count, c);
-			resize(size() + count + 1);
-			*end() = '\0';
-			return *static_cast<base_type*>(this);
-		}
-
-		base_type&			replace(const_iterator first, const_iterator last, const_pointer i1, const_pointer i2, size_type n) {
-			assert(first <= last);
-			assert(n || std::distance(first, last));
-			assert(first >= begin() && first <= end() && last >= first && last <= end());
-			assert((i1 < begin() || i1 >= end() || util::abs_distance(i1, i2) * n + size() < capacity()) && "Replacement by self can not autoresize");
-			const size_type bte = std::distance(first, last), bti = std::distance(i1, i2) * n;
-			const_iterator rp = static_cast<const_iterator>(first);
-			if (bti < bte)
-				rp = erase(rp, bte - bti);
-			else if (bte < bti)
-				rp = insert(rp, bti - bte);
-			fill(rp, i1, std::distance(i1, i2), n);
-			*end() = 0;
-			return *static_cast<base_type*>(this);
-		}
-
-		template <typename InputIt>
-		base_type&			replace(const_iterator first, const_iterator last, InputIt first2, InputIt last2) { return replace(first, last, first2, last2, 1); }
-		inline base_type&	replace(const_iterator first, const_iterator last, const std::string_view& s) { return replace(first, last, s.begin(), s.end()); }
-		base_type&			replace(const_iterator first, const_iterator last, const_pointer s)
-		{
-			if (!s) s = "";
-			replace(first, last, s, s + strlen(s));
-			return *static_cast<base_type*>(this);
-		}
-		inline base_type&		replace(const_iterator first, const_iterator last, const_pointer s, size_type slen) { return replace(first, last, s, s + slen); }
-		inline base_type&		replace(const_iterator first, const_iterator last, size_type n, value_type c) { return replace(first, last, &c, &c + 1, n); }
-		inline base_type&		replace(pos_type rp, size_type n, const const std::string_view& s) { return replace(iat(rp), iat(rp + n), s); }
-		inline base_type&		replace(pos_type rp, size_type n, const const std::string_view& s, size_t sp, size_type slen) { return replace(iat(rp), iat(rp + n), s.iat(sp), s.iat(sp + slen)); }
-		inline base_type&		replace(pos_type rp, size_type n, const_pointer s, size_type slen) { return replace(iat(rp), iat(rp + n), s, s + slen); }
-		inline base_type&		replace(pos_type rp, size_type n, const_pointer s) { return replace(iat(rp), iat(rp + n), string(s)); }
-		inline base_type&		replace(pos_type rp, size_type n, size_type count, value_type c) { return replace(iat(rp), iat(rp + n), count, c); }
-
-		template<typename B>
-		base_type& operator+=(const string_helper<B>& str) { return append(str); }
-		base_type& operator+=(char c) { return append(c); }
-		base_type& operator+=(const std::string_view& str) { return append(str); }
-
-
-
-	};
-
-	template<typename T1, typename T2> static inline  string_builder<T1>& operator+(string_builder<T1>& l, const T2& r) { l += r; return l; }
-
-
-};
-
-
 struct string_t;
 
-struct cstring_t : public util::string_helper<cstring_t> {
-private:
-	const char*  _str;
-public:
-	void swap(cstring_t& r) { if (std::addressof(r) != this) std::swap(_str, r._str); }
-	constexpr inline cstring_t() : _str("") {}
-	template<typename T>
-	constexpr inline cstring_t(const util::string_helper<T>& s) : _str(s.c_str()) {}
-	constexpr inline cstring_t(const char* s) : _str(s == nullptr ? "" : s) {}
-
-	constexpr inline const char* data() const { return _str; }
-	constexpr inline size_t size() const { return strlen(_str); }
+struct cstring_t : public ustl::string_helper<ustl::cmemlink, cstring_t> ;
+	using helper_t = ustl::string_helper<ustl::cmemlink, cstring_t>;
+	constexpr inline cstring_t() : helper_t("",0) {}
+	constexpr inline cstring_t(const char* s) : helper_t(s == nullptr ? "" : s) {}
+	template<typename T, typename B>
+	inline string_t(const ustl::string_helper<T, B>& s) : helper_t(s.data(), s.size()) {}
 };
 
-struct string_t : public util::string_helper<string_t> {
-private:
-	const char*  _str;
+struct string_t : public ustl::string_helper<ustl::cmemlink, string_t> {
 public:
+	using helper_t = ustl::string_helper<ustl::cmemlink, string_t>;
 	static  const char* intern(const char* str);
 	static  const char* intern(const char* str,size_t size);
 	static  const char* intern(const std::string_view&  str);
-	constexpr inline const char* data() const { return _str; }
-	constexpr inline size_t size() const { return *reinterpret_cast<const uint16_t*>(_str - sizeof(uint16_t)); }
-	void swap(string_t& r) { if (std::addressof(r) != this) std::swap(_str, r._str); }
-	constexpr inline string_t() : _str("") {}
-	template<typename T>
-	inline string_t(const util::string_helper<T>& s) : _str(intern(s.data(),s.size())) {}
-	inline string_t(const std::string_view&  str) : _str(intern(str)) { }
-	inline string_t(const char*  str) : _str(intern(str)) { }
+	constexpr inline string_t() : helper_t("") {}
+	template<typename T,typename B>
+	inline string_t(const ustl::string_helper<T,B>& s) : helper_t(intern(s.data(),s.size())) {}
+	inline string_t(const std::string_view&  str) : helper_t(intern(str)) { }
+	inline string_t(const char*  str) : helper_t(intern(str)) { }
  	friend class pr_system_t;
 };
 
-// a symbol is a string that is case insentive.  Its still a string_view, but the equal functions are diffrent
-// warning though, this does NOT override the compare functions.  I could make  the main comapre virtual, but 
-// I am trying to hold off on that
-// mabye rewrite this with static inhertenice? humm
-class symbol_t : public util::string_helper<symbol_t> {
-	std::string_view _view;
-public:
-	constexpr inline const char* data() const { return _view.data(); }
-	constexpr inline size_t size() const { return _view.size(); }
-	constexpr inline symbol_t() : _view("",0) {}
-	template<typename T>
-	constexpr inline symbol_t(const util::string_helper<T>& s) : _view(s.c_str(),s.length()) {}
-	constexpr inline symbol_t(const char* s) : _view(s == nullptr ? "" : s) {}
-};
-template<typename T>
-constexpr static bool operator==(const symbol_t& l, const util::string_helper<T>& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) == 0; }
-template<typename T>
-constexpr static bool operator!=(const symbol_t& l, const  util::string_helper<T>& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) != 0; }
-template<typename T>
-constexpr static bool operator==(const util::string_helper<T>& l, const symbol_t&r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) == 0; }
-template<typename T>
-constexpr static bool operator!=(const util::string_helper<T>&l, const symbol_t& r) { return symbol_t::str_casecmp(l.begin(), r.end(), r.begin(), r.end()) != 0; }
-
-static inline std::ostream& operator<<(std::ostream& os, const symbol_t& sv) { for (char c : sv) os << ::tolower(c); return os; }
 
 namespace std {
 	template<>
@@ -1238,7 +595,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		}
 		void reserve(size_type n) { (void)n; assert(n < _capacity); } // don't have to do anything
 
-		constexpr string_buffer() : _size(0), _capacity(0), _buffer(nullptr) {  }
+		constexpr string_buffer() : _size(0), _capacity(0), _buffer("") {  }
 		constexpr string_buffer(pointer buffer, size_type capacity) : _size(0), _capacity(capacity), _buffer(buffer) { _buffer[0] = 0; }
 		constexpr string_buffer(pointer buffer, size_type capacity, size_type size) : _size(size), _capacity(capacity), _buffer(buffer) { _buffer[size] = 0; }
 	};
@@ -2382,7 +1739,9 @@ bool Q_strncasecmp(cstring_t a, cstring_t b);
 int	Q_atoi (const char * str);
 float Q_atof (const char * str);
 int	Q_atoi(cstring_t str);
+int	Q_atoi(const std::string_view& str);
 float Q_atof(cstring_t str);
+float	Q_atof(const std::string_view& str);
 
 int Q_vsprintf(char* buffer, const char* fmt, va_list va);
 int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...);
@@ -2496,67 +1855,32 @@ namespace quake {
 void COM_Init (const char *path); // path not used?
 
 
-
-
-inline  std::pair<size_t, size_t> COM_FindFileBasePos(const std::string_view in) {
-#if 0
-	size_t slash =  in.size() - 1;
-	for (; slash > 0U && (in[slash] != '/' || in[slash] != '\\'); --slash);
-	size_t dot = slash;
-	for (; dot < in.size() && in[dot] != '.'; ++dot);
-	return std::make_pair(slash, dot == in.size() ? std::string_view::npos : dot);
-#else
-	auto slash = in.find_last_of("/\\");
-	if (slash == std::string_view::npos) slash = 0U;
-	auto dot = in.find_first_of('.', slash);
-	return std::make_pair(slash, dot);
-#endif
-}
 inline std::string_view COM_SkipPath(const std::string_view & in) {
-	auto pos = COM_FindFileBasePos(in);
-	return std::string_view(in.data() + pos.first, in.size()-pos.first);
+	auto slash = in.find_last_of("/\\");
+	return slash != std::string_view::npos ? in.substr(slash) : in;
 }
+inline std::string_view  COM_StripExtension(const std::string_view & in) {
+	auto dot = in.find_last_of('.');
+	return in.find_first_of("\\/", dot) != std::string_view::npos ? in : in.substr(0, dot);
+}
+
 inline  std::string_view  COM_FileExtension(const std::string_view in) {
-	auto pos = COM_FindFileBasePos(in);
-	if (pos.second != std::string_view::npos)
-		return std::string_view(in.data() + pos.second, in.size() - pos.second);
-	else
-		return std::string_view();
+	auto dot= in.find_last_of('.');
+	return in.find_first_of("\\/", dot) != std::string_view::npos ? in.substr(dot + 1) : std::string_view();
 }
 
-inline std::string_view  COM_StripExtension(const std::string_view & in)
-{
-	auto pos = COM_FindFileBasePos(in);
-	if (pos.second != std::string_view::npos)
-		return std::string_view(in.data() + pos.first, in.size() - pos.first - pos.second);
-	else
-		return in;
-}
-inline std::string_view  COM_FileBase(const std::string_view & in)
-{
-	auto pos = COM_FindFileBasePos(in);
-	std::string_view out(in.data()+ pos.first+1, in.size()-pos.first);
-	if (pos.second != std::string_view::npos)
-		out.remove_suffix(out.size() - pos.second);
-	return out;
+
+inline std::string_view  COM_FileBase(const std::string_view & in) {
+	auto slash = in.find_last_of("/\\");
+	auto strip = in.substr(slash == std::string_view::npos ? 0 : slash + 1);
+	return strip.substr(0, strip.find_last_of('.'));
 }
 
-template<typename C, typename CT, typename CA>
-inline void COM_DefaultExtension(std::basic_string<C,CT,CA>& path, cstring_t  extension) {
-	auto pos = COM_FindFileBasePos(path);
-	if (pos.second == priv::npos) {
-		path += '.';
-		path += extension;
-	}
-}
-template<size_t SIZE>
-inline void COM_DefaultExtension(quake::fixed_string<SIZE>& path, cstring_t  extension) {
-	auto pos = COM_FindFileBasePos(path);
-	if (pos.second == std::string_view::npos) {
-		if(extension[0] != '.')		path += '.';
-
-		path += extension;
-	}
+template<typename STRING_T>
+inline void COM_DefaultExtension(STRING_T& path, const std::string_view &extension) {
+	auto dot = path.find_last_of('.');
+	if (dot == STRING_T::npos)
+		path.append('.').append(extension);
 }
 
 // great info here, helps alot on this

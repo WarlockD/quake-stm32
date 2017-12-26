@@ -332,7 +332,7 @@ the given string.  Single ascii characters return themselves, while
 the K_* names are matched up.
 ===================
 */
-int Key_StringToKeynum (cstring_t str)
+int Key_StringToKeynum (const std::string_view& str)
 {
 	keyname_t	*kn;
 	
