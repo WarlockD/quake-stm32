@@ -398,3 +398,39 @@ struct common_type<T, U, V...>
 } // namespace ustl
 #endif // HAVE_CPP11
 #endif
+
+namespace  ustl {
+	
+	template <size_t Size, size_t Grain> struct aligned_storage { struct type { alignas(Grain) unsigned char _data[Size]; }; };
+/// Defines a has_member_function_name template where has_member_function_name<O>::value is true when O::name exists
+/// Example: HAS_MEMBER_FUNCTION(read, void (O::*)(istream&)); has_member_function_read<vector<int>>::value == true
+#define HAS_MEMBER_FUNCTION(name, signature)	\
+		template <typename T>				\
+		class __has_member_function_##name {		\
+			template <typename O, signature> struct test_for_##name {};\
+			template <typename O> static true_type found (test_for_##name<O,&O::name>*);\
+			template <typename O> static false_type found (...);\
+		public:						\
+			using type = decltype(found<T>(nullptr));	\
+		};						\
+		template <typename T>				\
+		struct has_member_function_##name : public __has_member_function_##name<T>::type {}
+
+/// Defines a has_static_member_variable template where has_static_member_variable_name<O>::value is true when O::name exists
+/// Example: HAS_STATIC_MEMBER_VARIABLE(int, _val); has_static_member_variable__val<A>::value == true
+#define HAS_STATIC_MEMBER_VARIABLE(varT,name)	\
+		template <typename T>				\
+		class __has_static_member_variable_##name {	\
+			template <typename O, add_pointer_t<decay_t<varT>> V> struct test_for_##name {};\
+			template <typename O> static true_type found (test_for_##name<O,&O::name>*);\
+			template <typename O> static false_type found (...);\
+		public:						\
+			using type = decltype(found<T>(nullptr));	\
+		};						\
+		template <typename T>				\
+		struct has_static_member_variable_##name : public __has_static_member_variable_##name<T>::type {}
+
+
+
+
+}

@@ -47,13 +47,13 @@ namespace ustl {
 	{
 		if (_capacity < newSize + minimumFreeCapacity())
 			reserve(newSize, bExact);
-		memlink::resize(newSize);
+		_data.resize(newSize);
 	}
 
 	/// Frees internal data.
 	void memblock::deallocate(void) noexcept {
 		if (_capacity) {
-			assert(cdata() && "Internal error: space allocated, but the pointer is nullptr");
+			assert(data() && "Internal error: space allocated, but the pointer is nullptr");
 			assert(data() && "Internal error: read-only block is marked as allocated space");
 			_memory_resource->deallocate(data(), _capacity);
 		}
@@ -66,7 +66,7 @@ namespace ustl {
 	{
 		assert(p || !n);
 		assert(!_capacity && "Already managing something. deallocate or unlink first.");
-		link(p, n);
+		_data.relink(p, n);
 		_capacity = n;
 	}
 
@@ -79,7 +79,7 @@ namespace ustl {
 	/// Copies data from \p p, \p n.
 	void memblock::assign(const void* p, size_type n)
 	{
-		assert((p != (const void*)cdata() || size() == n) && "Self-assignment can not resize");
+		assert((p != (const void*)data() || size() == n) && "Self-assignment can not resize");
 		resize(n);
 		copy_n(const_pointer(p), n, begin());
 	}
@@ -106,9 +106,9 @@ namespace ustl {
 		pointer newBlock = (pointer)_memory_resource->reallocate(oldBlock, newSize);
 		if (!newBlock)
 			throw bad_alloc(newSize);
-		if (!oldBlock & (cdata() != nullptr))
-			copy_n(cdata(), min(size() + 1, newSize), newBlock);
-		link(newBlock, size());
+		if (!oldBlock & (data() != nullptr))
+			copy_n(data(), min(size() + 1, newSize), newBlock);
+		base_t::link(newBlock, size());
 		_capacity = newSize;
 	}
 
@@ -142,14 +142,14 @@ namespace ustl {
 		reserve(size());	// copy-on-write
 		iterator iep = iat(ep);
 		memlink::erase(iep, n);
-		memlink::resize(size() - n);
+		resize(size() - n);
 		return iep;
 	}
 
 	/// Reads the object from stream \p s
 	void memblock::read(istream& is)
 	{
-		written_size_type n = 0;
+		uint32_t n = 0;
 		is >> n;
 		if (!is.verify_remaining("read", "ustl::memblock", n))
 			return;

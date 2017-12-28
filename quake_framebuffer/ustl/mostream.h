@@ -89,7 +89,6 @@ public:
     inline void		seekp (off_t p, seekdir d = beg);
     inline off_t	tellp (void) const		{ return pos(); }
 protected:
-	virtual void	_unlink() noexcept override { memlink::unlink(); _pos = 0; }
     inline void		SetPos (uoff_t newPos)		{ _pos = newPos; }
 private:
     streamoff		_pos;	///< Current write position.

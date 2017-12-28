@@ -79,10 +79,10 @@ namespace ustl {
 		explicit		istream(const ostream& source) noexcept;
 		inline iterator	end(void) const { return cmemlink::end(); }
 		inline void		link(const void* p, streamsize n) { cmemlink::link(p, n); }
-		inline void		link(const cmemlink& l) { cmemlink::link(l.cdata(), l.readable_size()); }
+		inline void		link(const cmemlink& l) { cmemlink::link(l.data(), l.size()); }
 		inline void		link(const void* f, const void* l) { cmemlink::link(f, l); }
 		inline void		relink(const void* p, streamsize n) { cmemlink::relink(p, n); _pos = 0; }
-		inline void		relink(const cmemlink& l) { relink(l.cdata(), l.readable_size()); }
+		inline void		relink(const cmemlink& l) { relink(l.data(), l.size()); }
 		
 		virtual streamsize	underflow(streamsize = 1);
 		inline uoff_t	pos(void) const { return _pos; }

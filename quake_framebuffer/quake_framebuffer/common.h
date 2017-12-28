@@ -128,25 +128,19 @@ using qboolean = bool;
 
 struct string_t;
 
-struct cstring_t : public ustl::string_helper<ustl::cmemlink, cstring_t> ;
-	using helper_t = ustl::string_helper<ustl::cmemlink, cstring_t>;
-	constexpr inline cstring_t() : helper_t("",0) {}
-	constexpr inline cstring_t(const char* s) : helper_t(s == nullptr ? "" : s) {}
-	template<typename T, typename B>
-	inline string_t(const ustl::string_helper<T, B>& s) : helper_t(s.data(), s.size()) {}
-};
+using cstring_t = ustl::cstring;
 
-struct string_t : public ustl::string_helper<ustl::cmemlink, string_t> {
+
+struct string_t : public ustl::cstring {
 public:
-	using helper_t = ustl::string_helper<ustl::cmemlink, string_t>;
 	static  const char* intern(const char* str);
 	static  const char* intern(const char* str,size_t size);
 	static  const char* intern(const std::string_view&  str);
-	constexpr inline string_t() : helper_t("") {}
-	template<typename T,typename B>
-	inline string_t(const ustl::string_helper<T,B>& s) : helper_t(intern(s.data(),s.size())) {}
-	inline string_t(const std::string_view&  str) : helper_t(intern(str)) { }
-	inline string_t(const char*  str) : helper_t(intern(str)) { }
+	constexpr inline string_t() : ustl::cstring() {}
+	template<typename T>
+	inline string_t(const ustl::string_helper<T>& s) : ustl::cstring(intern(s.data(),s.size())) {}
+	inline string_t(const std::string_view&  str) : ustl::cstring(intern(str)) { }
+	inline string_t(const char*  str) : ustl::cstring(intern(str)) { }
  	friend class pr_system_t;
 };
 
@@ -154,15 +148,11 @@ public:
 namespace std {
 	template<>
 	struct hash<cstring_t> {
-		inline constexpr size_t operator()(const cstring_t& s) const { return s.hash(); }
+		inline constexpr size_t operator()(const cstring_t& s) const { return ustl::util::str_hash(s.begin(), s.end()); }
 	};
 	template<>
 	struct hash<string_t> {
-		inline constexpr size_t operator()(const string_t& s) const { return s.hash(); }
-	};
-	template<>
-	struct hash<symbol_t> {
-		inline constexpr  size_t  operator()(const symbol_t& s) const { return s.hash(); }
+		inline constexpr size_t operator()(const string_t& s) const { return ustl::util::str_hash(s.begin(), s.end()); }
 	};
 }
 
@@ -574,13 +564,9 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 	// fixed buffer string
 	template<size_t SIZE> class fixed_string_stream;
 
-	class string_buffer : public util::string_builder<string_buffer> {
-	protected:
-		pointer _buffer;
-		size_t _capacity;
-		size_t _size;
+	class string_buffer : public ustl::string_helper<ustl::memlink> {
 	public:
-		using builder = util::string_builder<string_buffer>;
+		using builder = ustl::string_helper<string_buffer>;
 		constexpr size_type capacity() const { return _capacity; }
 		const_pointer data() const { return _buffer; }
 		pointer data() { return _buffer; }

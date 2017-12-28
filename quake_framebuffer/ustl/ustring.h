@@ -19,33 +19,177 @@ namespace ustl {
 
 		hashvalue_t str_hash(const char* first, const char* last) noexcept; // static
 		int str_compare(const char* first1, const char* last1, const char* first2, const char* last2) noexcept;
-		pos_type str_find(const cmemlink&  hay,  char c, pos_type pos = 0U)  noexcept;
-		pos_type str_find(const cmemlink&  hay, const cmemlink&  needle, pos_type pos=0U) noexcept;
-		inline pos_type	str_find(const cmemlink&  hay, unsigned char c, pos_type pos = 0)  noexcept { return str_find(hay, char(c), pos); }
-		inline pos_type	str_find(const cmemlink&  hay, const char* p, pos_type pos) { return str_find(hay, cmemlink(p, ::strlen(p)), pos); }
-		inline pos_type	str_find(const cmemlink&  hay, const char* p, pos_type pos, size_type count)  { return str_find(hay, cmemlink(p, count), pos); }
+		pos_type str_find(const cdata_t&  hay, char c, pos_type pos = 0U)  noexcept;
+		pos_type str_find(const cdata_t&  hay, const cdata_t&  needle, pos_type pos = 0U) noexcept;
+		inline pos_type	str_find(const cdata_t&  hay, unsigned char c, pos_type pos = 0)  noexcept { return str_find(hay, char(c), pos); }
+		inline pos_type	str_find(const cdata_t&  hay, const char* p, pos_type pos) { return str_find(hay, cdata_t(p, ::strlen(p)), pos); }
+		inline pos_type	str_find(const cdata_t&  hay, const char* p, pos_type pos, size_type count) { return str_find(hay, cdata_t(p, count), pos); }
 
 
-		pos_type str_rfind(const cmemlink&  hay, char c, pos_type pos= npos)  noexcept;
-		pos_type str_rfind(const cmemlink&  hay, const cmemlink& s, pos_type pos = npos)  noexcept;
-		inline pos_type	str_rfind(const cmemlink&  hay, const char* p, pos_type pos) { return str_rfind(hay, cmemlink(p, ::strlen(p)), pos); }
-		inline pos_type	str_rfind(const cmemlink&  hay, const char* p, pos_type pos, size_type count) { return str_rfind(hay, cmemlink(p, count), pos); }
+		pos_type str_rfind(const cdata_t&  hay, char c, pos_type pos = npos)  noexcept;
+		pos_type str_rfind(const cdata_t&  hay, const cdata_t& s, pos_type pos = npos)  noexcept;
+		inline pos_type	str_rfind(const cdata_t&  hay, const char* p, pos_type pos) { return str_rfind(hay, cdata_t(p, ::strlen(p)), pos); }
+		inline pos_type	str_rfind(const cdata_t&  hay, const char* p, pos_type pos, size_type count) { return str_rfind(hay, cdata_t(p, count), pos); }
 
-		pos_type str_find_first_of(const cmemlink&  hay, const cmemlink& s, pos_type pos = 0U)  noexcept;
-		pos_type str_find_last_of(const cmemlink&  hay, const cmemlink& s, pos_type pos = npos)  noexcept;
-		pos_type str_find_last_not_of(const cmemlink&  hay, const cmemlink& s, pos_type pos = npos)  noexcept;
-		pos_type str_find_first_not_of(const cmemlink&  hay, const cmemlink& s, pos_type pos = 0U)  noexcept;
+		pos_type str_find_first_of(const cdata_t&  hay, const cdata_t& s, pos_type pos = 0U)  noexcept;
+		pos_type str_find_last_of(const cdata_t&  hay, const cdata_t& s, pos_type pos = npos)  noexcept;
+		pos_type str_find_last_not_of(const cdata_t&  hay, const cdata_t& s, pos_type pos = npos)  noexcept;
+		pos_type str_find_first_not_of(const cdata_t&  hay, const cdata_t& s, pos_type pos = 0U)  noexcept;
 	}
 
 	// string helper gives a class bare bones stuff so we can do things like
 	// string search and make a simple string view class
-
-
-	template<typename LINK>
-	class string_helper: public LINK {
-	protected:
-		using link_type = LINK;
+	template<typename BASE>
+	class string_functions {
 	public:
+		using traits = link_traits<char, false, false>;
+		using value_type = typename traits::value_type;
+		using pointer = typename traits::pointer;
+		using const_pointer = typename traits::const_pointer;
+		using reference = typename traits::reference;
+		using const_reference = typename traits::const_reference;
+		using size_type = typename traits::size_type;
+		using difference_type = typename traits::difference_type;
+		using const_iterator = typename traits::const_iterator;
+		using iterator = typename traits::iterator;
+		using pos_type = size_type;
+		using uvalue_type = unsigned char;
+	private:
+
+		inline const BASE& base() const { return *static_cast<const BASE*>(this); }
+		inline const_pointer data() const { return base().data(); }
+		inline size_type size() const { return base().size(); }
+		inline const_iterator begin() const { return data(); }
+		inline const_iterator end() const { return data() + size(); }
+		inline const_iterator iat(pos_type pos) const { return begin() + std::min(size_type(pos), size()); }
+	public:
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, int>
+			inline	compare(const L& s) const {
+			return util::str_compare(data(), data() + size(), s.data(), s.data() + s.size());
+		}
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, int>
+			inline compare(pos_type start, size_type len, const L& s) const {
+			return util::str_compare(iat(start), iat(start + len), s.data(), s.data() + s.size());
+		}
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, int>
+			inline icompare(pos_type s1, size_type l1, const L&  s, pos_type s2, size_type l2) const {
+			return util::str_compare(iat(s1), iat(s1 + l1), s.data() + std::min(size_type(s2), s.size()), s.data() + std::min(size_type(l2), s.size()));
+		}
+		inline int			compare(const_pointer s) const { return util::str_compare(begin(), end(), s, s + ::strlen(s)); }
+		inline int			compare(pos_type s1, size_type l1, const_pointer s, size_type l2) const { return util::str_compare(iat(s1), LINK::iat(s1 + l1), s, s + l2); }
+		inline int			compare(pos_type s1, size_type l1, const_pointer s) const { return compare(s1, l1, s, ::strlen(s)); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, bool>
+			inline 				operator== (const L& s) const { return size() == s.size() && (data() == s.data() || ::memcmp(data(), size(), s.data() == 0)); }
+		inline bool			operator== (const_pointer s) const noexcept { return ((s == nullptr || s == "") && size() == 0) || size() == ::strlen(s) && 0 == ::memcmp(data(), s, size()); }
+		inline bool			operator== (value_type c) const { return size() == 1 && c == *data(); }
+		inline bool			operator== (uvalue_type c) const { return operator== (value_type(c)); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, bool>
+			inline				operator!= (const L& s) const { return !operator== (s); }
+		inline bool			operator!= (const_pointer s) const { return !operator== (s); }
+		inline bool			operator!= (value_type c) const { return !operator== (c); }
+		inline bool			operator!= (uvalue_type c) const { return !operator== (c); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, bool>
+			inline				operator< (const L& s) const { return 0 > compare(s); }
+		inline bool			operator< (const_pointer s) const { return 0 > compare(s); }
+		inline bool			operator< (value_type c) const { return 0 > compare(begin(), end(), &c, &c + 1); }
+		inline bool			operator< (uvalue_type c) const { return operator< (value_type(c)); }
+		inline bool			operator> (const_pointer s) const { return 0 < compare(s); }
+
+		pos_type			find(value_type c, pos_type pos = 0) const noexcept { return util::str_find(to_base(), c, pos); }
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			find(const L& s, pos_type pos = 0) const noexcept { return util::str_find(to_base(), s, pos); }
+		inline pos_type		find(uvalue_type c, pos_type pos = 0) const noexcept { return find(value_type(c), pos); }
+		inline pos_type		find(const_pointer p, pos_type pos, size_type count) const { return find(base_type(p, count), pos); }
+
+		pos_type			rfind(value_type c, pos_type pos = npos) const noexcept { return util::str_rfind(to_base(), c, pos); }
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			rfind(const L&s, pos_type pos = npos) const noexcept { return util::str_rfind(to_base(), s, pos); }
+		inline pos_type		rfind(uvalue_type c, pos_type pos = npos) const noexcept { return rfind(value_type(c), pos); }
+		inline pos_type		rfind(const_pointer p, pos_type pos, size_type count) const { return rfind(base_type(p, count), pos); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			find_first_of(const L& s, pos_type pos = npos) const noexcept { return util::str_find_first_of(to_base(), s, pos); }
+		inline pos_type		find_first_of(value_type c, pos_type pos = npos) const { return find_first_of(base_type(&c, 1), pos); }
+		inline pos_type		find_first_of(uvalue_type c, pos_type pos = npos) const { return find_first_of(value_type(c), pos); }
+		inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const { return find_first_of(base_type(p, count), pos); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			find_first_not_of(const L&  s, pos_type pos = npos) const noexcept { return util::str_find_first_not_of(to_base(), s, pos); }
+		inline pos_type		find_first_not_of(value_type c, pos_type pos = npos) const { return find_first_not_of(base_type(&c, 1), pos); }
+		inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = npos) const { return find_first_not_of(value_type(c), pos); }
+		inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const { return find_first_not_of(base_type(p, count), pos); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			find_last_of(const L&  s, pos_type pos = npos) const noexcept { return util::str_find_last_of(to_base(), s, pos); }
+		inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { return find_last_of(base_type(&c, 1), pos); }
+		inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
+		inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const { return find_last_of(base_type(p, count), pos); }
+
+		template<typename L>
+		typename std::enable_if_t<has_data_size_function<L>::value, pos_type>
+			find_last_not_of(const L& s, pos_type pos = npos) const noexcept { return util::str_find_last_not_of(to_base(), s, pos); }
+		inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { return find_last_not_of(base_type(&c, 1), pos); }
+		inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
+		inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const { return find_last_not_of(base_type(p, count), pos); }
+
+		hashvalue_t		hash() const noexcept { return util::str_hash(data(), data() + size()); }
+
+		constexpr inline cdata_t substr(size_type pos = 0, size_type count = npos) const {
+			return cdata_t(data(), size()).sub_data(pos, count);
+		}
+		constexpr inline cdata_t remove_prefix(size_type n) const {
+			return cdata_t(data(), size()).remove_prefix(n);
+		}
+		constexpr inline cdata_t  remove_suffix(size_type n) const {
+			return cdata_t(data(), size()).remove_suffix(n);
+		}
+
+		constexpr bool is_number() const { return data() != nullptr && size() > 0 && (util::is_char_number(data()[0]) || ((data()[0] == '+' || data()[0] == '-') && is_char_number(data()[1]))); }
+
+		const_iterator to_number(float& v) const {
+			char* str;
+			v = strtof(data(), &str);
+			return str != data() ? const_iterator(str) : data();
+		}
+		const_iterator to_number(int32_t& f, int base = 0) const {
+			char* str;
+			v = strtol(data(), &str, base);
+			return str != data() ? const_iterator(str) : data();
+		}
+		const_iterator to_number(int64_t& f, int base = 0) const {
+			char* str;
+			v = strtoll(data(), &str, base);
+			return str != data() ? const_iterator(str) : data();
+		}
+	};
+
+	template<typename T>
+	class string_functions_wrapper : public string_functions<string_functions_wrapper<T>> {
+		const T& _value;
+	public:
+		constexpr inline string_functions_wrapper(const T& value) : _value(value) {}
+		constexpr inline  const_pointer  data() const { return value.data(); }
+		constexpr inline  size_type size() const { return _value.size(); }
+	};
+#if 0
+	template<typename LINK>
+	class string_helper {
+	public:
+		using link_t = LINK;
 		using traits = typename LINK::traits;
 		using value_type = typename traits::value_type;
 
@@ -63,37 +207,38 @@ namespace ustl {
 		typedef ::ustl::reverse_iterator<const_iterator>	const_reverse_iterator;
 		typedef utf8in_iterator<const_iterator>		utf8_iterator;
 		using pos_type = size_type;
-
 		using wvalue_type = wchar_t;
 		using wpointer = wvalue_type*;
 		using const_wpointer = const wvalue_type*;
 
 		static constexpr const pos_type npos = std::numeric_limits<pos_type>::max();
+		void link(const_pointer p, size_t s) { _data.link(s, s); }
+		void link(const_pointer p) { link(s, strlen(p)); }
+		void link(const_iterator i1, const_iterator i2) { assert(i1 < i2);  link(i1, std::distance(i1, i2e)); }
 
 		// this is mainly here for returns on substring
-		string_helper() : LINK() {}
-		template<typename ... Args> // lazy hack
-		string_helper(Args&& ... args) : LINK(std::forward<Args>(args)...) {}
+		
+		string_helper(const_pointer p, size_t s) : _data() { link(p, s); }
+		string_helper(const_iterator i1, const_iterator i2) : string_helper(i1, std::distance(i1, i2)) {}
+		string_helper(const_pointer p) : string_helper(p,strlen(p)) { }
+		string_helper(const link_t& l) : _data(l) { }
+		string_helper(link_t&& l) : _data(std::move(l)) { }
 
-		template<class Q = LINK>
-		typename std::enable_if<traits::can_read || traits::can_write, const_reference>::type
-			operator[](size_type i) const { return LINK::data()[i]; }
+		const_pointer data() const { return _data.data(); }
+		size_type size() const { return _data.size(); }
 
-		template<class Q = LINK>
-		typename std::enable_if<!std::is_const<reference>::value, reference>::type
-			operator[](size_type i) { return LINK::data()[i]; }
-#if 0
+		const_reference operator[](size_type i) const { return _data.data()[i]; }
+		const_reference at(size_type i) const { return _data.data()[i]; }
+		const_iterator begin() const { return _data.begin(); }
+		const_iterator end() const { return _data.end(); }
+		inline const_iterator	iat(pos_type pos) const { return LINK::begin() + min(size_type(pos), LINK::size()); }
 		inline const_reverse_iterator	rbegin(void) const { return const_reverse_iterator(end()); }
 		inline const_reverse_iterator	crbegin(void) const { return rbegin(); }
 		inline const_reverse_iterator	rend(void) const { return const_reverse_iterator(begin()); }
 		inline const_reverse_iterator	crend(void) const { return rend(); }
-#endif
-		inline utf8_iterator	utf8_begin(void) const { return utf8_iterator(LINK::begin()); }
-		inline utf8_iterator	utf8_end(void) const { return utf8_iterator(LINK::end()); }
-#if 0
-		inline const_reference	at(pos_type pos) const { assert(pos <= LINK::size() && LINK::begin()); return LINK::begin()[pos]; }
-		inline const_iterator	iat(pos_type pos) const { return LINK::begin() +  min(size_type(pos), LINK::size()); }
-#endif
+		inline utf8_iterator utf8_begin(void) const { return utf8_iterator(begin()); }
+		inline utf8_iterator utf8_end(void) const { return utf8_iterator(end()); }
+
 		const_iterator wiat(pos_type i) const noexcept {
 			utf8in_iterator<const char*> cfinder(LINK::begin());
 			cfinder += i;
@@ -102,104 +247,44 @@ namespace ustl {
 		inline const_reference	front(void) const { return at(0); }
 		inline const_reference	back(void) const { return at(size() - 1); }
 		inline size_type		length(void) const { return distance(utf8_begin(), utf8_end()); }
-		template<typename L>
-		inline int			compare(const string_helper<L>& s) const { return util::str_compare(LINK::begin(), LINK::end(), s.begin(), s.end()); }
-		template<typename L>
-		inline int			compare(pos_type start, size_type len, const string_helper<L>& s) const { return util::str_compare(LINK::iat(start), LINK::iat(start + len), s.begin(), s.end()); }
-		template<typename L>
-		inline int			compare(pos_type s1, size_type l1, const string_helper<L>&  s, pos_type s2, size_type l2) const { return util::str_compare(LINK::iat(s1), LINK::iat(s1 + l1), s.iat(s2), s.iat(s2 + l2)); }
-		inline int			compare(const_pointer s) const { return util::str_compare(LINK::begin(), LINK::end(), s, s + ::strlen(s)); }
-		inline int			compare(pos_type s1, size_type l1, const_pointer s, size_type l2) const { return util::str_compare(LINK::iat(s1), LINK::iat(s1 + l1), s, s + l2); }
-		inline int			compare(pos_type s1, size_type l1, const_pointer s) const { return util::str_compare(s1, l1, s, ::strlen(s)); }
 
-		template<typename L>
-		inline bool			operator== (const string_helper<L>& s) const { return LINK::operator== (s); }
-		inline bool			operator== (const_pointer s) const noexcept { return ((s == nullptr || s == "") && LINK::size() == 0)|| LINK::size() == ::strlen(s) && 0 == ::memcmp(LINK::data(), s, LINK::size()); }
-		inline bool			operator== (value_type c) const { return LINK::size() == 1 && c == at(0); }
-		inline bool			operator== (uvalue_type c) const { return operator== (value_type(c)); }
-		template<typename L>
-		inline bool			operator!= (const string_helper<L>& s) const { return !operator== (s); }
-		inline bool			operator!= (const_pointer s) const { return !operator== (s); }
-		inline bool			operator!= (value_type c) const { return !operator== (c); }
-		inline bool			operator!= (uvalue_type c) const { return !operator== (c); }
-		template<typename L>
-		inline bool			operator< (const string_helper<L>& s) const { return 0 > compare(s); }
-		inline bool			operator< (const_pointer s) const { return 0 > compare(s); }
-		inline bool			operator< (value_type c) const { return 0 > compare(LINK::begin(), LINK::end(), &c, &c + 1); }
-		inline bool			operator< (uvalue_type c) const { return operator< (value_type(c)); }
-		inline bool			operator> (const_pointer s) const { return 0 < compare(s); }
 
-		pos_type			find(value_type c, pos_type pos = 0) const noexcept { return util::str_find(to_base(), c, pos); }
-		template<typename L>
-		pos_type			find(const string_helper<L>& s, pos_type pos = 0) const noexcept { return util::str_find(to_base(), s, pos); }
-		inline pos_type		find(uvalue_type c, pos_type pos = 0) const noexcept { return find(value_type(c), pos); }
-		inline pos_type		find(const_pointer p, pos_type pos, size_type count) const {  return find(base_type(p, count), pos); }
-		
-		pos_type			rfind(value_type c, pos_type pos = npos) const noexcept { return util::str_rfind(to_base(), c, pos); }
-		template<typename L>
-		pos_type			rfind(const string_helper<L>&s, pos_type pos = npos) const noexcept { return util::str_rfind(to_base(), s, pos); }
-		inline pos_type		rfind(uvalue_type c, pos_type pos = npos) const noexcept { return rfind(value_type(c), pos); }
-		inline pos_type		rfind(const_pointer p, pos_type pos, size_type count) const { return rfind(base_type(p, count), pos); }
 
-		template<typename L>
-		pos_type			find_first_of(const string_helper<L>& s, pos_type pos = npos) const noexcept { return util::str_find_first_of(to_base(), s, pos); }
-		inline pos_type		find_first_of(value_type c, pos_type pos = npos) const { return find_first_of(base_type(&c, 1), pos); }
-		inline pos_type		find_first_of(uvalue_type c, pos_type pos = npos) const { return find_first_of(value_type(c), pos); }
-		inline pos_type		find_first_of(const_pointer p, pos_type pos, size_type count) const { return find_first_of(base_type(p, count), pos); }
 
-		template<typename L>
-		pos_type			find_first_not_of(const string_helper<L>&  s, pos_type pos = npos) const noexcept { return util::str_find_first_not_of(to_base(), s, pos); }
-		inline pos_type		find_first_not_of(value_type c, pos_type pos = npos) const { return find_first_not_of(base_type(&c, 1), pos); }
-		inline pos_type		find_first_not_of(uvalue_type c, pos_type pos = npos) const { return find_first_not_of(value_type(c), pos); }
-		inline pos_type		find_first_not_of(const_pointer p, pos_type pos, size_type count) const { return find_first_not_of(base_type(p, count), pos); }
+		constexpr bool has_c_str() const { return is_zero_terminated<LINK>::value; }
 
-		template<typename L>
-		pos_type			find_last_of(const string_helper<L>&  s, pos_type pos = npos) const noexcept { return util::str_find_last_of(to_base(), s, pos); }
-		inline pos_type		find_last_of(value_type c, pos_type pos = npos) const { return find_last_of(base_type(&c, 1), pos); }
-		inline pos_type		find_last_of(uvalue_type c, pos_type pos = npos) const { return find_last_of(value_type(c), pos); }
-		inline pos_type		find_last_of(const_pointer p, pos_type pos, size_type count) const { return find_last_of(base_type(p, count), pos); }
-		
-		template<typename L>
-		pos_type			find_last_not_of(const string_helper<L>& s, pos_type pos = npos) const noexcept { return util::str_find_last_not_of(to_base(), s, pos); }
-		inline pos_type		find_last_not_of(value_type c, pos_type pos = npos) const { return find_last_not_of(base_type(&c, 1), pos); }
-		inline pos_type		find_last_not_of(uvalue_type c, pos_type pos = npos) const { return find_last_not_of(value_type(c), pos); }
-		inline pos_type		find_last_not_of(const_pointer p, pos_type pos, size_type count) const {  return find_last_not_of(base_type(p,count), pos); }
+		void link(const char* p, size_type n) { _data.link(p, n); }
+		void link(const char* p, size_type n) { _data.link(p, n); }
+		template<class Q = LINK>
+		typename std::enable_if<is_zero_terminated<LINK>::value, const char*>::type
+			c_str() const { return _data.c_str(); }
 
-		hashvalue_t		hash() const noexcept { return util::str_hash(LINK::begin(), LINK::end()); }
+		template<class Q = LINK>
+		typename std::enable_if<!std::is_const<Q::pointer>::value, Q::pointer>::type
+			 data()  { return _data.data(); }
 
-		constexpr string_helper<cmemlink> substr(size_type pos = 0, size_type count = npos) const {
-			return (pos > size())
-				? (throw std::out_of_range("data_helpers::substr"), std::cmemlink())
-				: string_helper<cmemlink>(data() + pos, std::min(count, size() - pos));
-		}
-		constexpr bool is_number() const { return !empty() && (util::is_char_number(at(0)) || ((at(0) == '+' || at(0) == '-') && is_char_number(at(1)))); }
+		template<class Q = LINK>
+		typename std::enable_if<!std::is_const<reference>::value, reference>::type
+			operator[](size_type i) { return _data.data()[i]; }
+		template<class Q = LINK>
 
-		const_iterator to_number(float& v) const {
-			char* str;
-			v = strtof(data(), &str);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		const_iterator to_number(int32_t& f, int base = 0) const {
-			char* str;
-			v = strtol(data(), &str, base);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		const_iterator to_number(int64_t& f, int base = 0) const {
-			char* str;
-			v = strtoll(data(), &str, base);
-			return str <= end() ? const_iterator(str) : begin();
-		}
-		constexpr cmemlink remove_prefix(size_type n) const {
-			return (n > size())
-				? (throw std::out_of_range("data_helpers::remove_prefix"), std::string_view())
-				: cmemlink(data() + n, size() - n);
-		}
-		constexpr cmemlink remove_suffix(size_type n) const {
-			return (n > size())
-				? (throw std::out_of_range("data_helpers::remove_suffix"), std::string_view())
-				: cmemlink(data(), size() - n);
-		}
+		typename std::enable_if<!std::is_const<iterator>::value, iterator>::type
+			begin() { return _data.begin(); }
+		template<class Q = LINK>
+		typename std::enable_if<!std::is_const<iterator>::value, iterator>::type
+			end() { return _data.end(); }
 
+
+	protected:
+		link_t _data;
+	};
+
+	class cstring : public string_helper<cstringlink> {
+	public:
+		using helper = string_helper<cstringlink>;
+		cstring() : helper("") {}
+		cstring(const char* s) : helper(s) {}
+		const char* c_str() const { return data(); } // we are zero terminated
 	};
 	class string_view : public string_helper<cmemlink> {
 	public:
@@ -207,8 +292,8 @@ namespace ustl {
 		string_view() : helper("", 0) {}
 		string_view(const char* s) : helper(s, ::strlen(s)) {}
 		string_view(const char* s, size_t i) : helper(s, i) {}
+		string_view(const cstring& s) : helper(s, ::strlen(s)) {}
 		string_view(const cmemlink& s) : helper(s.data(), s.size()) {}
-
 	};
 
 
@@ -243,9 +328,11 @@ namespace ustl {
 	/// search for delimiters and modify text between them as opaque blocks. If you
 	/// do anything else, you are hardcoding yourself into a locale! So stop it!
 	///
-	class string : public string_helper<memblock> {
+	template<typename LINK>
+	class string_builder : public string_helper<LINK> {
 	public:
-		using helper = string_helper<memblock>;
+		using helper = string_helper<LINK>;
+		using link_t = LINK;
 		using value_type = typename helper::value_type;
 		using uvalue_type = typename helper::uvalue_type;
 		using pointer = typename helper::pointer;
@@ -264,24 +351,76 @@ namespace ustl {
 
 		using pos_type = typename helper::pos_type;
 		using size_type = typename helper::size_type;
+	
 		static constexpr const pos_type npos = helper::npos;	///< Value that means the end of string.
+	private:
+		// private functions at the top with some tags
+		void reserve(size_type n, bool bExact, std::false_type) {
+			if (n > capacity()) std::bad_alloc("Not enough fixed space");
+		}
+		void reserve(size_type n, bool bExact, std::true_type) {
+			if (capacity() < newSize)
+				_data.reserve(newSize, bExact);
+		}
+		void resize(size_type n, bool bExact ,std::false_type) {
+			if (capacity() == 0) _capacity = size(); 
+			if( n > capacity()) throw std::bad_alloc("Not enough fixed space");
+			_data.resize(n);
+			_data.at(n) = 0;
+		}
+		void resize(size_type n, bool bExact ,std::true_type) {
+			if (n < capacity()) _data.reserve(n, bExact);
+			_data.resize(n);
+			_data.at(n) = 0;
+		}
 	public:
-		inline			string(void) noexcept : helper() { relink("", 0); }
-		string(const string& s);
-		inline			string(const string& s, pos_type o, size_type n = npos);
-		inline explicit		string(const cmemlink& l);
-		string(const_pointer s) noexcept;
-		inline			string(const_pointer s, size_type len);
-		inline			string(const std::string_view& s) : string(s.data(), s.size()) {}
-		inline			string(const_pointer s1, const_pointer s2);
-		string(size_type n, value_type c);
+		size_type capacity() const { return _capacity; }
+		void reserve(size_type n, bool bExact = true) { reserve(n, bExact, has_reserve_function<link_t>); }
+		void resize(size_type n, bool bExact = true) { resize(n, bExact,has_reserve_function<link_t>); }
+		// these are basicly soft links, no allocations happened yet
+		string_builder(const_pointer p, size_t s) : helper(p,s), _capacity(0U) {  }
+		string_builder(const_iterator i1, const_iterator i2) : helper(i1, i2), _capacity(0U) {}
+		string_builder(const_pointer p) : helper(p), _capacity(0U) { }
+		string_builder(const link_t& l) : helper(l), _capacity(0U) { }
+		string_builder(link_t&& l) : helper(std::move(l)), _capacity(0U) { }
+		string_builder(const std::string_view& s) : helper(s.data(), s.size()), _capacity(0U) {  }
+		template<typename L>
+		string_builder(const string_helper<L>& s) : helper(s.data(), s.size()), _capacity(0U) {}	// +1 because base ctor can't call virtuals of this class
+		// we might have to allocate in these
+		template<typename L>
+		string_builder(const string_builder<L>& s) : helper() , _capacity() {	// +1 because base ctor can't call virtuals of this class
+			if (s.is_linked())
+				_data.relink(s.data(), s.size());
+			else {
+				resize(s.size());
+				std::copy(s.begin(), s.end(), _data.begin());
+			}
+		}
+		template<typename L>
+		inline			string_builder(const string_helper& s, pos_type o, size_type n = npos);
+		inline explicit	string_builder(const cmemlink& l) : helper() {
+
+
+		}
+		string_builder(const_pointer s) noexcept : helper() {
+			if (!s) s = "";
+			relink(s, strlen(s));
+
+		}
+
+		string(size_type n, value_type c) : helper() {
+			_data.resize(n + 1);
+			_data.relink(begin(), size() - 1);	// --m_Size
+			std::fill_n(_data.begin(), n, c);
+			_data.at(n) = 0;
+		}
 		inline			~string(void) noexcept { }
 		inline pointer		data(void) { return string::pointer(memblock::data()); }
 		inline const_pointer	data(void) const { return string::const_pointer(memblock::data()); }
 		inline const_pointer	c_str(void) const { return string::const_pointer(memblock::data()); }
 		inline size_type		max_size(void) const { size_type s(memblock::max_size()); return s - !!s; }
 		inline size_type		capacity(void) const { size_type c(memblock::capacity()); return c - !!c; }
-		void			resize(size_type n);
+	
 		inline void			resize(size_type n, value_type c);
 		inline void			clear(void) { resize(0); }
 		
@@ -401,7 +540,8 @@ namespace ustl {
 	private:
 		virtual size_type		minimumFreeCapacity(void) const noexcept final override;
 	};
-
+#endif
+#if 0
 	//----------------------------------------------------------------------
 
 	/// Assigns itself the value of string \p s
@@ -541,4 +681,5 @@ inline type name (const string& str, size_t* idx = nullptr) \
 		NUMBER_TO_STRING_CONVERTER(long double, "%Lf")
 #undef NUMBER_TO_STRING_CONVERTER
 
+#endif
 };
