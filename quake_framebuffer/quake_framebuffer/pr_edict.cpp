@@ -22,10 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /*
 	Some side notes on the original Quake.  I havn't looked at Quake2 yet but they do ALOT of string copies.  First its copyied to com_token, THEN to another buff
 	THEN another buffer for vector_t for the Q_atof.  Thats just WAY to much because ware are directly moving it to the dictionary
-	So I made a class c alled std::string_view that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
+	So I made a class c alled quake::string_view that contains the raw data from the file (poisiton size) for a token with inbuilt "to float" function so we don't have to do all
 	that crazy copying.
 
-	Just watch it as if the file is unloaded all the std::string_view's suddenly become invalid
+	Just watch it as if the file is unloaded all the quake::string_view's suddenly become invalid
 */
 #include "icommon.h"
 
@@ -53,8 +53,8 @@ int				pr_edict_size;	// in bytes
 
 
 
-qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& value);
-qboolean	ED_ParseEpair(edict_t *base, const ddef_t *key, const std::string_view& value);
+qboolean	ED_ParseEpair(void *base, const ddef_t *key, const quake::string_view& value);
+qboolean	ED_ParseEpair(edict_t *base, const ddef_t *key, const quake::string_view& value);
 
 cvar_t<float> nomonsters = { 0.0f} ;
 cvar_t<float> gamecfg = { 0.0f} ;
@@ -446,7 +446,7 @@ ED_ParseGlobals
 */
 void ED_ParseGlobals (COM_Parser& parser)
 {
-	std::string_view keyname,value;
+	quake::string_view keyname,value;
 	while (parser.Next(keyname))
 	{	
 		if (keyname.empty())
@@ -577,7 +577,7 @@ namespace string_table {
 		}
 
 	}
-	static const char* intern(const std::string_view&  s) {
+	static const char* intern(const quake::string_view&  s) {
 		return intern(s.data(), s.size());
 	}
 	static const char* intern_literal(const char* str,bool force=false){
@@ -600,7 +600,7 @@ namespace string_table {
 }
 const char* string_t::intern(const char* str,size_t size) { return string_table::intern(str, size); }
 const char* string_t::intern(const char* str) { return string_table::intern(str, ::strlen(str));   }
-const char* string_t::intern(const std::string_view& str) { return string_table::intern(str); }
+const char* string_t::intern(const quake::string_view& str) { return string_table::intern(str); }
 
 /*
 =============
@@ -710,7 +710,7 @@ const char* pr_system_t::ED_LocalModelName(uint8_t v) const {
 	return number;
 }
 #endif
-string_t pr_system_t::ED_NewString (const std::string_view& string,bool zmalloc) {
+string_t pr_system_t::ED_NewString (const quake::string_view& string,bool zmalloc) {
 	return string_table::intern(string);
 }
 
@@ -727,7 +727,7 @@ returns false if error
 
 
 // globals?
-qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& value) {
+qboolean	ED_ParseEpair(void *base, const ddef_t *key, const quake::string_view& value) {
 	eval_t* d = reinterpret_cast<eval_t*>(reinterpret_cast<uint32_t*>(base) + key->ofs);
 	switch (idType::ClearSaveGlobal(key->type))
 	{
@@ -738,7 +738,7 @@ qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& va
 		assert(quake::to_number(value, d->_float));
 		break;
 	case etype_t::ev_vector: {
-		std::string_view fv;
+		quake::string_view fv;
 		COM_Parser parser(value);
 		assert(parser.Next(fv));
 		assert(quake::to_number(fv, d->vector[0]));
@@ -775,7 +775,7 @@ qboolean	ED_ParseEpair(void *base, const ddef_t *key, const std::string_view& va
 	}
 	return true;
 }
-qboolean ED_ParseEpair(edict_t* ent, const ddef_t *key, const std::string_view& value) {
+qboolean ED_ParseEpair(edict_t* ent, const ddef_t *key, const quake::string_view& value) {
 	return ED_ParseEpair(reinterpret_cast<void*>(&ent->v), key, value);
 }
 /*
@@ -789,7 +789,7 @@ Used for initial level load and for savegames.
 */
 static std::unordered_map<string_t, edict_t*> loaded_edicts;
 edict_t * ED_ParseEdict(COM_Parser& parser, edict_t *ent) {
-	std::string_view keyname, value;
+	quake::string_view keyname, value;
 	// clear it
 	//if (ent)  std::memset(&ent->v, 0, vm.progs->entityfields * 4);
 	//assert(!vm.is_edict_free(ent)); 		// hack
@@ -879,14 +879,14 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
-void ED_LoadFromFile (const std::string_view& data)
+void ED_LoadFromFile (const quake::string_view& data)
 {	
 	edict_t		*ent = nullptr;
 	int			inhibit = 0;
 
 	vm.pr_global_struct->time = static_cast<float>(sv.time);
 	COM_Parser parser(data);
-	std::string_view token;
+	quake::string_view token;
 	size_t ent_index = 0;
 // parse ents
 	while (1) 
@@ -1021,7 +1021,7 @@ void pr_system_t::LoadProgs(void) {
 	// ok, no way around this, we need our own dedicated string space
 	{
 		for (size_t i = 0; i < static_cast<size_t>(progs->numstrings); i++) {
-			std::string_view sv(pr_strings + i);
+			quake::string_view sv(pr_strings + i);
 			string_table::intern(sv);
 			i += sv.size();
 		}

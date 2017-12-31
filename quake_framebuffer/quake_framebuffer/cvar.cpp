@@ -56,7 +56,7 @@ template<> float* Cvar_Get<float>(string_t var_name) { return _Cvar_Get<float>(v
 template<> cstring_t* Cvar_Get<cstring_t>(string_t var_name) { return _Cvar_Get<cstring_t>(var_name); }
 
 
-void Cvar_Set(string_t var_name, const std::string_view& v) {
+void Cvar_Set(string_t var_name, const quake::string_view& v) {
 	cstring_t* old_value = Cvar_Get<cstring_t>(var_name);
 	if (!old_value)
 	{	// there is an error in C code if this happens
@@ -96,7 +96,7 @@ void 	Cvar_Set(string_t var_name, float v) {
 Cvar_CompleteVariable
 ============
 */
-std::string_view  Cvar_CompleteVariable (const std::string_view& partial)
+quake::string_view  Cvar_CompleteVariable (const quake::string_view& partial)
 {
 	// not supported yet
 #if 0
@@ -110,10 +110,10 @@ std::string_view  Cvar_CompleteVariable (const std::string_view& partial)
 #endif
 
 
-	return std::string_view();
+	return quake::string_view();
 }
 
-static void Cvar_RegisterVariable(const std::string_view& name, var_ref v) {
+static void Cvar_RegisterVariable(const quake::string_view& name, var_ref v) {
 	string_t qname = string_t::intern(name);
 	// first check to see if it has allready been defined
 	// check for overlap with a command
@@ -132,10 +132,10 @@ static void Cvar_RegisterVariable(const std::string_view& name, var_ref v) {
 	c_vars.emplace(var_name, v);
 }
 
-void Cvar_RegisterVariable(const std::string_view& name, cvar_t<float>& variable) {
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<float>& variable) {
 	Cvar_RegisterVariable(name, var_ref(variable, &variable.value));
 }
-void Cvar_RegisterVariable(const std::string_view& name, cvar_t<cstring_t>& variable) {
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<cstring_t>& variable) {
 	Cvar_RegisterVariable(name, var_ref(variable, &variable.value));
 }
 

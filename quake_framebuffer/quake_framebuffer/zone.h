@@ -109,9 +109,9 @@ char *Z_Strdup(const char *s);
 
 void Z_CheckHeap(void);
 void *Hunk_Alloc(size_t size);		// returns 0 filled memory
-void *Hunk_AllocName(int size, const std::string_view& name);
+void *Hunk_AllocName(int size, const quake::string_view& name);
 
-void *Hunk_HighAllocName(size_t size, const std::string_view& name);
+void *Hunk_HighAllocName(size_t size, const quake::string_view& name);
 
 int	Hunk_LowMark(void);
 void Hunk_FreeToLowMark(int mark);
@@ -136,7 +136,7 @@ void *Cache_Check(cache_user_t *c);
 
 void Cache_Free(cache_user_t *c);
 
-void *Cache_Alloc(cache_user_t *c, int size, const std::string_view&  name);
+void *Cache_Alloc(cache_user_t *c, int size, const quake::string_view&  name);
 // Returns NULL if all purgable data was tossed and there still
 // wasn't enough room.
 
@@ -259,39 +259,122 @@ private:
 	ALLOC _alloc;
 	size_t _type_size;
 };
+namespace umm {
+	class umm_allocator {
+	public:
+		using bindex_t = unsigned short int;
+		constexpr static size_t max_align_t = alignof(std::max_align_t);
+	private:
+		struct umm_block_t* _heap;
+		size_t _numblocks;
+		bindex_t umm_blocks(size_t size);
+		void umm_make_new_block(bindex_t c, bindex_t blocks, bindex_t freemask);
+		void umm_disconnect_from_free_list(bindex_t c);
+		void umm_assimilate_up(bindex_t c);
+		bindex_t umm_assimilate_down(bindex_t c, bindex_t freemask);
+		bool umm_pointer_in_heap(void* p) const noexcept;
+	public:
+		umm_allocator() : _heap(nullptr), _numblocks(0U) {}
+		umm_allocator(void* heap, size_t heap_size);
+		size_t numblocks() const;
+		size_t maxsize() const;
+		// ----------------------------------------------------------------------------
 
+		void* allocate(std::size_t n);
+		void* allocate(std::size_t n, void* ptr); // basicly this is realloc
+		void deallocate(void * ptr);
+		bool operator==(const umm_allocator& a) const { return _heap == a._heap; }
+		bool operator!=(const umm_allocator& a) const { return _heap != a._heap; }
+	};
+}
+
+template <class T>
 class umm_allocator {
-public:
-	using bindex_t = unsigned short int;
-	constexpr static size_t max_align_t = alignof(std::max_align_t);
+	using value_type = T;
+	template <class _Up> struct rebind { using other = umm_allocator<_Up>; };
+
+	umm_allocator(const umm_allocator&) = default;
+	umm_allocator& operator=(const umm_allocator&) = delete;
+
+	umm_allocator(const umm::umm_allocator& a) noexcept : _a(a) {}
+	template <class U>
+	umm_allocator(const umm_allocator<U>& a) noexcept : _a(a._a) {}
+	umm_allocator(const umm::umm_allocator& a) : _a(a) {}
+
+	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate(n*sizeof(T)); }
+	void deallocate(T* p, std::size_t n) noexcept { _a.deallocate(reinterpret_cast<char*>(p)); } //, n * sizeof(T));
+
+
+	template <class U> friend class umm_allocator;
+
+	template<typename U>
+	bool operator==(const umm_allocator<U>& other) const { return &_a == &other._a; }
+	template<typename U>
+	bool operator!=(const umm_allocator<U>& other) const { return &_a != &other._a; }
 private:
-	struct umm_block_t* _heap;
-	size_t _numblocks;
-	bindex_t umm_blocks(size_t size);
-	void umm_make_new_block(bindex_t c, bindex_t blocks, bindex_t freemask);
-	void umm_disconnect_from_free_list(bindex_t c);
-	void umm_assimilate_up(bindex_t c);
-	bindex_t umm_assimilate_down(bindex_t c, bindex_t freemask);
-	bool umm_pointer_in_heap(void* p) const noexcept;
-public:
-	umm_allocator() : _heap(nullptr), _numblocks(0U) {}
-	umm_allocator(void* heap, size_t heap_size);
-	size_t numblocks() const;
-	size_t maxsize() const;
-	// ----------------------------------------------------------------------------
-
-	void* allocate(std::size_t n);
-	void* allocate(std::size_t n,void* ptr); // basicly this is realloc
-	void deallocate(void * ptr);
-
+	umm::umm_allocator  _a;
 };
-template<size_t size>
-class umm_stack_allocator : public umm_allocator {
+
+template <class T,size_t _SIZE>
+class umm_stack_allocator : public umm_allocator<T> {
+	using value_type = T;
+	template <class _Up> struct rebind { using other = umm_allocator<_Up>; };
+
+	umm_stack_allocator(const umm_stack_allocator&) = default;
+	umm_stack_allocator& operator=(const umm_stack_allocator&) = delete;
+
+	umm_stack_allocator() noexcept : umm_allocator<T>(umm::umm_allocator(_data.data(), _data.size()) {}
+
+
+	template <class U, size_t S> friend class umm_stack_allocator<U,S>;
+
+	template<typename U,size_t S>
+	bool operator==(const umm_stack_allocator<U,S>& other) const { return &_data == &other._data; }
+	template<typename U, size_t S>
+	bool operator!=(const umm_stack_allocator<U,S>& other) const { return &_data != &other._data; }
+private:
+	std::array<char, _SIZE> _data;
+};
+
+template <class T, size_t SIZE>
+class umm_stack_allocator
+{
+public:
+	using value_type = T;
+	template <class _Up,size_t SIZE> struct rebind { using other = umm_stack_allocator<_Up,SIZE>; };
+
+	short_alloc(const short_alloc&) = default;
+	short_alloc& operator=(const short_alloc&) = delete;
+
+	short_alloc() noexcept : _a(a)
+	{
+		static_assert(size % alignment == 0,
+			"size N needs to be a multiple of alignment Align");
+	}
+	template <class U>
+	short_alloc(const short_alloc<U>& a) noexcept : _a(a._a) {}
+
+
+	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate<alignof(T)>(n * sizeof(T))); }
+	void deallocate(T* p, std::size_t n) noexcept { _a.deallocate(reinterpret_cast<char*>(p), n * sizeof(T)); }
+
+	template <class U> friend class short_alloc;
+
+	template<typename U>
+	bool operator==(const short_alloc<U>& other) const { return &_a == &other._a; }
+	template<typename U>
+	bool operator!=(const short_alloc<U>& other) const { return &_a != &other._a; }
+
+private:
 	std::array<char, size> _buffer;
-public:
-	umm_stack_allocator() : umm_allocator(_buffer.data(), _buffer.size()) {}
-
+	umm_allocator _umm;
 };
+
+namespace quake{
+
+
+}
+
 
 class memory_area
 {
@@ -662,7 +745,7 @@ using SStream = std::basic_stringstream<char, std::char_traits<char>, UAllocator
 template<typename T>
 using ZVector = std::vector<T, UAllocator<T>>;
 
-using StringArgs = ZVector<std::string_view>;
+using StringArgs = ZVector<quake::string_view>;
 
 
 #endif

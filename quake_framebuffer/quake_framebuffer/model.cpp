@@ -176,7 +176,7 @@ Mod_FindName
 
 ==================
 */
-static model_t *Mod_FindName (const std::string_view& name)
+static model_t *Mod_FindName (const quake::string_view& name)
 {
 	int		i;
 	model_t* mod = nullptr;
@@ -209,7 +209,7 @@ Mod_TouchModel
 
 ==================
 */
-void Mod_TouchModel (const std::string_view&  name)
+void Mod_TouchModel (const quake::string_view&  name)
 {
 	model_t	*mod;
 	
@@ -222,7 +222,7 @@ void Mod_TouchModel (const std::string_view&  name)
 	}
 }
 template<size_t SIZE>
-static void COM_FileBase(const std::string_view& in, char(&out)[SIZE])
+static void COM_FileBase(const quake::string_view& in, char(&out)[SIZE])
 {
 	const char *s2;
 	const char* s = &in.back();
@@ -323,7 +323,7 @@ Mod_ForName
 Loads in a model for the given name
 ==================
 */
-model_t *Mod_ForName (const std::string_view&  name, qboolean crash)
+model_t *Mod_ForName (const quake::string_view&  name, qboolean crash)
 {
 	model_t	*mod;
 

@@ -279,7 +279,7 @@ void		NET_Shutdown (void);
 qsocket_t	*NET_CheckNewConnections (void);
 // returns a new connection number if there is one pending, else -1
 
-qsocket_t	*NET_Connect (std::string_view host);
+qsocket_t	*NET_Connect (quake::string_view host);
 // called by client to connect to a host.  Returns -1 if not able to
 
 qboolean NET_CanSendMessage (qsocket_t *sock);

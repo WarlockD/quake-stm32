@@ -199,7 +199,7 @@ void CL_Record_f (cmd_source_t source, const StringArgs& args)
 		return;
 	}
 
-	if (args[1].find("..") != std::string_view::npos)
+	if (args[1].find("..") != quake::string_view::npos)
 	{
 		Con_Printf ("Relative pathnames are not allowed.\n");
 		return;

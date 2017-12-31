@@ -369,7 +369,7 @@ NET_Connect
 int hostCacheCount = 0;
 hostcache_t hostcache[HOSTCACHESIZE];
 
-qsocket_t *NET_Connect( std::string_view host)
+qsocket_t *NET_Connect( quake::string_view host)
 {
 	qsocket_t		*ret;
 	int				n;
@@ -409,7 +409,7 @@ qsocket_t *NET_Connect( std::string_view host)
 	{
 		if (hostCacheCount != 1)
 			return NULL;
-		host = std::string_view(hostcache[0].cname.c_str());
+		host = quake::string_view(hostcache[0].cname.c_str());
 		quake::con << "Connecting to... " << hostcache[0].name << " @ " << host << std::endl;
 	}
 
@@ -417,7 +417,7 @@ qsocket_t *NET_Connect( std::string_view host)
 		for (n = 0; n < hostCacheCount; n++)
 			if (Q_strcasecmp (host, hostcache[n].name) == 0)
 			{
-				host = std::string_view(hostcache[n].cname);
+				host = quake::string_view(hostcache[n].cname);
 				break;
 			}
 

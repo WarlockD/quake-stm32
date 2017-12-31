@@ -58,7 +58,7 @@ struct off_name_map_t {
 		assert(offset_debug_lookup[k] != nullptr);
 		return offset_debug_lookup[k];
 	}
-	const ddef_t * lookup(const std::string_view& k) const {
+	const ddef_t * lookup(const quake::string_view& k) const {
 		auto it = string_debug_lookup.find(k);
 		if (it == string_debug_lookup.end()) return nullptr;
 		return it->second;
@@ -71,7 +71,7 @@ struct off_name_map_t {
 		inline T* cast_offset(ptrdiff_t k) { return reinterpret_cast<T*>(reinterpret_cast<float*>(_start) + k); }
 		template<typename T>
 		inline  const T* cast_offset(ptrdiff_t k) const  { return reinterpret_cast<const T*>(reinterpret_cast<const float*>(_start) + k); }
-		const ddef_t* checktype(const std::string_view& name, const idType& type) const {
+		const ddef_t* checktype(const quake::string_view& name, const idType& type) const {
 			const ddef_t* def = _map.lookup(string_t::intern(name));
 			assert(def);
 			if (type != etype_t::ev_void) {
@@ -93,10 +93,10 @@ struct off_name_map_t {
 		data_lookup_t(off_name_map_t& map, void* start=nullptr) : _map(map), _start(start) {}
 		void set_data(void* data) { _start = data; }
 
-		eval_t* get(const std::string_view& name, idType type = etype_t::ev_void)  {
+		eval_t* get(const quake::string_view& name, idType type = etype_t::ev_void)  {
 			return cast_offset<eval_t>(checktype(name, type)->ofs);
 		}
-		const eval_t* get(const std::string_view& name, idType type = etype_t::ev_void) const {
+		const eval_t* get(const quake::string_view& name, idType type = etype_t::ev_void) const {
 			return cast_offset<eval_t>(checktype(name, type)->ofs);
 		}
 		eval_t* get( ptrdiff_t k, idType type = etype_t::ev_void) {
@@ -115,13 +115,13 @@ struct off_name_map_t {
 			std::memcpy(get(k, etype_t::ev_void), &v, sizeof(T));
 		}
 		template<typename T>
-		void set(const std::string_view& k, const T& v) {
+		void set(const quake::string_view& k, const T& v) {
 			auto def = _map.lookup(k);
 			assert(def);
 			static_assert(sizeof(T) == sizeof(float) * 3 || sizeof(T) == sizeof(float), "Incorrect size");
 			std::memcpy(get(k, etype_t::ev_void), &v, sizeof(T));
 		}
-		void set(const std::string_view& k, bool v) { set(k, (v ? 1.0f : 0.0f)); }
+		void set(const quake::string_view& k, bool v) { set(k, (v ? 1.0f : 0.0f)); }
 		void set(ptrdiff_t k, bool v) { set(k, (v ? 1.0f : 0.0f)); }
 		inline eval_t* get_eval(ptrdiff_t o) { return get(o, etype_t::ev_void); }
 		inline const eval_t* get_eval(ptrdiff_t o) const { return get(o, etype_t::ev_void); }
@@ -132,21 +132,21 @@ struct off_name_map_t {
 		inline vec3_t& get_vector(ptrdiff_t o) { return  get(o, etype_t::ev_vector)->vector; }
 		inline const vec3_t& get_vector(ptrdiff_t o) const { return get(o, etype_t::ev_vector)->vector; }
 		cstring_t get_string(ptrdiff_t k) const { return get(k, etype_t::ev_string)->string; }
-		cstring_t get_string(const std::string_view& k) const { return get(k, etype_t::ev_string)->string; }
+		cstring_t get_string(const quake::string_view& k) const { return get(k, etype_t::ev_string)->string; }
 
 		edict_t* get_edict(ptrdiff_t k) const { return get(k, etype_t::ev_entity)->edict; }
 		const edict_t* et_edict(eval_t* start, ptrdiff_t k) { return get(k, etype_t::ev_entity)->edict; }
 
-		inline eval_t* get_eval(const std::string_view& o) { return get(o, etype_t::ev_void); }
-		inline const eval_t* get_eval(const std::string_view& o) const { return get(o, etype_t::ev_void); }
-		inline float& get_float(const std::string_view& o) { return get(o, etype_t::ev_float)->_float; }
-		inline const float& get_float(const std::string_view& o) const { return get(o, etype_t::ev_float)->_float; }
-		inline int& get_int(const std::string_view& o) { return reinterpret_cast<int&>(get_float(o)); }
-		inline const int& get_int(const std::string_view& o) const { return reinterpret_cast<const int&>(get_float(o)); }
-		inline vec3_t& get_vector(const std::string_view& o) { return  get(o, etype_t::ev_vector)->vector; }
-		inline const vec3_t& get_vector(const std::string_view& o) const { return get(o, etype_t::ev_vector)->vector; }
+		inline eval_t* get_eval(const quake::string_view& o) { return get(o, etype_t::ev_void); }
+		inline const eval_t* get_eval(const quake::string_view& o) const { return get(o, etype_t::ev_void); }
+		inline float& get_float(const quake::string_view& o) { return get(o, etype_t::ev_float)->_float; }
+		inline const float& get_float(const quake::string_view& o) const { return get(o, etype_t::ev_float)->_float; }
+		inline int& get_int(const quake::string_view& o) { return reinterpret_cast<int&>(get_float(o)); }
+		inline const int& get_int(const quake::string_view& o) const { return reinterpret_cast<const int&>(get_float(o)); }
+		inline vec3_t& get_vector(const quake::string_view& o) { return  get(o, etype_t::ev_vector)->vector; }
+		inline const vec3_t& get_vector(const quake::string_view& o) const { return get(o, etype_t::ev_vector)->vector; }
 		cstring_t& get_string(ptrdiff_t k)  { return get(k, etype_t::ev_string)->string; }
-		cstring_t& get_string(const std::string_view& k)  { return get(k, etype_t::ev_string)->string; }
+		cstring_t& get_string(const quake::string_view& k)  { return get(k, etype_t::ev_string)->string; }
 	};
 };
 
@@ -207,8 +207,8 @@ struct edict_t {
 
 	inline eval_t* E_EVAL(ptrdiff_t o) { return vars.get(o, etype_t::ev_void); }
 	inline const eval_t* E_EVAL(ptrdiff_t o) const { return vars.get(o, etype_t::ev_void); }
-	inline eval_t* E_EVAL(cstring_t o) { return vars.get(o, etype_t::ev_void); }
-	inline const eval_t* E_EVAL(cstring_t o) const { return vars.get(o, etype_t::ev_void); }
+	inline eval_t* E_EVAL(const quake::string_view& o) { return vars.get(o, etype_t::ev_void); }
+	inline const eval_t* E_EVAL(const quake::string_view& o) const { return vars.get(o, etype_t::ev_void); }
 
 	
 	inline float& E_FLOAT(ptrdiff_t o) { return vars.get(o,etype_t::ev_float)->_float; }
@@ -227,17 +227,17 @@ struct edict_t {
 		std::memcpy(vars.get(k, etype_t::ev_void),&v,sizeof(T));
 	}
 	template<typename T>
-	void set(cstring_t k, const T& v) {
+	void set(const quake::string_view& k, const T& v) {
 		static_assert(sizeof(T) == 1||  "Incorrect size");
 		std::memcpy(vars.get(k, etype_t::ev_void), &v, sizeof(T));
 	}
-	void set(cstring_t k, const vec3_t& v) {
+	void set(const quake::string_view& k, const vec3_t& v) {
 		std::memcpy(vars.get(k, etype_t::ev_void), &v, sizeof(vec3_t));
 	}
 	value_t operator[](ptrdiff_t off) ;
 	const_value_t operator[](ptrdiff_t off) const;
-	value_t operator[](cstring_t off) ;
-	const_value_t operator[](cstring_t off)const;
+	value_t operator[](const quake::string_view& off) ;
+	const_value_t operator[](const quake::string_view& off)const;
 	void Print();
 	//static void* operator new(size_t size);
 	//static void operator delete(void* ptr);
@@ -278,8 +278,8 @@ class idValue {
 public:
 	idValue() : _type() {}
 	idValue(eval_t* value, idType type) : _value(value), _type(type) {}
-	idValue(std::string_view name, eval_t* value, idType type) : _value(value), _type(type){}
-	idValue(std::string_view name, eval_t* value,const ddef_t* def) : _value(value), _type(def ? def->type : etype_t::ev_void) {}
+	idValue(quake::string_view name, eval_t* value, idType type) : _value(value), _type(type){}
+	idValue(quake::string_view name, eval_t* value,const ddef_t* def) : _value(value), _type(def ? def->type : etype_t::ev_void) {}
 	const eval_t& value() const { return *_value; }
 	eval_t& value()  { return *_value; }
 	const idType& type() const { return _type; }
@@ -297,7 +297,7 @@ edict_t * ED_ParseEdict(COM_Parser& data, edict_t *ent=nullptr);
 void ED_WriteGlobals(std::ostream& f);
 void ED_ParseGlobals(COM_Parser& data);
 
-void ED_LoadFromFile(const std::string_view& data);
+void ED_LoadFromFile(const quake::string_view& data);
 
 typedef void(*builtin_t) (void);
 extern	builtin_t *pr_builtins;
@@ -348,8 +348,8 @@ struct pr_system_t {
 
 	value_t operator[](ptrdiff_t off)  { return value_t(pr_global_struct, _global_info.lookup(off)); }
 	const_value_t operator[](ptrdiff_t off) const { return const_value_t(pr_global_struct, _global_info.lookup(off)); }
-	value_t operator[](cstring_t off)  { return value_t(pr_global_struct, _global_info.lookup(off)); }
-	const_value_t operator[](cstring_t off) const { return const_value_t(pr_global_struct, _global_info.lookup(off)); }
+	value_t operator[](const quake::string_view& off)  { return value_t(pr_global_struct, _global_info.lookup(off)); }
+	const_value_t operator[](const quake::string_view& off) const { return const_value_t(pr_global_struct, _global_info.lookup(off)); }
 
 	int				pr_edict_size;	// in bytes
 	std::vector<idType> _globaltypes;  // quick lookup agesnt the types in global vars
@@ -375,16 +375,15 @@ struct pr_system_t {
 	inline size_t NUM_FOR_EDICT(const edict_t* e) const { return e->num; }
 	const ddef_t *ED_GlobalAtOfs(int ofs)const { return _global_info.lookup(ofs); }
 	const ddef_t *ED_FieldAtOfs(int ofs) const { return _field_info.lookup(ofs); }
-	const ddef_t *ED_FindGlobal(cstring_t name)const { return _global_info.lookup(name); }
-	const ddef_t *ED_FindField(cstring_t name)const { return _field_info.lookup(name); }
-	const ddef_t *ED_FindGlobal(const std::string_view& name)const { return _global_info.lookup(name); }
-	const ddef_t *ED_FindField(const std::string_view& name)const { return _field_info.lookup(name); }
+	const ddef_t *ED_FindGlobal(const quake::string_view& name)const { return _global_info.lookup(name); }
+	const ddef_t *ED_FindField(const quake::string_view& name)const { return _field_info.lookup(name); }
 
-	size_t ED_FindFunctionIndex(const std::string_view&  name) const {
+
+	size_t ED_FindFunctionIndex(const quake::string_view&  name) const {
 		auto it = _function_info.find(name);
 		return it->second - pr_functions;
 	}
-	const dfunction_t *ED_FindFunction(const std::string_view&  name) const {
+	const dfunction_t *ED_FindFunction(const quake::string_view&  name) const {
 		auto it = _function_info.find(name);
 		return it != _function_info.end() ? it->second : nullptr;
 	}
@@ -418,7 +417,7 @@ struct pr_system_t {
 	bool is_edict_free(edict_t* e) const { return e->free; }
 	const char* ED_QuickToString(uint8_t v) const; // quickly finds a number to string, super fast
 	const char* ED_LocalModelName(uint8_t v) const; // quickly finds a number to string, super fast
-	string_t ED_NewString(const std::string_view& string, bool zmalloc = false);
+	string_t ED_NewString(const quake::string_view& string, bool zmalloc = false);
 	void ED_ClearStrings();
 	inline eval_t* G_EVAL(ptrdiff_t o) { return vars.get(o, etype_t::ev_void); }
 	inline const eval_t* G_EVAL(ptrdiff_t o) const { return vars.get(o, etype_t::ev_void); }
@@ -458,8 +457,8 @@ struct pr_system_t {
 extern pr_system_t vm;
 inline value_t edict_t::operator[](ptrdiff_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
 inline const_value_t edict_t::operator[](ptrdiff_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
-inline value_t edict_t::operator[](cstring_t off)  { return value_t(&v, vm._field_info.lookup(off)); }
-inline const_value_t edict_t::operator[](cstring_t off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
+inline value_t edict_t::operator[](const quake::string_view& off)  { return value_t(&v, vm._field_info.lookup(off)); }
+inline const_value_t edict_t::operator[](const quake::string_view& off) const { return const_value_t(&v, vm._field_info.lookup(off)); }
 
 
 inline cstring_t field_t::name() const {
@@ -469,7 +468,7 @@ inline size_t field_t::offset() const {
 	return (vm.pr_fielddefs + _index)->ofs;
 }
 inline void off_name_map_t::insert(const ddef_t * def) {
-	string_debug_lookup.emplace(string_t::intern(def->name()), def);
+	string_debug_lookup.emplace(string_t(def->name()), def);
 	if (def->ofs >= offset_debug_lookup.size()) offset_debug_lookup.resize(def->ofs + 1);
 	offset_debug_lookup[def->ofs] = def;
 }

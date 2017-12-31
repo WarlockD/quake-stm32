@@ -67,6 +67,13 @@ namespace ustl {
 	using hashvalue_t = uint32_t; ///< Value type returned by the hash functions.
 	using streamsize = size_t;	///< Size of stream data
 	using streamoff = uoff_t;	///< Offset into a stream
+	// forwards
+	class memblock;
+	class cmemlink;
+	template<typename C> class string_helper;
+	template<typename C> class string_builder;
+	using string_view = string_helper<cmemlink>;
+	using string = string_builder<memblock>;
 }
 
 

@@ -149,7 +149,7 @@ struct client_static_t
 	void clear();		
 	void stop_playback();
 	void stop();
-	void establish_connection(const std::string_view& host);
+	void establish_connection(const quake::string_view& host);
 	void disconnect();
 	void signon_reply();
 	void next_demo();

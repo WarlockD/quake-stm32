@@ -66,7 +66,7 @@ namespace quake {
 		std::string  DecompileValueString(etype_t type, void *val);
 		std::string DecompileGlobal(gofs_t ofs, const def_t * req_t);
 		gofs_t DecompileScaleIndex(const dfunction_t * df, gofs_t ofs);
-		const std::string& DecompileImmediate(const dfunction_t * df, gofs_t ofs, int fun, std::string_view n= std::string_view());
+		const std::string& DecompileImmediate(const dfunction_t * df, gofs_t ofs, int fun, quake::string_view n= quake::string_view());
 		void DecompileDecompileFunction(std::ostream& os, const dfunction_t * df);
 		std::string  DecompileValueString(etype_t type, void *val);
 		std::string  DecompilePrintParameter(const ddef_t * def);

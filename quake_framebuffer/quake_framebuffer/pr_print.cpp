@@ -393,7 +393,7 @@ namespace quake {
 
 #define MAX_NO_LOCAL_IMMEDIATES 4096 /* dln: increased, not enough! */
 
-		const std::string& DecompileImmediate(const dfunction_t * df, gofs_t ofs, int fun, std::string_view n)
+		const std::string& DecompileImmediate(const dfunction_t * df, gofs_t ofs, int fun, quake::string_view n)
 		{
 			static std::map<gofs_t, std::string> IMMEDIATES;
 			static std::string empty("");
@@ -783,7 +783,7 @@ namespace quake {
 
 			switch (type) {
 			case etype_t::ev_string:
-				return DecompileString(std::string_view((const char*)val));
+				return DecompileString(quake::string_view((const char*)val));
 			case etype_t::ev_void:
 				return "void";
 				break;
@@ -1135,7 +1135,7 @@ namespace quake {
 			os << std::endl;
 		}
 #if 0
-		void DecompilePrintFunction(std::ostream& os, const  std::string_view name)
+		void DecompilePrintFunction(std::ostream& os, const  quake::string_view name)
 		{
 			int i;
 			dstatement_t *ds;

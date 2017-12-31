@@ -39,17 +39,6 @@ struct eval_t;
 
 
 
-// swaps
-
-
-static inline std::ostream& operator<<(std::ostream& os, const string_t& s) {
-	os << s.c_str();
-	return os;
-}
-static inline std::ostream& operator<<(std::ostream& os, const cstring_t& s) {
-	os << s.c_str();
-	return os;
-}
 
 struct field_t {
 	operator size_t&() { return _index; }
@@ -61,8 +50,8 @@ struct field_t {
 	inline size_t offset() const;
 	bool operator==(const field_t& l) const { return _index == l._index; }
 	bool operator!=(const field_t& l) const { return _index != l._index; }
-	bool operator==(const std::string_view& l) const { return name() == l; }
-	bool operator!=(const std::string_view& l) const { return name() != l; }
+	bool operator==(const quake::string_view& l) const { return name() == l; }
+	bool operator!=(const quake::string_view& l) const { return name() != l; }
 	bool operator<(const field_t& l) const { return _index < l._index; }
 private:
 	size_t _index;
@@ -77,8 +66,8 @@ struct func_t {
 	operator const size_t&() const { return _index; }
 	func_t(size_t index) : _index(_index) {}
 	inline size_t index() const { return _index; }
-	bool operator==(const std::string_view& l) const { return name() == l; }
-	bool operator!=(const std::string_view& l) const { return name() != l; }
+	bool operator==(const quake::string_view& l) const { return name() == l; }
+	bool operator!=(const quake::string_view& l) const { return name() != l; }
 	bool operator<(const func_t& l) const { return _index < l._index; }
 private:
 	size_t _index;

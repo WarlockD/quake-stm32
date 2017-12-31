@@ -141,7 +141,7 @@ ifstream::size_type ifstream::underflow (size_type n)
 	const ssize_t neededFreeSpace = max (n, _buffer.size() / 2);
 	const size_t oughtToErase = Align (max (0, neededFreeSpace - freeSpace));
 	const size_type nToErase = min (pos(), oughtToErase);
-	_buffer.memlink::erase (_buffer.begin(), nToErase);
+	_buffer.container().erase (_buffer.begin(), nToErase);
 	const uoff_t oldPos (pos() - nToErase);
 
 	size_type br = oldPos;
@@ -179,7 +179,7 @@ int ifstream::sync (void)
 ifstream& ifstream::seekg (off_t p, seekdir d)
 {
     _buffer.clear();
-    link (_buffer);
+    link (_buffer.container());
     _file.seekg (p, d);
     clear (_file.rdstate());
     return *this;

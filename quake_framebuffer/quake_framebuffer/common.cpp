@@ -39,29 +39,6 @@ static quake::fixed_string<MAX_OSPATH> com_gamedir;
 
 namespace quake {
 
-	void zstring::release() {
-		if (_capacity) { _capacity = 0U; Z_Free(_buffer); }
-		_buffer = "";
-		_size = 0U;
-	}
-	void zstring::reserve(size_type n) { // don't have to do anything
-		if (_capacity < n) {
-			// special case
-			if (_capacity == 0 && _size > 0U) {
-				// we are on copy on write, so need to make a new buffer and copy first
-				// we have an existing buffer
-				char* p = (pointer)Z_Realloc(nullptr, n, "ztring");
-				strncpy(p, _buffer, _size);
-				_buffer = p;
-			}
-			else {
-				_buffer = (pointer)Z_Realloc(_size == 0U ? nullptr : _buffer, n, "ztring");
-			}
-
-			_capacity = n;
-			assert(_buffer);
-		}
-	}
 }
 #define NUM_SAFE_ARGVS  7
 
@@ -363,14 +340,14 @@ int Q_strncasecmp (const char * s1, const char * s2, size_t n)
 	
 	return -1;
 }
-int Q_strcasecmp(const std::string_view& s1, const char * s2) {
+int Q_strcasecmp(const quake::string_view& s1, const char * s2) {
 	return Q_strncasecmp(s1.data(), s2,  s1.size());
 }
 int Q_strcasecmp (const char * s1, const char * s2)
 {
 	return Q_strncasecmp(s1, s2, 99999);
 }
-int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2) {
+int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2) {
 	return Q_strncasecmp(s1.data(), s2.data(), std::min(s1.size(), s2.size()));
 }
 static const char* SkipWhiteSpace(const char* data)  {
@@ -396,7 +373,7 @@ static inline int toHex(int c) {
 		return  c - 'A' + 10;
 	else return -1; 
 }
-int	Q_atoi(const std::string_view& str) {
+int	Q_atoi(const quake::string_view& str) {
 	char* ptr = nullptr;
 	int ret = strtol(str.data(), &ptr, 0);
 	assert(ptr == (str.data() + str.size())); // debug
@@ -408,7 +385,7 @@ int	Q_atoi(cstring_t str) {
 	assert(ptr == (str.data() + str.size())); // debug
 	return ret;
 }
-float	Q_atof(const std::string_view& str) {
+float	Q_atof(const quake::string_view& str) {
 	char* ptr;
 	float ret = strtof(str.data(), &ptr);
 	if (ptr == str.data()) { // not a number
@@ -485,7 +462,7 @@ int Q_atoi (const char * str)
 	
 	return 0;
 }
-std::string_view COM_GameDir() {
+quake::string_view COM_GameDir() {
 	return com_gamedir;
 }
 
@@ -913,7 +890,7 @@ float MSG_ReadAngle (void)
 
 
 
-void sizebuf_t::Print(const std::string_view&  data) {
+void sizebuf_t::Print(const quake::string_view&  data) {
 	size_t 	len = data.size() + 1;
 	if (back())
 		Q_memcpy(GetSpace(len), data.data(), len); // no trailing 0
@@ -1083,12 +1060,12 @@ static constexpr const Entry lex_table_ignore_eol[][7] = {
 	// new line
 	{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				RESTART(0), },
 };
-static std::string_view eol_token("\n");
+static quake::string_view eol_token("\n");
 
 
 // switched to more state based
-bool COM_Parser::Next(std::string_view& token, bool test_eol){
-	token = std::string_view();
+bool COM_Parser::Next(quake::string_view& token, bool test_eol){
+	token = quake::string_view();
 	while (_pos >= _data.size()) return false;
 	size_t start = _pos;
 	size_t len = 0;
@@ -1368,8 +1345,8 @@ static unordered_map_t com_packfilesearch;
 static ZVector<string_t> com_searchpaths;
 
 
-static std::unordered_map<std::string_view, std::unique_ptr<pack_t>> com_packfiles;
-static void AddSearchPath(const std::string_view& dir) {
+static std::unordered_map<quake::string_view, std::unique_ptr<pack_t>> com_packfiles;
+static void AddSearchPath(const quake::string_view& dir) {
 #if 0
 	char* cptr = (char*)Hunk_Alloc(sizeof(searchpath_t) + dir.size());
 	searchpath_t* ptr = new(cptr) searchpath_t;
@@ -1393,7 +1370,7 @@ Loads the header and directory, adding the files at the beginning
 of the list so they override previous pack files.
 =================
 */
-static bool COM_LoadPackFile(const std::string_view& packfile)
+static bool COM_LoadPackFile(const quake::string_view& packfile)
 {
 	dpackheader_t   header;
 	//dpackfile_t             info[MAX_FILES_IN_PACK];
@@ -1405,21 +1382,21 @@ static bool COM_LoadPackFile(const std::string_view& packfile)
 	sys_file file(c_helper.str().c_str());
 	if (!file.is_open())
 	{
-		Con_Printf("Couldn't open %s\n", packfile);
+		quake::con << "Couldn't open " << c_helper.str().c_str() << std::endl;
 		return false;
 	}
 	file.read((char*)&header, sizeof(header));
 
 	if (header.id[0] != 'P' || header.id[1] != 'A'
 		|| header.id[2] != 'C' || header.id[3] != 'K')
-		Sys_Error("%s is not a packfile", packfile);
+		Sys_Error("%s is not a packfile", c_helper.str().c_str();
 	header.dirofs = LittleLong(header.dirofs);
 	header.dirlen = LittleLong(header.dirlen);
 
 	size_t numpackfiles = header.dirlen / sizeof(dpackfile_t);
 
 	if (numpackfiles > MAX_FILES_IN_PACK)
-		Sys_Error("%s has %i files", packfile, numpackfiles);
+		Sys_Error("%s has %i files", c_helper.str().c_str(, numpackfiles);
 
 	if (numpackfiles != PAK0_COUNT)
 		com_modified = true;    // not the original file
@@ -1429,7 +1406,7 @@ static bool COM_LoadPackFile(const std::string_view& packfile)
 	// crc the directory to check for modifications
 	CRC_Init(&crc);
 	pack_t* pack = new((pack_t*)Hunk_AllocName(sizeof(pack_t) + (numpackfiles - 1) * sizeof(search_value_t), "packfile")) pack_t;
-	pack->filename = string_t::intern(packfile);
+	pack->filename = string_t::intern(packfile.data(),packfile.size());
 	pack->file_count = numpackfiles;
 
 	com_packfiles.emplace(pack->filename, pack);
@@ -1480,7 +1457,7 @@ COM_WriteFile
 The filename will be prefixed by the current game directory
 ============
 */
-void COM_WriteFile (const std::string_view& filename, const void * data, int len)
+void COM_WriteFile (const quake::string_view& filename, const void * data, int len)
 {
 	quake::fixed_string_stream<MAX_OSPATH> name;
 
@@ -1546,7 +1523,7 @@ Sets com_filesize and one of handle or file
 */
 
 
-size_t COM_FindFile(const std::string_view& filename, std::fstream& stream)
+size_t COM_FindFile(const quake::string_view& filename, std::fstream& stream)
 {
 	quake::fixed_string_stream<MAX_OSPATH>   cachepath;
 	quake::fixed_string_stream<MAX_OSPATH>   netpath;
@@ -1629,7 +1606,7 @@ cache_user_t *loadcache;
 byte    *loadbuf;
 int             loadsize;
 
-static byte *COM_LoadFile (const std::string_view& path, int usehunk, size_t* file_size=nullptr)
+static byte *COM_LoadFile (const quake::string_view& path, int usehunk, size_t* file_size=nullptr)
 {
 	byte    *buf = nullptr;  // quiet compiler warning
 // look for it in the filesystem or pack files
@@ -1658,8 +1635,10 @@ static byte *COM_LoadFile (const std::string_view& path, int usehunk, size_t* fi
 	else
 		Sys_Error ("COM_LoadFile: bad usehunk");
 
-	if (!buf)
-		Sys_Error ("COM_LoadFile: not enough space for %s", path);
+	if (!buf) {
+		Sys_Error("COM_LoadFile: not enough space for %s", quake::string(path).c_str()));
+	}
+		
 		
 	((byte *)buf)[len] = 0;
 
@@ -1682,29 +1661,29 @@ static byte *COM_LoadFile (const std::string_view& path, int usehunk, size_t* fi
 
 	return buf;
 }
-byte *COM_LoadZFile(const std::string_view& path, size_t* file_size )
+byte *COM_LoadZFile(const quake::string_view& path, size_t* file_size )
 {
 	return COM_LoadFile(path, 0);
 }
 
-byte *COM_LoadHunkFile (const std::string_view& path, size_t* file_size)
+byte *COM_LoadHunkFile (const quake::string_view& path, size_t* file_size)
 {
 	return COM_LoadFile (path, 1, file_size);
 }
 
-byte *COM_LoadTempFile (const std::string_view& path)
+byte *COM_LoadTempFile (const quake::string_view& path)
 {
 	return COM_LoadFile (path, 2);
 }
 
-void COM_LoadCacheFile (const std::string_view& path, struct cache_user_t *cu)
+void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu)
 {
 	loadcache = cu;
 	COM_LoadFile (path, 3);
 }
 
 // uses temp hunk if larger than bufsize
-byte *COM_LoadStackFile (const std::string_view& path, void *buffer, int bufsize)
+byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize)
 {
 	byte    *buf;
 	
@@ -1724,7 +1703,7 @@ Sets com_gamedir, adds the directory to the head of the path,
 then loads and adds pak1.pak pak2.pak ... 
 ================
 */
-static void COM_AddGameDirectory(const std::string_view& dir)
+static void COM_AddGameDirectory(const quake::string_view& dir)
 {
 	AddSearchPath(dir);
 
@@ -1817,11 +1796,11 @@ void COM_InitFilesystem(void)
 	if ((i = host_parms.COM_CheckParm("-path")) != 0)
 	{
 		com_modified = true;
-		std::string_view file_name;
+		quake::string_view file_name;
 		for (size_t j = i + 1; i < host_parms.args.size(); i++) {
 			auto it = host_parms.args[j];
 			if (!it.empty() || it.at(0) == '+' || it.at(0) == '-') {
-				file_name = std::string_view(it);
+				file_name = it.c_str();
 				break;
 			}
 

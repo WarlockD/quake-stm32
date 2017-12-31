@@ -42,13 +42,13 @@ The game starts with a Cbuf_AddText ("exec quake.rc\n"); Cbuf_Execute ();
 void Cbuf_Init (void);
 // allocates an initial text buffer that will grow as needed
 
-void Cbuf_AddText (const std::string_view&  text);
+void Cbuf_AddText (const quake::string_view&  text);
 
 
 // as new commands are generated from the console or keybindings,
 // the text is added to the end of the command buffer.
 
-void Cbuf_InsertText (const std::string_view&  text);
+void Cbuf_InsertText (const quake::string_view&  text);
 
 // when a command wants to issue other commands immediately, the text is
 // inserted at the beginning of the buffer, before any remaining unexecuted
@@ -83,7 +83,7 @@ typedef enum
 
 typedef void (*xcommand_t) (cmd_source_t source, const StringArgs& args);
 void execute_args(const StringArgs& args, cmd_source_t src);
-void execute_args(const  std::string_view& text, cmd_source_t src);
+void execute_args(const  quake::string_view& text, cmd_source_t src);
 
 
 
@@ -97,7 +97,7 @@ void	Cmd_AddCommand (string_t cmd_name, xcommand_t function);
 qboolean Cmd_Exists (string_t cmd_name);
 // used by the cvar code to check for cvar / command name overlap
 
-std::string_view Cmd_CompleteCommand (const std::string_view& partial);
+quake::string_view Cmd_CompleteCommand (const quake::string_view& partial);
 // attempts to match a partial command for automatic command line completion
 // returns NULL if nothing fits
 

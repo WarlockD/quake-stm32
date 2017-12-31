@@ -177,13 +177,12 @@ private:
 
 /// Writes \p v into the stream.
 template <typename Iterator, typename WChar>
-utf8out_iterator<Iterator,WChar>& utf8out_iterator<Iterator,WChar>::operator= (WChar v)
-{
+utf8out_iterator<Iterator,WChar>& utf8out_iterator<Iterator,WChar>::operator= (WChar v) {
     const size_t nBytes = Utf8Bytes (v);
     if (nBytes > 1) {
 	// Write the bits 6 bits at a time, except for the first one,
 	// which may be less than 6 bits.
-	wchar_t shift = nBytes * 6;
+	size_t shift = nBytes * 6;
 	*_i++ = ((v >> (shift -= 6)) & 0x3F) | (0xFF << (8 - nBytes));
 	while (shift)
 	    *_i++ = ((v >> (shift -= 6)) & 0x3F) | 0x80;
@@ -196,15 +195,13 @@ utf8out_iterator<Iterator,WChar>& utf8out_iterator<Iterator,WChar>::operator= (W
 
 /// Returns a UTF-8 adaptor writing to \p i. Useful in conjuction with back_insert_iterator.
 template <typename Iterator>
-inline utf8out_iterator<Iterator> utf8out (Iterator i)
-{
+inline utf8out_iterator<Iterator> utf8out (Iterator i) {
     return utf8out_iterator<Iterator> (i);
 }
 
 /// Returns a UTF-8 adaptor reading from \p i.
 template <typename Iterator>
-inline utf8in_iterator<Iterator> utf8in (Iterator i)
-{
+inline utf8in_iterator<Iterator> utf8in (Iterator i) {
     return utf8in_iterator<Iterator> (i);
 }
 

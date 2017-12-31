@@ -11,13 +11,13 @@ namespace ustl {
 	/// Reads the object from stream \p s
 	void memlink::read(istream& is)
 	{
-		uint32_t n = 0;
+		written_size_type n = 0;
 		is >> n;
 		if (!is.verify_remaining("read", "ustl::memlink", n))
 			return;
 		if (n > size())
 			throw length_error("memlink can not increase the size of the linked storage for reading");
-		_data.resize(n);
+		resize(n);
 		is.read(data(), n);
 		is.align(stream_align_of(n));
 	}
@@ -29,5 +29,16 @@ namespace ustl {
 	/// \arg elCount Number of times to write the pattern.
 	/// Total number of bytes written is \p elSize * \p elCount.
 	///
+	void memlink::fill(const_iterator cstart, const void* p, size_type elSize, size_type elCount) noexcept
+	{
+		assert(data() || !elCount || !elSize);
+		assert(cstart >= begin() && cstart + elSize * elCount <= end());
+		iterator start = const_cast<iterator>(cstart);
+		if (elSize == 1)
+			fill_n(start, elCount, *reinterpret_cast<const uint8_t*>(p));
+		else while (elCount--)
+			start = copy_n(const_iterator(p), elSize, start);
+	}
+
 
 }

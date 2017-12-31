@@ -52,8 +52,8 @@ public:
     void			iread (wchar_t& v);
     void			iread (string& v);
     inline void			iread (fmtflags_bits f);
-    inline string		str (void) const	{ string s; s.link (*this); return s; }
-    inline istringstream&	str (const string& s)	{ link (s); return *this; }
+    inline string		str (void) const	{ string s; s.link (data(),size()); return s; }
+    inline istringstream&	str (const string& s)	{ link (s.container()); return *this; }
     inline istringstream&	get (char& c)	{ return read (&c, sizeof(c)); }
     inline int			get (void)	{ char c = EOF; get(c); return c; }
     istringstream&		get (char* p, size_type n, char delim = '\n');

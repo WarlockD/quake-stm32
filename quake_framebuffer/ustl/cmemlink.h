@@ -143,155 +143,142 @@ namespace ustl {
 			else return 0;
 		}
 	};
-	template<typename _TRAITS>
-	struct clink_interface {
-		using traits = _TRAITS;
-		using self_t = clink_interface<_TRAITS>;
-		using value_type = typename traits::value_type;
-		using pointer = typename traits::pointer;
-		using const_pointer = typename traits::const_pointer;
-		using reference = typename traits::reference;
-		using const_reference = typename traits::const_reference;
-		using size_type = typename traits::size_type;
-		using difference_type = typename traits::difference_type;
-		using const_iterator = typename traits::const_iterator;
-		using iterator = typename traits::iterator;
-		// interface
-		virtual const_pointer data() const = 0;
-		virtual size_type size() const = 0;
-		//helpers
-		const_iterator begin() const { return const_iterator(data()); }
-		const_iterator end() const { return const_iterator(data()) + size(); }
-		
-		inline bool empty(void) const { return!size(); }
 
-		template<typename TRAITS>
-		inline bool operator==(const clink_interface<TRAITS>& r) const {
-			return size() == r.size() && (data() == r.data() || ::memcmp(data(), r.data(), size()) == 0);
-		}
-		template<typename TRAITS>
-		inline bool operator!=(const clink_interface<TRAITS>& r) const { return !(*this == r); }
-
-		virtual ~clink_interface() {}
-	};
-	// fuck this shit, tryuing to make this too complcated with to many templates
-	struct cdata_t : public cmemlink_t<cdata_t, clink_interface<link_traits<char, false, false>>> {
-		using base_t = cmemlink_t<cdata_t, clink_interface<link_traits<char, false, false>>>;
-		using traits = base_t::traits;
-		using value_type = typename traits::value_type;
-		using pointer = typename traits::pointer;
-		using const_pointer = typename traits::const_pointer;
-		using reference = typename traits::reference;
-		using const_reference = typename traits::const_reference;
-		using size_type = typename traits::size_type;
-		using difference_type = typename traits::difference_type;
-		using const_iterator = typename traits::const_iterator;
-		using iterator = typename traits::iterator;
-
-		constexpr inline cdata_t() : _data(nullptr), _size(0U) { }
-		constexpr inline cdata_t(const void* p, size_type s) : _data(reinterpret_cast<const char*>(p)), _size(s) { }
-		template<typename B, typename I>
-		constexpr inline cdata_t(const cmemlink_t<B, I>& l) : _data(l.data()), _size(l.size()) { }
-
-		// interface
-		inline const_pointer data() const override final { return _data; }
-		inline size_type size() const override final { return _size; }
-	protected:
-		void relink(const void* p, size_type s) override final { _data = traits::cast(p); _size = s; }
-		const_pointer _data;
-		size_type _size;
-	};
-
-	template<typename _BASE, typename _INTERFACE>
-	struct cmemlink_t : public _INTERFACE { //clink_interface<_TRAITS> {
-		using base_t = _BASE;
-		using ibase_t = _INTERFACE;
-		using traits = typename ibase_t::traits;
-		using self_t = cmemlink_t<base_t, ibase_t>;
-		using value_type = typename traits::value_type;
-		using pointer = typename traits::pointer;
-		using const_pointer = typename traits::const_pointer;
-		using reference = typename traits::reference;
-		using const_reference = typename traits::const_reference;
-		using size_type = typename traits::size_type;
-		using difference_type = typename traits::difference_type;
-		using const_iterator = typename traits::const_iterator;
-		using iterator = typename traits::iterator;
-		//static_assert(has_size_function<BASE>::value, "Missing size()");
-		//static_assert(has_cdata_function<BASE, value_type>::value, "Missing data()");
-
-		void unlink() { relink(nullptr, 0U);  }
-		void link(const void* p, size_type n) {
-			if (!p && n) throw bad_alloc(n);
-			if (p != data() || n != size()) // don't relink self
-				relink(p, n);
-		}
-		template<typename BASE,typename I>
-		inline void	link(cmemlink_t<BASE,I>& l) { link(l.begin(), l.size()); }
-		inline void link(const void* first, const void*  last) { return  link(first, distance(first, last)); }
-		// we can have a diffrent base, but the type and traits have to be the same
-		template<typename BASE, typename I>
-		void swap(cmemlink_t<BASE,I>& l) {
-			if (std::addressof(l) != this) {
-				auto p = data();
-				auto s = size();
-				link(l.data, l.size());
-				l.link(p, s);
-			}
-		}
-	protected:
-		inline base_t sub_data(size_type pos = 0, size_type count = traits::npos) const {
-			if (pos > size()) throw std::out_of_range("size_terminated_data::sub_data");
-			base_t b;
-			b.link(data() + pos, min(count, size() - pos));
-			return std::move(b);
-		}
-		inline base_t remove_prefix(size_type n, std::false_type) const {
-			if (n > size()) throw std::out_of_range("size_terminated_data::sub_data");
-			base_t b;
-			b.link(data() + n, size() - n);
-			return std::move(b);
-		}
-		inline base_t remove_suffix(size_type n, std::false_type) const {
-			if (n > size()) throw std::out_of_range("size_terminated_data::sub_data");
-			base_t b;
-			b.link(data(), size() - n);
-			return std::move(b);
-		}
-	
-		// we need this
-		virtual void relink(const void* p, size_type s) = 0;
-	private:
-		base_t& base() { return *static_cast<base_t*>(this); }
-		const base_t& base() const { return *static_cast<const base_t*>(this); }
-
-	
-	};
-
-
-
-	class cmemlink : public cdata_t {
+	/// \class cmemlink cmemlink.h ustl.h
+	/// \ingroup MemoryManagement
+	///
+	/// \brief A read-only pointer to a sized block of memory.
+	///
+	/// Use this class the way you would a const pointer to an allocated unstructured block.
+	/// The pointer and block size are available through member functions and cast operator.
+	///
+	/// Example usage:
+	///
+	/// \code
+	///     void* p = malloc (46721);
+	///     cmemlink a, b;
+	///     a.link (p, 46721);
+	///     assert (a.size() == 46721));
+	///     b = a;
+	///     assert (b.size() == 46721));
+	///     assert (b.DataAt(34) == a.DataAt(34));
+	///     assert (0 == memcmp (a, b, 12));
+	/// \endcode
+	///
+	class cmemlink {
 	public:
-		using base_t = cmemlink_t<cdata_t, cmemlink>;
-		using written_size_type = uint32_t;
-
-		inline cmemlink(void) : cdata_t() { }
-		inline cmemlink(const void* p, size_type n) : cdata_t(p,n) { }
-		inline cmemlink(const cdata_t& l) : cdata_t(l){  }
-
-		inline iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
-		inline size_type	max_size(void) const { return size(); }
+		typedef char		value_type;
+		typedef const value_type*	pointer;
+		typedef const value_type*	const_pointer;
+		typedef value_type		reference;
+		typedef value_type		const_reference;
+		typedef size_t		size_type;
+		typedef uint32_t		written_size_type;
+		typedef ptrdiff_t		difference_type;
+		typedef const_pointer	const_iterator;
+		typedef const_iterator	iterator;
+		typedef const cmemlink&	rcself_t;
+	public:
+		constexpr inline		cmemlink(void) : _data(nullptr), _size(0) { }
+		constexpr inline		cmemlink(const void* p, size_type n) : _data(const_pointer(p)), _size(n) { assert(p || !n); }
+		constexpr inline		cmemlink(const cmemlink& l) : _data(l._data), _size(l._size) {}
+		inline virtual     ~cmemlink(void) noexcept {}
+		void		link(const void* p, size_type n);
+		inline void		link(const cmemlink& l) { link(l.begin(), l.size()); }
+		inline void		link(const void* first, const void* last) { link(first, distance(first, last)); }
+		inline void		relink(const void* p, size_type n);
+		virtual void	unlink(void) noexcept { _data = nullptr; _size = 0; }
+		inline rcself_t	operator= (const cmemlink& l) { link(l); return *this; }
+		bool		operator== (const cmemlink& l) const noexcept;
+		inline void		swap(cmemlink& l) { ::ustl::swap(_data, l._data); ::ustl::swap(_size, l._size); }
+		constexpr inline size_type	size(void) const { return _size; }
+		constexpr inline size_type	max_size(void) const { return size(); }
 		inline size_type	readable_size(void) const { return size(); }
-
-		inline void		resize(size_type n) { relink(data(), n); }
+		constexpr inline bool		empty(void) const { return !size(); }
+		constexpr inline const_pointer	data(void) const { return _data; }
+		constexpr inline const_pointer	cdata(void) const { return _data; }
+		inline iterator	begin(void) const { return iterator(cdata()); }
+		inline iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
+		inline iterator	end(void) const { return iat(size()); }
+		inline void		resize(size_type n) { _size = n; }
 		inline void		read(istream&) { assert(!"ustl::cmemlink is a read-only object."); }
 		void		write(ostream& os) const;
 		size_type		stream_size(void) const noexcept;
 		void		text_write(ostringstream& os) const;
 		void		write_file(const char* filename, int mode = 0644) const;
-		/// A fast alternative to link which can be used when relinking to the same block (i.e. when it is resized)
-		size_type capacity() const { return size(); }
+	private:
+		const_pointer	_data;		///< Pointer to the data block (const)
+		size_type		_size;		///< size of the data block
 	};
+
+	//----------------------------------------------------------------------
+
+	/// A fast alternative to link which can be used when relinking to the same block (i.e. when it is resized)
+	inline void cmemlink::relink(const void* p, size_type n)
+	{
+		_data = reinterpret_cast<const_pointer>(p);
+		_size = n;
+	}
+
+	//----------------------------------------------------------------------
+
+	/// Use with cmemlink-derived classes to link to a static array
+#define static_link(v)	link (VectorBlock(v))
+	// fuck this shit, tryuing to make this too complcated with to many templates
+	template<typename T,typename LINK= cmemlink>
+	struct cdata_t {
+		using value_type = T;
+		using const_pointer = const value_type*;
+		using pointer = const_pointer;
+		using const_reference = const value_type&;
+		using reference = const_reference;
+		using const_iterator = const_pointer;
+		using iterator = const_iterator;
+		using reference = const_reference;
+		using size_type = std::size_t;
+		using difference_type = std::ptrdiff_t;
+		static constexpr size_type npos = size_t(-1);
+		constexpr inline cdata_t() : data() { }
+		constexpr inline cdata_t(const_pointer p, size_type s) : _data(p, s * sizeof(T)), _count(s) { }
+		constexpr inline cdata_t(const LINK& l) : _data(l.data(),l.size()), _count(l.size()/sizeof(T)) { }
+
+		constexpr inline const_pointer data() const { return reinterpret_cast<const_pointer>(_data.data()); }
+		constexpr inline size_type size() const { return _count; }
+		constexpr inline bool		empty(void) const { return !size(); }
+
+		constexpr const_reference at(size_t i) const { assert(i < _count); return data()[i]; }
+		constexpr const_reference operator[](size_t i) const { assert(i < _count); return data()[i]; }
+
+		constexpr const_iterator begin() const { return data(); }
+		constexpr const_iterator end() const { return data() + size(); }
+		constexpr const_reference front() const { return *data(); }
+		constexpr const_reference back() const { return *(data() + size()-1); }
+
+		inline void link(const void* p, size_type s) { _data.link(p, s); }
+		inline void	link(const LINK& l) { _data.link(l); }
+		inline void link(const void* first, const void*  last) { _data.link(first, last); }
+
+		void swap(cdata_t& l) { _data.swap(l.sub_data); }
+
+		inline cdata_t sub_data(size_type pos = 0, size_type count = npos) const {
+			assert(pos < size());
+			return cdata_t(data() + pos, min(count, size() - pos));
+		}
+		inline cdata_t remove_prefix(size_type n) const {
+			assert(n < size());
+			return cdata_t(data() + n, size() - n);
+		}
+		inline cdata_t remove_suffix(size_type n) const {
+			assert(n < size());
+			return cdata_t(data(), size() - n);
+		}
+		inline bool operator==(const cdata_t& r) const { return _data == r._data; }
+		inline bool operator!=(const cdata_t& r) const { return !(*this == r); }
+	protected:
+		LINK _data;
+		size_type _count;
+	};
+
 
 	//----------------------------------------------------------------------
 

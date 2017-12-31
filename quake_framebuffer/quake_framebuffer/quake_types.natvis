@@ -19,7 +19,7 @@
 
   
   
-  <Type Name="std::string_view" Inheritable="true">
+  <Type Name="quake::string_view" Inheritable="true">
     <DisplayString Condition="_size == 0">empty</DisplayString>
     <DisplayString Condition="_size > 0">[ size={_size}] {_data,[_size]s8}</DisplayString>
   </Type>

@@ -84,20 +84,20 @@ struct cvar_t<cstring_t> : public cvar_t_base {
 
 typename 
 
-void Cvar_RegisterVariable(const std::string_view& name, cvar_t<float>& variable);
-void Cvar_RegisterVariable(const std::string_view& name, cvar_t<cstring_t>& variable);
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<float>& variable);
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<cstring_t>& variable);
 
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
-void 	Cvar_Set (string_t var_name, const std::string_view& value);
+void 	Cvar_Set (string_t var_name, const quake::string_view& value);
 void 	Cvar_Set(string_t var_name, float value);
 // equivelant to "<name> <variable>" typed at the console
 
 // expands value to a string and calls Cvar_Set
 // returns an empty string if not defined
 
-std::string_view Cvar_CompleteVariable (const std::string_view& partial);
+quake::string_view Cvar_CompleteVariable (const quake::string_view& partial);
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 

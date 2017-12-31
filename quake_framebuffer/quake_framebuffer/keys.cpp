@@ -175,7 +175,7 @@ void Key_Console (int key)
 
 	if (key == K_TAB)
 	{	// command completion
-		std::string_view cmd = Cmd_CompleteCommand (key_lines[edit_line].substr(1));
+		quake::string_view cmd = Cmd_CompleteCommand (key_lines[edit_line].substr(1));
 		if (cmd.empty())
 			cmd = Cvar_CompleteVariable (key_lines[edit_line].substr(1));
 		if (!cmd.empty())
@@ -332,7 +332,7 @@ the given string.  Single ascii characters return themselves, while
 the K_* names are matched up.
 ===================
 */
-int Key_StringToKeynum (const std::string_view& str)
+int Key_StringToKeynum (const quake::string_view& str)
 {
 	keyname_t	*kn;
 	

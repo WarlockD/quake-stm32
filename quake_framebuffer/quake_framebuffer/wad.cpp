@@ -93,14 +93,14 @@ void WadFile::load(const char* filename) {
 		lump_p.filepos = LittleLong(lump_p.filepos);
 		lump_p.size = LittleLong(lump_p.size);
 		W_CleanupName(lump_p.name);
-		std::string_view name(lump_p.name);
+		quake::string_view name(lump_p.name);
 		wad_lookup.emplace(name, &lump_p);
 		if (lump_p.type == TYP_QPIC)
 			SwapPic((qpic_t *)(wad_base + lump_p.filepos));
 	}
 }
 
-lumpinfo_t* WadFile::findinfo(const std::string_view& name) {
+lumpinfo_t* WadFile::findinfo(const quake::string_view& name) {
 	auto it = wad_lookup.find(name);
 	if (it != wad_lookup.end()) return it->second;
 

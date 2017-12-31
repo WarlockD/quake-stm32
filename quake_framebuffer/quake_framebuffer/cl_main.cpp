@@ -171,7 +171,7 @@ void CL_Disconnect_f(cmd_source_t source, const StringArgs& args)
 }
 
 
-void client_static_t::establish_connection(const std::string_view& host) {
+void client_static_t::establish_connection(const quake::string_view& host) {
 	if (state == ca_dedicated) return;
 	if (demoplayback) return;
 

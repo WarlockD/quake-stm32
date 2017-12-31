@@ -473,7 +473,7 @@ void Host_Savegame_f(cmd_source_t source, const StringArgs& args)
 		return;
 	}
 
-	if (args[1].find("..") != std::string_view::npos)
+	if (args[1].find("..") != quake::string_view::npos)
 	{
 		quake::con << "Relative pathnames are not allowed." << std::endl;
 		return;
@@ -652,7 +652,7 @@ void Host_Loadgame_f(cmd_source_t source, const StringArgs& args)
 		str[i] = 0;
 		start = str;
 		COM_Parser parser(str);
-		std::string_view token;
+		quake::string_view token;
 		if (!parser.Next(token)) break; // end of file
 
 		if (token[0] != '{')
@@ -1031,7 +1031,7 @@ void Host_Say(cmd_source_t source, const StringArgs&args, qboolean teamonly)
 		//sprintf (text, "%c<%s> ", 1, hostname.string);
 	for (size_t i = 1; i < args.size(); i++) {
 		// remove quotes if present
-		std::string_view p = args[i];
+		quake::string_view p = args[i];
 		text << p << ' ';
 	}
 	text << std::endl;
@@ -1083,7 +1083,7 @@ void Host_Tell_f(cmd_source_t source, const StringArgs& args)
 	text << host_client->name << ": ";
 	for (size_t i = 1; i < args.size(); i++) {
 		// remove quotes if present
-		std::string_view p = args[i];
+		quake::string_view p = args[i];
 		text << p << ' ';
 	}
 	text << std::endl;
@@ -1492,7 +1492,7 @@ void Host_Give_f(cmd_source_t source, const StringArgs& args)
 	if (vm.pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
-	std::string_view t = args[1];
+	quake::string_view t = args[1];
 	v = Q_atoi (args[2]);
 	
 	switch (t[0])

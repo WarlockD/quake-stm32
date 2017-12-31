@@ -9,7 +9,7 @@
 
 namespace ustl {
 
-class string;
+
 
 /// \class ostringstream sostream.h ustl.h
 /// \ingroup TextStreams
@@ -40,7 +40,7 @@ public:
     void			iwrite (bool v);
     inline void			iwrite (const char* s)		{ write (s, strlen(s)); }
     inline void			iwrite (const unsigned char* s)	{ iwrite ((const char*) s); }
-    inline void			iwrite (const string& v)	{ write (v.begin(), v.size()); }
+    inline void			iwrite (const string& v)	{ write (v.data(), v.size()); }
     inline void			iwrite (fmtflags_bits f);
 #if HAVE_THREE_CHAR_TYPES
     inline void			iwrite (signed char v)		{ iwrite ((char) v); }

@@ -37,7 +37,7 @@ public:
 	//const char* name;
 	//const char* value;
 	//static void operator delete(void *ptr);
-	//static cmdalias_t* create(const std::string_view& name, const std::string_view& value);
+	//static cmdalias_t* create(const quake::string_view& name, const quake::string_view& value);
 	//char	name[MAX_ALIAS_NAME];
 	//quake::fixed_string<256> value; // this can be a script.. humm
 } ;

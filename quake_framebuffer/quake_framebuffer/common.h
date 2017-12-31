@@ -46,6 +46,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // based of sys\queue.h  could always use that I suppose
 #include "list.hpp"
 #include "tailq.hpp"
+#include <ustring.h>
 
 #include "macros.h"
 // cause I am having problems with list and tail I am putting a wrapper around it
@@ -129,22 +130,40 @@ using qboolean = bool;
 struct string_t;
 
 using cstring_t = ustl::cstring;
+namespace quake {
+	using string = ustl::string;
+
+	using string_view = ustl::string_view;
+
+}
+
 
 
 struct string_t : public ustl::cstring {
 public:
 	static  const char* intern(const char* str);
 	static  const char* intern(const char* str,size_t size);
-	static  const char* intern(const std::string_view&  str);
-	constexpr inline string_t() : ustl::cstring() {}
+	static  const char* intern(const quake::string_view&  str);
+	inline string_t() : ustl::cstring() {}
 	template<typename T>
 	inline string_t(const ustl::string_helper<T>& s) : ustl::cstring(intern(s.data(),s.size())) {}
-	inline string_t(const std::string_view&  str) : ustl::cstring(intern(str)) { }
+	inline string_t(const quake::string_view&  str) : ustl::cstring(intern(str)) { }
 	inline string_t(const char*  str) : ustl::cstring(intern(str)) { }
  	friend class pr_system_t;
 };
 
+// swaps
+#if 0
 
+static inline std::ostream& operator<<(std::ostream& os, const string_t& s) {
+	os << s.c_str();
+	return os;
+}
+static inline std::ostream& operator<<(std::ostream& os, const cstring_t& s) {
+	os << s.c_str();
+	return os;
+}
+#endif
 namespace std {
 	template<>
 	struct hash<cstring_t> {
@@ -226,7 +245,7 @@ using link_list_t = list::head<T, FIELD>;
 //============================================================================
 
 //http://videocortex.io/2017/custom-stream-buffers/
-int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2);
+int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2);
 
 namespace quake {
 	static constexpr size_t DEFAULT_STREAM_BUFFER_SIZE = 1024;
@@ -539,143 +558,83 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 
 
 	template<typename FUNC, typename T>
-	inline size_t _to_number_int(FUNC f, const std::string_view& str, T& value, int base = 0) {
+	inline size_t _to_number_int(FUNC f, const quake::string_view& str, T& value, int base = 0) {
 		const char* sp = str.data();
 		char* endp = nullptr;
 		value = f(sp, &endp, base);
 		return endp - sp;
 	}
 	template<typename FUNC, typename T>
-	inline size_t _to_number_float(FUNC f, const std::string_view& str, T& value) {
+	inline size_t _to_number_float(FUNC f, const quake::string_view& str, T& value) {
 		const char* sp = str.data();
 		char* endp = nullptr;
 		value = f(sp, &endp);
 		return endp - sp;
 	}
-	inline size_t to_number(const std::string_view& str, float& value) { return _to_number_float(::strtof, str, value); }
-	inline size_t to_number(const std::string_view& str, double& value) { return _to_number_float(::strtod, str, value); }
-	inline size_t to_number(const std::string_view& str, long double& value) { return _to_number_float(::strtold, str, value); }
-	inline size_t to_number(const std::string_view& str, int& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
-	inline size_t to_number(const std::string_view& str, long& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
-	inline size_t to_number(const std::string_view& str, unsigned long& value, int base = 0) { return _to_number_int(::strtoul, str, value, base); }
+	inline size_t to_number(const quake::string_view& str, float& value) { return _to_number_float(::strtof, str, value); }
+	inline size_t to_number(const quake::string_view& str, double& value) { return _to_number_float(::strtod, str, value); }
+	inline size_t to_number(const quake::string_view& str, long double& value) { return _to_number_float(::strtold, str, value); }
+	inline size_t to_number(const quake::string_view& str, int& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
+	inline size_t to_number(const quake::string_view& str, long& value, int base = 0) { return _to_number_int(::strtol, str, value, base); }
+	inline size_t to_number(const quake::string_view& str, unsigned long& value, int base = 0) { return _to_number_int(::strtoul, str, value, base); }
 
 
 
 	// fixed buffer string
 	template<size_t SIZE> class fixed_string_stream;
+#if 0
 
-	class string_buffer : public ustl::string_helper<ustl::memlink> {
-	public:
-		using builder = ustl::string_helper<string_buffer>;
-		constexpr size_type capacity() const { return _capacity; }
-		const_pointer data() const { return _buffer; }
-		pointer data() { return _buffer; }
-		size_type size() const { return _size; }
-		const_pointer c_str() const { return _buffer; }
-		size_t max_size() const { return _capacity-1; } // we cannot expand this, needed for builder
-		void resize(size_type n) { 
-			assert(n <= max_size());
-			if(_buffer && _buffer != "") _buffer[_size] = '\0';
-			else _size = 0U; // empty buffer
-			 _size = n; 
-		}
-		void reserve(size_type n) { (void)n; assert(n < _capacity); } // don't have to do anything
+	using string = ustl::string;
+	
 
-		constexpr string_buffer() : _size(0), _capacity(0), _buffer("") {  }
-		constexpr string_buffer(pointer buffer, size_type capacity) : _size(0), _capacity(capacity), _buffer(buffer) { _buffer[0] = 0; }
-		constexpr string_buffer(pointer buffer, size_type capacity, size_type size) : _size(size), _capacity(capacity), _buffer(buffer) { _buffer[size] = 0; }
-	};
-
-	class zstring : public util::string_builder<string_buffer> {
-	protected:
-		pointer _buffer;
-		size_t _capacity;
-		size_t _size;
-		using builder = util::string_builder<zstring>;
-		void release();
-	public:
-		constexpr size_type capacity() const { return _capacity-1; }
-		const_pointer data() const { return _buffer; }
-		pointer data() { return _buffer; }
-		size_type size() const { return _size; }
-		const_pointer c_str() const { return _buffer; }
-		size_t max_size() const { return 0xFFFFF; } // we cannot expand this, needed for builder
-		void swap(zstring& other) {
-			if (std::addressof(other) != this) {
-				std::swap(_buffer, other._buffer);
-				std::swap(_size, other._size);
-				std::swap(_capacity, other._capacity);
-			}
-		}
-		void reserve(size_type n);
-		void resize(size_type n) { if (_size < (_capacity - 1)) zstring::reserve(n + 16); _size = n; }
-		zstring() : _buffer(""), _capacity(0), _size(0) {}
-		zstring(const char* str, size_t size) : _buffer(nullptr), _capacity(0), _size(0) {}
-		zstring(const std::string_view& str) : zstring(str.data(), str.size()) {
-			if (str.data()[str.size()] == 0) { _buffer = const_cast<char*>(str.data()); _size = str.size(); }
-			else assign(str);
-		}
-		template<typename T>
-		zstring(const util::string_helper<T>& s) : _buffer(s.c_str()), _capacity(0U), _size(s.size()) {}
-		// have to handle assigments because of pointer
-		zstring(const zstring& v) : _buffer(v._buffer), _capacity(0U), _size(v.size()) {}
-		zstring(zstring&& v) : _buffer(v._buffer), _capacity(v._capacity), _size(v._size) { v._capacity = 0U; }
-		zstring& operator=(const zstring& v) { release();  _buffer = v._buffer;  _size = v._size;  return *this; }
-		zstring& operator= (zstring&& v) { swap(v); return *this; }
-		~zstring() { release(); }
-
-	};
-	// fixed buffer string
 	template<size_t _SIZE>
-	class fixed_string : public string_buffer {
-		std::array<string_buffer::value_type, _SIZE> _fbuffer;
-	public:
-		fixed_string() : string_buffer(_fbuffer.data(), _fbuffer.size()) {}
-		fixed_string(const_pointer str) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str); }
-		template<typename T>
-		fixed_string(const util::string_helper<T>& str) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str.c_str(), str.length()); }
-		fixed_string(const_pointer str,size_t len) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(str,len); }
-		fixed_string(const std::string_view& s) : string_buffer(_fbuffer.data(), _fbuffer.size()) { assign(s); }
-		operator string_buffer&() { return *this; }
-		operator const string_buffer&() const{ return *this; }
-		template<size_t SIZE>
-		inline bool operator==(const fixed_string<SIZE>& s) const { return string_view(_buffer, _size).compare(s) == 0; }
-		template<size_t SIZE>
-		inline bool operator!=(const fixed_string<SIZE>& s) const { return string_view(_buffer, _size).compare(s) != 0; }
-	};
+	using fixed_string = ustl::static_string<_SIZE>;
+	using string_buffer = ustl::fixed_string;
+
+#endif
+	using zstring = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
+	using string = std::string;
+	using  string_view = std::string_view;
+	using string_buffer = std::string;
+	template<size_t _SIZE>
+	using fixed_string = std::basic_string<char, std::char_traits<char>, umm_stack_allocator<char,_SIZE>>;
+
+
 
 	class fixed_string_buffer : public std::streambuf {
 	public:
 		void clear() {
-			if (_str) {
-				setp(_str, _str + _capacity - 1);  // always have room for the zero
+			if (_buf.data()) {
+				_buf.resize(0U);
+				setp(_buf.data(), _buf.data() + capacity() - 1);  // always have room for the zero
 				*pptr() = 0;
 			} else setp(nullptr, nullptr);
 		} 
 		//fixed_string_buffer() : _str() { }
 		fixed_string_buffer(const fixed_string_buffer& copy) = delete;
-		fixed_string_buffer(fixed_string_buffer && move) : _str(move._str), std::streambuf(move) {}
-		fixed_string_buffer(char* buffer, size_t size) : _str(buffer), _capacity(size) { clear(); }
-		size_t capacity() const { return _capacity; }
+		fixed_string_buffer(fixed_string_buffer && move) : _buf(move._buf), std::streambuf(move) {}
+		fixed_string_buffer(char* buffer, size_t size) : _buf(buffer,size) { clear(); }
+		size_t capacity() const { return _buf.capacity(); }
 		size_t size() const { return pbase() ? pptr() - pbase() : 0; }
 		// fuck windows, just fuck them
 		// I had to zero terminate here becuase windows would take the raw buffer pointer
 		string_buffer str() {
-			return string_buffer(pbase(), capacity(), size());
+			_buf.resize(size());
+			return string_buffer(_buf.data(),_buf.size());
 		}
 		string_buffer str() const {
-			return string_buffer(pbase(), capacity(),size());
+			const_cast<ustl::fixed_memblock&>(_buf).resize(size());
+			return string_buffer(_buf);
 		}
 		void swap(fixed_string_buffer& r)
 		{	// swap with _Right
 			if (this != std::addressof(r)) {
-				std::swap(_str,r._str);
+				std::swap(_buf,r._buf);
 				std::streambuf::swap(r);
 			}
 		}
 	protected:
-		size_t _capacity;
-		char* _str;
+		ustl::fixed_memblock _buf;
 
 
 		pos_type seekoff(off_type off, std::ios_base::seekdir way, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final {
@@ -743,8 +702,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 				}
 #endif
 		std::streambuf* setbuf(char * buffer, std::streamsize size) override final {
-			_str = buffer;
-			_capacity = size_t(size);
+			_buf.manage(buffer, size);
 			clear();
 			return std::streambuf::setbuf(buffer, size);
 		}
@@ -753,9 +711,9 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		// be careful with this as there isn't any checking on it
 		int_type underflow() override final {
 			if (pbase() == nullptr) return EOF;
-			setg(_str, _str + 1, _str + size());
+			setg(_buf.data(), _buf.data() + 1, _buf.data() + size());
 			setp(nullptr,nullptr);  // clear the output as we are reading
-			return _str[0];
+			return _buf.data()[0];
 		}
 		// good suggestion
 		// https://stackoverflow.com/questions/5642063/inheriting-ostream-and-streambuf-problem-with-xsputn-and-overflow
@@ -767,6 +725,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 				if (ch != traits_type::eof()) {
 					*pptr() = traits_type::to_char_type(ch);
 					pbump(1);
+
 				}
 				else ch = 0;
 			}
@@ -789,6 +748,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		void clear() { _sbuf.clear(); }
 		fixed_string_buffer* rdbuf() const   { return const_cast<fixed_string_buffer*>(&_sbuf); }
 	protected:
+	
 		fixed_string_buffer _sbuf;
 	};
 
@@ -1002,7 +962,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		static constexpr size_t inital_buckets = 16;
 		struct string_bucket {
 			link_t<string_bucket> chain;
-			std::string_view str;
+			quake::string_view str;
 			string_bucket* next;
 		};
 	public:
@@ -1356,7 +1316,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 #if 0
 // it could be data_view<char> but mabye data could be binary data so lets not
 template<typename T>
-inline typename  std::enable_if<std::is_base_of<std::string_view, T>::value, std::ostream&>::type
+inline typename  std::enable_if<std::is_base_of<quake::string_view, T>::value, std::ostream&>::type
 operator<<(std::ostream& os, cstring_t s) {
 	os.write(s.data(), s.size());
 	return os;
@@ -1472,7 +1432,7 @@ public:
 	void Alloc(size_t startsize);
 	void Insert(const void* data, size_t length, size_t pos=0);
 	void Write(const void* data, size_t length);
-	void Print(const std::string_view& data);
+	void Print(const quake::string_view& data);
 	void Print(char c);
 	void WriteByte(int c);
 	void WriteChar(int c);
@@ -1513,8 +1473,8 @@ public:
 	void    ReadString(char* data, size_t size);
 	void    ReadStringLine(char* data, size_t size);
 
-	template<typename B>
-	void ReadString(util::string_builder<B>& str) {
+	template<typename T,typename B>
+	void ReadString(ustl::string_builder<T,B>& str) {
 		str.clear();
 		str.reserve(_read_count - _cursize);
 		while (_cursize < _read_count) {
@@ -1526,8 +1486,8 @@ public:
 			str.push_back(c);
 		}
 	}
-	template<typename B>
-	void ReadStringLine(util::string_builder<B>& str) {
+	template<typename T, typename B>
+	void ReadStringLine(ustl::string_builder<T, B>& str) {
 		str.clear();
 		str.reserve(_read_count - _cursize);
 		while (_cursize < _read_count) {
@@ -1712,9 +1672,9 @@ int Q_strcmp (const char * s1, const char * s2);
 int Q_strncmp (const char * s1, const char * s2, size_t count);
 
 int Q_strcasecmp (const char * s1, const char * s2);
-int Q_strcasecmp(const std::string_view& s1, const char * s2);
-int Q_strcasecmp(const std::string_view& s1, const std::string_view& s2);
-inline int Q_strcmp(const std::string_view& a, const std::string_view& b) { return a.compare(b); }
+int Q_strcasecmp(const quake::string_view& s1, const char * s2);
+int Q_strcasecmp(const quake::string_view& s1, const quake::string_view& s2);
+inline int Q_strcmp(const quake::string_view& a, const quake::string_view& b) { return a.compare(b); }
 
 int Q_strncasecmp (const char * s1, const char * s2, size_t n);
 #if 0
@@ -1725,9 +1685,9 @@ bool Q_strncasecmp(cstring_t a, cstring_t b);
 int	Q_atoi (const char * str);
 float Q_atof (const char * str);
 int	Q_atoi(cstring_t str);
-int	Q_atoi(const std::string_view& str);
+int	Q_atoi(const quake::string_view& str);
 float Q_atof(cstring_t str);
-float	Q_atof(const std::string_view& str);
+float	Q_atof(const quake::string_view& str);
 
 int Q_vsprintf(char* buffer, const char* fmt, va_list va);
 int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...);
@@ -1766,7 +1726,7 @@ namespace quake {
 		void clear() { _size = 0;  _buffer[0] = '\0'; }
 		constexpr const char* c_str() const { return _buffer; }
 		constexpr operator const char*() const { return c_str(); }
-		constexpr operator std::string_view() const { return std::string_view(c_str(),size()); }
+		constexpr operator quake::string_view() const { return quake::string_view(c_str(),size()); }
 		constexpr size_t capacity() const { return N; }
 
 		void assign(const char* str) {
@@ -1841,29 +1801,29 @@ namespace quake {
 void COM_Init (const char *path); // path not used?
 
 
-inline std::string_view COM_SkipPath(const std::string_view & in) {
+inline quake::string_view COM_SkipPath(const quake::string_view & in) {
 	auto slash = in.find_last_of("/\\");
-	return slash != std::string_view::npos ? in.substr(slash) : in;
+	return slash != quake::string_view::npos ? in.substr(slash) : in;
 }
-inline std::string_view  COM_StripExtension(const std::string_view & in) {
+inline quake::string_view  COM_StripExtension(const quake::string_view & in) {
 	auto dot = in.find_last_of('.');
-	return in.find_first_of("\\/", dot) != std::string_view::npos ? in : in.substr(0, dot);
+	return in.find_first_of("\\/", dot) != quake::string_view::npos ? in : in.substr(0, dot);
 }
 
-inline  std::string_view  COM_FileExtension(const std::string_view in) {
+inline  quake::string_view  COM_FileExtension(const quake::string_view in) {
 	auto dot= in.find_last_of('.');
-	return in.find_first_of("\\/", dot) != std::string_view::npos ? in.substr(dot + 1) : std::string_view();
+	return in.find_first_of("\\/", dot) != quake::string_view::npos ? in.substr(dot + 1) : quake::string_view();
 }
 
 
-inline std::string_view  COM_FileBase(const std::string_view & in) {
+inline quake::string_view  COM_FileBase(const quake::string_view & in) {
 	auto slash = in.find_last_of("/\\");
-	auto strip = in.substr(slash == std::string_view::npos ? 0 : slash + 1);
+	auto strip = in.substr(slash == quake::string_view::npos ? 0 : slash + 1);
 	return strip.substr(0, strip.find_last_of('.'));
 }
 
 template<typename STRING_T>
-inline void COM_DefaultExtension(STRING_T& path, const std::string_view &extension) {
+inline void COM_DefaultExtension(STRING_T& path, const quake::string_view &extension) {
 	auto dot = path.find_last_of('.');
 	if (dot == STRING_T::npos)
 		path.append('.').append(extension);
@@ -1965,15 +1925,15 @@ struct cache_user_t;
 
 
 
-void COM_WriteFile (const std::string_view& filename, const void * data, int len);
+void COM_WriteFile (const quake::string_view& filename, const void * data, int len);
 //std::istream* COM_OpenFile (cstring_t filename, size_t& length);
 
 
-byte *COM_LoadStackFile (const std::string_view& path, void *buffer, int bufsize);
-byte *COM_LoadTempFile (const std::string_view& path);
-byte *COM_LoadHunkFile (const std::string_view& path, size_t* file_size = nullptr);
-void COM_LoadCacheFile (const std::string_view& path, struct cache_user_t *cu);
- size_t COM_FindFile(const std::string_view& filename, std::fstream& file);
+byte *COM_LoadStackFile (const quake::string_view& path, void *buffer, int bufsize);
+byte *COM_LoadTempFile (const quake::string_view& path);
+byte *COM_LoadHunkFile (const quake::string_view& path, size_t* file_size = nullptr);
+void COM_LoadCacheFile (const quake::string_view& path, struct cache_user_t *cu);
+ size_t COM_FindFile(const quake::string_view& filename, std::fstream& file);
 
 
 
@@ -1986,10 +1946,10 @@ public:
 		Eof = -1
 	};
 	COM_Value() : _type((int)Kind::Eof) {}
-	COM_Value(const std::string_view& text, Kind token=Kind::Symbol) : _type((int)token), _text(text) {}
+	COM_Value(const quake::string_view& text, Kind token=Kind::Symbol) : _type((int)token), _text(text) {}
 	bool operator==(const COM_Value& r) const { return _type == r._type; }
 	Kind type() const { return (Kind)_type; }
-	const std::string_view& text() const {  return _text; }
+	const quake::string_view& text() const {  return _text; }
 	bool operator==(int c) const { return _type == c; }
 	bool operator==(Kind c) const { return _type == (int)c; }
 	bool operator!=(const COM_Value& r) const { return !(*this == r); }
@@ -1997,28 +1957,28 @@ public:
 	bool operator!=(Kind r) const { return !(*this == r); }
 private:
 	int _type;
-	std::string_view _text;
+	quake::string_view _text;
 };
 
 // parser
 class COM_Parser {
 public:
 	COM_Parser() : _data(""), _state(0) {}
-	COM_Parser(const std::string_view & data) : _data(data), _pos(0), _state(0) {}
-	bool Next(std::string_view& token,bool test_eol=false);
-	operator const std::string_view&() const { return _data; }
+	COM_Parser(const quake::string_view & data) : _data(data), _pos(0), _state(0) {}
+	bool Next(quake::string_view& token,bool test_eol=false);
+	operator const quake::string_view&() const { return _data; }
 	size_t pos() const { return _pos; }
-	std::string_view remaining() const { return _data.substr(_pos); }
+	quake::string_view remaining() const { return _data.substr(_pos); }
 protected:
 	int _state;
 	size_t _pos;
-	std::string_view _data;
+	quake::string_view _data;
 };
 
 
 
 
-std::string_view  COM_GameDir();
+quake::string_view  COM_GameDir();
 
 template<typename TO, typename FROM> constexpr TO idCast(FROM f);
 

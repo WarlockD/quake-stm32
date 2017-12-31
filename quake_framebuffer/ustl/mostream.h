@@ -16,7 +16,6 @@
 namespace ustl {
 
 class istream;
-class string;
 
 /// \class ostream mostream.h ustl.h
 /// \ingroup BinaryStreams

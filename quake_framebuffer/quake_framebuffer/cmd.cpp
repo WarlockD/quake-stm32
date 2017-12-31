@@ -72,7 +72,7 @@ void Cmd_Wait_f(cmd_source_t source, const StringArgs& args)
 std::default_delete<char> meh;
 
 using StringPtr = std::unique_ptr<char, z_delete<char>>;
-using StringViewList = UVector<std::string_view>;
+using StringViewList = UVector<quake::string_view>;
 
 
 
@@ -81,9 +81,9 @@ class SafeArgs {
 	ZUniquePtr<char> _text;
 	UList<StringArgs> _list;
 public:
-	static UList<StringArgs> ParseArgs(const std::string_view&  text);
+	static UList<StringArgs> ParseArgs(const quake::string_view&  text);
 	SafeArgs(ZUniquePtr<char>&& text) :_text(std::move(text)), _list(std::move(ParseArgs(_text.get()))) {}
-	SafeArgs(const std::string_view& text) :_text((char*)Z_Malloc(text.size()+1)) {
+	SafeArgs(const quake::string_view& text) :_text((char*)Z_Malloc(text.size()+1)) {
 		text.copy(_text.get(), text.size());
 		_text.get()[text.size()] = 0; // make a copy
 		_list = ParseArgs(_text.get());
@@ -100,9 +100,9 @@ public:
 	UList<StringArgs>* operator->() { return &_list; }
 	const UList<StringArgs>* operator->() const { return &_list; }
 };
-UList<StringArgs> SafeArgs::ParseArgs(const std::string_view&  text) {
+UList<StringArgs> SafeArgs::ParseArgs(const quake::string_view&  text) {
 	COM_Parser parser(text);
-	std::string_view token;
+	quake::string_view token;
 	StringArgs args;
 	UList<StringArgs> list;
 	while (parser.Next(token, true)) {
@@ -132,7 +132,7 @@ void Cbuf_Init (void)
 
 
 
-void ParseCommands(const std::string_view& text, bool front = false) {
+void ParseCommands(const quake::string_view& text, bool front = false) {
 	SafeArgs args(text);
 	if (front) 
 		_parsed_commands.emplace_front(std::move(args));
@@ -146,7 +146,7 @@ Cbuf_AddText
 Adds command text at the end of the buffer
 ============
 */
-void Cbuf_AddText (const std::string_view& text){
+void Cbuf_AddText (const quake::string_view& text){
 	ParseCommands(text, false);
 }
 
@@ -160,7 +160,7 @@ Adds a \n to the text
 FIXME: actually change the command buffer to do less copying
 ============
 */
-void Cbuf_InsertText (const std::string_view& text) {
+void Cbuf_InsertText (const quake::string_view& text) {
 	ParseCommands(text, true);
 }
 
@@ -242,7 +242,7 @@ void Cmd_StuffCmds_f (cmd_source_t source, const StringArgs& args)
 		Cbuf_InsertText (build.c_str());
 }
 
-byte *COM_LoadZFile(const std::string_view& path, size_t* file_size = nullptr);
+byte *COM_LoadZFile(const quake::string_view& path, size_t* file_size = nullptr);
 /*
 ===============
 Cmd_Exec_f
@@ -310,7 +310,7 @@ Creates a new command that executes a command string (possibly ; seperated)
 */
 #if 0
 void cmdalias_t::operator delete(void *ptr) { Z_Free(ptr); }
-cmdalias_t* cmdalias_t::create(const std::string_view&  name, const std::string_view&  value) {
+cmdalias_t* cmdalias_t::create(const quake::string_view&  name, const quake::string_view&  value) {
 	char* ptr = (char*)Z_Malloc(value.size() + name.size() + sizeof(cmdalias_t) + 2);
 	char* n_name = ptr + sizeof(cmdalias_t);
 	char* n_value = n_name + name.size() + 1;
@@ -438,7 +438,7 @@ qboolean	Cmd_Exists (string_t cmd_name)
 Cmd_CompleteCommand
 ============
 */
-std::string_view Cmd_CompleteCommand (const std::string_view&  partial)
+quake::string_view Cmd_CompleteCommand (const quake::string_view&  partial)
 {
 	//cmd_function_t	*cmd;
 	
@@ -451,7 +451,7 @@ std::string_view Cmd_CompleteCommand (const std::string_view&  partial)
 			return it->first;
 	}
 
-	return std::string_view();
+	return quake::string_view();
 }
 qboolean	Cvar_Command(const StringArgs& args);
 
@@ -536,7 +536,7 @@ void execute_args(const StringArgs& args, cmd_source_t src) {
 #endif
 	}
 }
-void execute_args(const  std::string_view& text, cmd_source_t src) {
+void execute_args(const  quake::string_view& text, cmd_source_t src) {
 	auto list = SafeArgs::ParseArgs(text); 
 	for (const auto& args : list) {
 		execute_args(args, src_command);

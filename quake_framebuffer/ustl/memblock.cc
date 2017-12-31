@@ -47,7 +47,7 @@ namespace ustl {
 	{
 		if (_capacity < newSize + minimumFreeCapacity())
 			reserve(newSize, bExact);
-		_data.resize(newSize);
+		memlink::resize(newSize);
 	}
 
 	/// Frees internal data.
@@ -62,11 +62,10 @@ namespace ustl {
 
 	/// Assumes control of the memory block \p p of size \p n.
 	/// The block assigned using this function will be freed in the destructor.
-	void memblock::manage(void* p, size_type n) noexcept
-	{
+	void memblock::manage(void* p, size_type n) noexcept {
 		assert(p || !n);
 		assert(!_capacity && "Already managing something. deallocate or unlink first.");
-		_data.relink(p, n);
+		memlink::relink(p, n);
 		_capacity = n;
 	}
 
@@ -77,8 +76,7 @@ namespace ustl {
 	}
 
 	/// Copies data from \p p, \p n.
-	void memblock::assign(const void* p, size_type n)
-	{
+	void memblock::assign(const void* p, size_type n) {
 		assert((p != (const void*)data() || size() == n) && "Self-assignment can not resize");
 		resize(n);
 		copy_n(const_pointer(p), n, begin());

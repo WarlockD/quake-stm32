@@ -30,7 +30,7 @@ bool uncaught_exception() noexcept;
 #endif
 namespace ustl {
 
-class string;
+
 
 typedef uint32_t	xfmt_t;
 

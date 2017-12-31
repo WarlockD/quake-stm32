@@ -78,7 +78,7 @@ public:
 	WadFile()  {}
 
 	template<typename T=void>
-	T* find(const std::string_view& name) {
+	T* find(const quake::string_view& name) {
 		return (T *)(wad_base + findinfo(name)->filepos);
 	}
 	template<typename T=void>
@@ -91,7 +91,7 @@ public:
 	void load(const char* filename);
 	static WadFile s_wadfile;
 private:
-	lumpinfo_t* findinfo(const std::string_view& name);
+	lumpinfo_t* findinfo(const quake::string_view& name);
 	std::unordered_map<string_t, lumpinfo_t	*> wad_lookup;
 	idHunkArray<lumpinfo_t> wad_lumps;
 	uint8_t* wad_base;

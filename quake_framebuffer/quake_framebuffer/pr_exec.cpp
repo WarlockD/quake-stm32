@@ -175,7 +175,7 @@ static bool IsOffsetLocal(int ofs) {
 	const uint16_t locals_end = f->parm_start + f->locals;;
 	return locals_start >= ofs && locals_end < locals_end;
 }
-static std::string_view GetFieldOffsetName(int ofs) {
+static quake::string_view GetFieldOffsetName(int ofs) {
 	const ddef_t *def = vm.ED_FieldAtOfs(ofs);
 	assert(def);
 	return def->name();

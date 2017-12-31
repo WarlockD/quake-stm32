@@ -10,19 +10,27 @@
 
 namespace ustl {
 
+
 	/// \brief Attaches the object to pointer \p p of size \p n.
 	///
 	/// If \p p is nullptr and \p n is non-zero, bad_alloc is thrown and current
 	/// state remains unchanged.
 	///
-	
+	void cmemlink::link(const void* p, size_type n)
+	{
+		if (!p && n)
+			throw bad_alloc(n);
+		unlink();
+		relink(p, n);
+	}
+
 	/// Writes the object to stream \p os
 	void cmemlink::write(ostream& os) const
 	{
 		const written_size_type sz(size());
 		assert(sz == size() && "No support for writing memblocks larger than 4G");
 		os << sz;
-		os.write(data(), sz);
+		os.write(cdata(), sz);
 		os.align(stream_align_of(sz));
 	}
 
@@ -45,10 +53,14 @@ namespace ustl {
 		fstream f;
 		f.exceptions(fstream::allbadbits);
 		f.open(filename, fstream::out | fstream::trunc, mode);
-		f.write(data(), readable_size());
+		f.write(cdata(), readable_size());
 		f.close();
 	}
 
-
-
+	/// Compares to memory block pointed by l. Size is compared first.
+	bool cmemlink::operator== (const cmemlink& l) const noexcept
+	{
+		return l._size == _size &&
+			(l._data == _data || 0 == memcmp(l._data, _data, _size));
+	}
 }
