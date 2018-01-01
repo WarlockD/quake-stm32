@@ -71,8 +71,10 @@ struct cvar_t<float> : public cvar_t_base {
 	float value;
 	cvar_t(float value, bool archive = false, bool server = false) :  value(value), cvar_t_base(archive, server) {}
 };	
+using cvar_float = cvar_t<float>;
+
 template<>
-struct cvar_t<cstring_t> : public cvar_t_base {
+struct cvar_t<quake::string> : public cvar_t_base {
 	using value_type = cstring_t;
 	using refrence_type = value_type & ;
 	using pointer_type = value_type * ;
@@ -81,11 +83,10 @@ struct cvar_t<cstring_t> : public cvar_t_base {
 	cstring_t value;
 	cvar_t(cstring_t value, bool archive = false, bool server = false) : value(value), cvar_t_base(archive, server) {}
 };
+using cvar_string = cvar_t<quake::string>;
 
-typename 
-
-void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<float>& variable);
-void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<cstring_t>& variable);
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_float& variable);
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_string& variable);
 
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.

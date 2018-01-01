@@ -26,21 +26,21 @@ using namespace std::chrono;
 // references them even when on a unix system.
 
 // these two are not intended to be set directly
-cvar_t<cstring_t> cl_name = {   "player", true} ;
-cvar_t<float> cl_color = { 0.0f, true} ;
+cvar_string cl_name = {   "player", true} ;
+cvar_float cl_color = { 0.0f, true} ;
 
 //cvar_t<float> cl_shownet = { 0.0f} ;	// can be 0, 1, or 2
-cvar_t<float> cl_shownet = { 0.0f } ;	// can be 0, 1, or 2
-cvar_t<float> cl_nolerp = { 0.0f} ;
+cvar_float cl_shownet = { 0.0f } ;	// can be 0, 1, or 2
+cvar_float cl_nolerp = { 0.0f} ;
 
-cvar_t<float> lookspring = { 0.0f, true} ;
-cvar_t<float> lookstrafe = { 0.0f, true} ;
-cvar_t<float> sensitivity = { 3.0f, true} ;
+cvar_float lookspring = { 0.0f, true} ;
+cvar_float lookstrafe = { 0.0f, true} ;
+cvar_float sensitivity = { 3.0f, true} ;
 
-cvar_t<float> m_pitch = { 0.022f, true} ;
-cvar_t<float> m_yaw = { 0.022f, true} ;
-cvar_t<float> m_forward = { 1.0f, true} ;
-cvar_t<float> m_side = { 0.8f, true} ;
+cvar_float m_pitch = { 0.022f, true} ;
+cvar_float m_yaw = { 0.022f, true} ;
+cvar_float m_forward = { 1.0f, true} ;
+cvar_float m_side = { 0.8f, true} ;
 
 namespace quake {
 	client_static_t	cls;

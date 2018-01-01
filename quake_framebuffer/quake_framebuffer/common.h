@@ -46,7 +46,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // based of sys\queue.h  could always use that I suppose
 #include "list.hpp"
 #include "tailq.hpp"
-#include <ustring.h>
 
 #include "macros.h"
 // cause I am having problems with list and tail I am putting a wrapper around it
@@ -126,31 +125,10 @@ typedef uint8_t 		byte;
 
 using qboolean = bool;
 
-
-struct string_t;
-
-using cstring_t = ustl::cstring;
-namespace quake {
-	using string = ustl::string;
-
-	using string_view = ustl::string_view;
-
-}
+// basicly copyeed string view for this
+#include "qstring.h"
 
 
-
-struct string_t : public ustl::cstring {
-public:
-	static  const char* intern(const char* str);
-	static  const char* intern(const char* str,size_t size);
-	static  const char* intern(const quake::string_view&  str);
-	inline string_t() : ustl::cstring() {}
-	template<typename T>
-	inline string_t(const ustl::string_helper<T>& s) : ustl::cstring(intern(s.data(),s.size())) {}
-	inline string_t(const quake::string_view&  str) : ustl::cstring(intern(str)) { }
-	inline string_t(const char*  str) : ustl::cstring(intern(str)) { }
- 	friend class pr_system_t;
-};
 
 // swaps
 #if 0
@@ -164,16 +142,7 @@ static inline std::ostream& operator<<(std::ostream& os, const cstring_t& s) {
 	return os;
 }
 #endif
-namespace std {
-	template<>
-	struct hash<cstring_t> {
-		inline constexpr size_t operator()(const cstring_t& s) const { return ustl::util::str_hash(s.begin(), s.end()); }
-	};
-	template<>
-	struct hash<string_t> {
-		inline constexpr size_t operator()(const string_t& s) const { return ustl::util::str_hash(s.begin(), s.end()); }
-	};
-}
+
 
 // https://stackoverflow.com/questions/41936763/type-traits-to-check-if-class-has-member-function
 namespace priv {
@@ -592,12 +561,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 	using string_buffer = ustl::fixed_string;
 
 #endif
-	using zstring = std::basic_string<char, std::char_traits<char>, ZAllocator<char>>;
-	using string = std::string;
-	using  string_view = std::string_view;
-	using string_buffer = std::string;
-	template<size_t _SIZE>
-	using fixed_string = std::basic_string<char, std::char_traits<char>, umm_stack_allocator<char,_SIZE>>;
+
 
 
 
@@ -613,19 +577,13 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 		//fixed_string_buffer() : _str() { }
 		fixed_string_buffer(const fixed_string_buffer& copy) = delete;
 		fixed_string_buffer(fixed_string_buffer && move) : _buf(move._buf), std::streambuf(move) {}
-		fixed_string_buffer(char* buffer, size_t size) : _buf(buffer,size) { clear(); }
+		fixed_string_buffer(char* buffer, size_t size)  { _buf.manage(buffer, size); clear(); }
 		size_t capacity() const { return _buf.capacity(); }
 		size_t size() const { return pbase() ? pptr() - pbase() : 0; }
 		// fuck windows, just fuck them
 		// I had to zero terminate here becuase windows would take the raw buffer pointer
-		string_buffer str() {
-			_buf.resize(size());
-			return string_buffer(_buf.data(),_buf.size());
-		}
-		string_buffer str() const {
-			const_cast<ustl::fixed_memblock&>(_buf).resize(size());
-			return string_buffer(_buf);
-		}
+		string_buffer& str() { return _buf; }
+		const string_buffer& str() const { return _buf; }
 		void swap(fixed_string_buffer& r)
 		{	// swap with _Right
 			if (this != std::addressof(r)) {
@@ -634,7 +592,7 @@ template<typename T,typename E> static inline T operator##op (const debug_t<T,E>
 			}
 		}
 	protected:
-		ustl::fixed_memblock _buf;
+		string_buffer _buf;
 
 
 		pos_type seekoff(off_type off, std::ios_base::seekdir way, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override final {
@@ -1473,8 +1431,8 @@ public:
 	void    ReadString(char* data, size_t size);
 	void    ReadStringLine(char* data, size_t size);
 
-	template<typename T,typename B>
-	void ReadString(ustl::string_builder<T,B>& str) {
+	template<typename T>
+	void ReadString(quake::string_builder<T>& str) {
 		str.clear();
 		str.reserve(_read_count - _cursize);
 		while (_cursize < _read_count) {
@@ -1486,8 +1444,8 @@ public:
 			str.push_back(c);
 		}
 	}
-	template<typename T, typename B>
-	void ReadStringLine(ustl::string_builder<T, B>& str) {
+	template<typename T>
+	void ReadStringLine(quake::string_builder<T>& str) {
 		str.clear();
 		str.reserve(_read_count - _cursize);
 		while (_cursize < _read_count) {
@@ -1801,16 +1759,16 @@ namespace quake {
 void COM_Init (const char *path); // path not used?
 
 
-inline quake::string_view COM_SkipPath(const quake::string_view & in) {
+inline quake::string_view COM_SkipPath(const quake::string_view& in) {
 	auto slash = in.find_last_of("/\\");
 	return slash != quake::string_view::npos ? in.substr(slash) : in;
 }
-inline quake::string_view  COM_StripExtension(const quake::string_view & in) {
+inline quake::string_view  COM_StripExtension(const quake::string_view& in) {
 	auto dot = in.find_last_of('.');
 	return in.find_first_of("\\/", dot) != quake::string_view::npos ? in : in.substr(0, dot);
 }
 
-inline  quake::string_view  COM_FileExtension(const quake::string_view in) {
+inline  quake::string_view  COM_FileExtension(const quake::string_view& in) {
 	auto dot= in.find_last_of('.');
 	return in.find_first_of("\\/", dot) != quake::string_view::npos ? in.substr(dot + 1) : quake::string_view();
 }

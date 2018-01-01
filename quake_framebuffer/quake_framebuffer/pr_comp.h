@@ -146,7 +146,8 @@ public:
 	constexpr static inline const char* eTypeString(etype_t t) {
 		return type_string[static_cast<underlying_type>(t) & ~def_saveglobal];
 	}
-	constexpr idType(etype_t t = etype_t::ev_void) : _type(t) {}
+	constexpr idType() : _type( etype_t::ev_void) {}
+	constexpr idType(etype_t t) : _type(t) {}
 	constexpr idType(etype_t t,bool save_global) : _type(save_global ? SetSaveGlobal(t) : ClearSaveGlobal(t)) {}
 	constexpr size_t size() const { return eTypeSize(_type); }
 	constexpr const char* string() const { return eTypeString(_type); }
@@ -156,9 +157,17 @@ public:
 
 private:
 	etype_t _type;
-	EQUAL_CMP_OPS_FRIEND(idType, _type);
 };
-EQUAL_CMP_OPS(idType, _type)
+#if 0
+static inline bool operator==(const idType& s1, const idType& s2) { return s1.type() == s2.type(); }
+static inline bool operator==(etype_t s1, const idType& s2) { return s1 == s2.type(); }
+static inline bool operator==(const idType& s1, etype_t 2) { return s1.type() == s2; }
+
+static inline bool operator!=(const idType& s1, const idType& s2) { return s1.type() != s2.type(); }
+static inline bool operator==(etype_t s1, const idType& s2) { return s1 != s2.type(); }
+static inline bool operator==(const idType& s1, etype_t 2) { return s1.type() != s2; }
+#endif
+
 static inline std::ostream& operator<<(std::ostream& os, const idType& type) {
 	os << idType::type_string[(int)type.type()];
 	return os;

@@ -46,8 +46,8 @@ namespace quake {
 static char     *safeargvs[NUM_SAFE_ARGVS] =
 	{"-stdvid", "-nolan", "-nosound", "-nocdaudio", "-nojoy", "-nomouse", "-dibonly"};
 
-cvar_t<float> registered = { 0.0f } ;
-cvar_t<cstring_t> cmdline = {  "",  false, true} ;
+cvar_float registered = { 0.0f } ;
+cvar_string cmdline = {  "",  false, true} ;
 static char _com_gamedir[MAX_QPATH];
 qboolean        com_modified;   // set true if using non-id files
 
@@ -1275,7 +1275,7 @@ QUAKE FILESYSTEM
 
 =============================================================================
 */
-static 	umm_stack_allocator<0xFFFF> umm_memory;
+static 	umm_stack_allocator<char,0xFFFF> umm_memory;
 
 
 //
@@ -1389,14 +1389,14 @@ static bool COM_LoadPackFile(const quake::string_view& packfile)
 
 	if (header.id[0] != 'P' || header.id[1] != 'A'
 		|| header.id[2] != 'C' || header.id[3] != 'K')
-		Sys_Error("%s is not a packfile", c_helper.str().c_str();
+		Sys_Error("%s is not a packfile", c_helper.str().c_str());
 	header.dirofs = LittleLong(header.dirofs);
 	header.dirlen = LittleLong(header.dirlen);
 
 	size_t numpackfiles = header.dirlen / sizeof(dpackfile_t);
 
 	if (numpackfiles > MAX_FILES_IN_PACK)
-		Sys_Error("%s has %i files", c_helper.str().c_str(, numpackfiles);
+		Sys_Error("%s has %i files", c_helper.str().c_str(), numpackfiles);
 
 	if (numpackfiles != PAK0_COUNT)
 		com_modified = true;    // not the original file
@@ -1636,7 +1636,7 @@ static byte *COM_LoadFile (const quake::string_view& path, int usehunk, size_t* 
 		Sys_Error ("COM_LoadFile: bad usehunk");
 
 	if (!buf) {
-		Sys_Error("COM_LoadFile: not enough space for %s", quake::string(path).c_str()));
+		Sys_Error("COM_LoadFile: not enough space for %s", quake::string(path).c_str());
 	}
 		
 		
@@ -1805,7 +1805,7 @@ void COM_InitFilesystem(void)
 			}
 
 		}
-		if (COM_FileExtension(file_name) == "pak")
+		if (COM_FileExtension(file_name) == quake::string_view("pak"))
 		{
 			COM_LoadPackFile(file_name);
 #if 0

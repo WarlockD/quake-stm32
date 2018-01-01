@@ -29,10 +29,10 @@ void Cmd_ForwardToServer(cmd_source_t source, const StringArgs& args);
 //static	cmd_function_t	*cmd_functions;		// possible commands to execute
 //cmdalias_t	*cmd_alias;
 struct func_equal_compare {
-	bool operator()(const string_t& l, const string_t&r) const { return util::util::str_casecmp(l.begin(), l.end(), r.begin(), r.end())==0; }
+	bool operator()(const string_t& l, const string_t&r) const { return quake::string_info::str_case_compare(l.data(), l.size(), r.data(),r.size()) == 0; }
 };
 struct func_hash_compare {
-	size_t operator()(const string_t& l) const { return util::util::case_hasher(l.data(), l.length()); }
+	size_t operator()(const string_t& l) const { return quake::string_info::str_hash(l.data(), l.data()+l.size()); }
 };
 
 static std::unordered_map<string_t, xcommand_t, func_hash_compare, func_equal_compare> cmd_functions;

@@ -21,7 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 #include "icommon.h"
-using cvar_var_t = std::variant<float*, cstring_t*>;
+using cvar_var_t = std::variant<decltype(cvar_float::value)*, decltype(cvar_string::value)*>;
+
 struct var_ref {
 	cvar_t_base& base;
 	cvar_var_t value;
@@ -132,10 +133,10 @@ static void Cvar_RegisterVariable(const quake::string_view& name, var_ref v) {
 	c_vars.emplace(var_name, v);
 }
 
-void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<float>& variable) {
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_float& variable) {
 	Cvar_RegisterVariable(name, var_ref(variable, &variable.value));
 }
-void Cvar_RegisterVariable(const quake::string_view& name, cvar_t<cstring_t>& variable) {
+void Cvar_RegisterVariable(const quake::string_view& name, cvar_string& variable) {
 	Cvar_RegisterVariable(name, var_ref(variable, &variable.value));
 }
 

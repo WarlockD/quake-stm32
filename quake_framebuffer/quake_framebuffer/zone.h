@@ -290,18 +290,21 @@ namespace umm {
 
 template <class T>
 class umm_allocator {
+public:
 	using value_type = T;
 	template <class _Up> struct rebind { using other = umm_allocator<_Up>; };
 
 	umm_allocator(const umm_allocator&) = default;
 	umm_allocator& operator=(const umm_allocator&) = delete;
 
+	umm_allocator() noexcept : _a() {}
 	umm_allocator(const umm::umm_allocator& a) noexcept : _a(a) {}
+	umm_allocator(umm::umm_allocator&& a) noexcept : _a(a) {}
 	template <class U>
 	umm_allocator(const umm_allocator<U>& a) noexcept : _a(a._a) {}
-	umm_allocator(const umm::umm_allocator& a) : _a(a) {}
 
-	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate(n*sizeof(T)); }
+
+	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate(n*sizeof(T))); }
 	void deallocate(T* p, std::size_t n) noexcept { _a.deallocate(reinterpret_cast<char*>(p)); } //, n * sizeof(T));
 
 
@@ -314,19 +317,18 @@ class umm_allocator {
 private:
 	umm::umm_allocator  _a;
 };
+template <class U, size_t S>  class umm_stack_allocator;
 
 template <class T,size_t _SIZE>
 class umm_stack_allocator : public umm_allocator<T> {
+public:
 	using value_type = T;
 	template <class _Up> struct rebind { using other = umm_allocator<_Up>; };
 
 	umm_stack_allocator(const umm_stack_allocator&) = default;
 	umm_stack_allocator& operator=(const umm_stack_allocator&) = delete;
 
-	umm_stack_allocator() noexcept : umm_allocator<T>(umm::umm_allocator(_data.data(), _data.size()) {}
-
-
-	template <class U, size_t S> friend class umm_stack_allocator<U,S>;
+	umm_stack_allocator() : umm_allocator<T>(umm::umm_allocator(_data.data(), _data.size())) {}
 
 	template<typename U,size_t S>
 	bool operator==(const umm_stack_allocator<U,S>& other) const { return &_data == &other._data; }
@@ -336,44 +338,6 @@ private:
 	std::array<char, _SIZE> _data;
 };
 
-template <class T, size_t SIZE>
-class umm_stack_allocator
-{
-public:
-	using value_type = T;
-	template <class _Up,size_t SIZE> struct rebind { using other = umm_stack_allocator<_Up,SIZE>; };
-
-	short_alloc(const short_alloc&) = default;
-	short_alloc& operator=(const short_alloc&) = delete;
-
-	short_alloc() noexcept : _a(a)
-	{
-		static_assert(size % alignment == 0,
-			"size N needs to be a multiple of alignment Align");
-	}
-	template <class U>
-	short_alloc(const short_alloc<U>& a) noexcept : _a(a._a) {}
-
-
-	T* allocate(std::size_t n) { return reinterpret_cast<T*>(_a.allocate<alignof(T)>(n * sizeof(T))); }
-	void deallocate(T* p, std::size_t n) noexcept { _a.deallocate(reinterpret_cast<char*>(p), n * sizeof(T)); }
-
-	template <class U> friend class short_alloc;
-
-	template<typename U>
-	bool operator==(const short_alloc<U>& other) const { return &_a == &other._a; }
-	template<typename U>
-	bool operator!=(const short_alloc<U>& other) const { return &_a != &other._a; }
-
-private:
-	std::array<char, size> _buffer;
-	umm_allocator _umm;
-};
-
-namespace quake{
-
-
-}
 
 
 class memory_area

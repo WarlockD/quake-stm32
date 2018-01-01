@@ -263,7 +263,7 @@ namespace quake {
 //
 // cvars
 //
-extern	cvar_t<ustl::string>	cl_name;
+extern	cvar_t<quake::string>	cl_name;
 extern	cvar_t<float>	cl_color;
 
 extern	cvar_t<float>		cl_upspeed;

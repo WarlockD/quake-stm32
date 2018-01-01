@@ -156,9 +156,6 @@
     <ProjectReference Include="..\glfw3\glfw3.vcxproj">
       <Project>{ebd2796f-27b4-4891-80d6-d38878655f42}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\ustl\ustl.vcxproj">
-      <Project>{6ff3f4c6-bf5c-4640-9229-c73305b0da70}</Project>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\glad\debug\src\glad.c">
@@ -304,6 +301,7 @@
     <ClInclude Include="protocol.h" />
     <ClInclude Include="pr_comp.h" />
     <ClInclude Include="pr_print.h" />
+    <ClInclude Include="qstring.h" />
     <ClInclude Include="quakeasm.h" />
     <ClInclude Include="quakedef.h" />
     <ClInclude Include="render.h" />
