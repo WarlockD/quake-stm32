@@ -22,6 +22,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 
 dprograms_t		*progs;
+quake::fixed_array<dfunction_t>		pr_functions;
+char			*					pr_strings;
+quake::fixed_array<ddef_t>			pr_globaldefs;
+quake::fixed_array<ddef_t>			pr_fielddefs;
+quake::fixed_array<dstatement_t>	pr_statements;
+globalvars_t*	pr_global_struct;
+quake::fixed_array<float>			pr_globals;			// same as pr_global_struct
+#if 0
 dfunction_t		*pr_functions;
 char			*pr_strings;
 ddef_t			*pr_fielddefs;
@@ -29,6 +37,7 @@ ddef_t			*pr_globaldefs;
 dstatement_t	*pr_statements;
 globalvars_t	*pr_global_struct;
 float			*pr_globals;			// same as pr_global_struct
+#endif
 int				pr_edict_size;	// in bytes
 
 unsigned short		pr_crc;
@@ -288,7 +297,7 @@ char *PR_ValueString (etype_t type, eval_t *val)
 		sprintf (line, "entity %i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
 		break;
 	case ev_function:
-		f = pr_functions + val->function;
+		f = &pr_functions[val->function];
 		Q_sprintf (line, "%s()", pr_strings + f->s_name);
 		break;
 	case ev_field:
@@ -340,7 +349,7 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 		Q_sprintf (line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
 		break;
 	case ev_function:
-		f = pr_functions + val->function;
+		f = &pr_functions[val->function]  ;
 		Q_sprintf (line, "%s", pr_strings + f->s_name);
 		break;
 	case ev_field:
@@ -386,7 +395,7 @@ char *PR_GlobalString (int ofs)
 		sprintf (line,"%i(???)", ofs);
 	else
 	{
-		s = PR_ValueString (def->type, (eval_t*)val);
+		s = PR_ValueString (def->type(), (eval_t*)val);
 		Q_sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
 	}
 	
@@ -452,7 +461,7 @@ void ED_Print (edict_t *ed)
 		v = (int *)((char *)&ed->v + d->ofs*4);
 
 	// if the value is still all 0, skip the field
-		type = d->type & ~DEF_SAVEGLOBAL;
+		type = d->itype & ~DEF_SAVEGLOBAL;
 		
 		for (j=0 ; j<type_size[type] ; j++)
 			if (v[j])
@@ -465,7 +474,7 @@ void ED_Print (edict_t *ed)
 		while (l++ < 15)
 			Con_Printf (" ");
 
-		Con_Printf ("%s\n", PR_ValueString(d->type, (eval_t *)v));		
+		Con_Printf ("%s\n", PR_ValueString(d->type(), (eval_t *)v));		
 	}
 }
 
@@ -502,7 +511,7 @@ void ED_Write (FILE *f, edict_t *ed)
 		v = (int *)((char *)&ed->v + d->ofs*4);
 
 	// if the value is still all 0, skip the field
-		type = d->type & ~DEF_SAVEGLOBAL;
+		type = d->itype & ~DEF_SAVEGLOBAL;
 		for (j=0 ; j<type_size[type] ; j++)
 			if (v[j])
 				break;
@@ -510,7 +519,7 @@ void ED_Write (FILE *f, edict_t *ed)
 			continue;
 	
 		fprintf (f,"\"%s\" ",name);
-		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type, (eval_t *)v));		
+		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type(), (eval_t *)v));		
 	}
 
 	fprintf (f, "}\n");
@@ -618,8 +627,8 @@ void ED_WriteGlobals (FILE *f)
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
 		def = &pr_globaldefs[i];
-		type = def->type;
-		if ( !(def->type & DEF_SAVEGLOBAL) )
+		type = def->type();
+		if ( !(def->type() & DEF_SAVEGLOBAL) )
 			continue;
 		type &= ~DEF_SAVEGLOBAL;
 
@@ -671,7 +680,7 @@ void ED_ParseGlobals (const char * data)
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)pr_globals, key, com_token))
+		if (!ED_ParseEpair ((void *)&pr_globals[0], key, com_token))
 			Host_Error ("ED_ParseGlobals: parse error");
 	}
 }
@@ -730,7 +739,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 	
 	d = (void *)((int *)base + key->ofs);
 	
-	switch (key->type & ~DEF_SAVEGLOBAL)
+	switch (key->type() & ~DEF_SAVEGLOBAL)
 	{
 	case ev_string:
 		*(string_t *)d = ED_NewString (s) - pr_strings;
@@ -775,7 +784,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 			Con_Printf ("Can't find function %s\n", s);
 			return false;
 		}
-		*(func_t *)d = func - pr_functions;
+		*(func_t *)d = pr_functions.indexof(func);
 		break;
 		
 	default:
@@ -964,7 +973,7 @@ void ED_LoadFromFile (char *data)
 		}
 
 		pr_global_struct->self = EDICT_TO_PROG(ent);
-		PR_ExecuteProgram (func - pr_functions);
+		PR_ExecuteProgram ( pr_functions.indexof(func));
 	}	
 
 	Con_DPrintf ("%i entities inhibited\n", inhibit);
@@ -985,8 +994,8 @@ void PR_LoadProgs (void)
 		gefvCache[i].field[0] = 0;
 
 	CRC_Init (&pr_crc);
-
-	progs = (dprograms_t *)COM_LoadHunkFile ("progs.dat");
+	char* raw_progs = (char*)COM_LoadHunkFile("progs.dat");
+	progs = (dprograms_t *)raw_progs;
 	if (!progs)
 		Sys_Error ("PR_LoadProgs: couldn't load progs.dat");
 	Con_DPrintf ("Programs occupy %iK.\n", com_filesize/1024);
@@ -1003,14 +1012,14 @@ void PR_LoadProgs (void)
 	if (progs->crc != PROGHEADER_CRC)
 		Sys_Error ("progs.dat system vars have been modified, progdefs.h is out of date");
 
-	pr_functions = (dfunction_t *)((byte *)progs + progs->ofs_functions);
+	pr_functions.manage(raw_progs + progs->ofs_functions, progs->numfunctions);
 	pr_strings = (char *)progs + progs->ofs_strings;
-	pr_globaldefs = (ddef_t *)((byte *)progs + progs->ofs_globaldefs);
-	pr_fielddefs = (ddef_t *)((byte *)progs + progs->ofs_fielddefs);
-	pr_statements = (dstatement_t *)((byte *)progs + progs->ofs_statements);
+	pr_globaldefs.manage(raw_progs + progs->ofs_globaldefs, progs->numglobaldefs);
+	pr_fielddefs.manage(raw_progs + progs->ofs_fielddefs, progs->numfielddefs);
+	pr_statements.manage(raw_progs + progs->ofs_statements, progs->numstatements);
 
 	pr_global_struct = (globalvars_t *)((byte *)progs + progs->ofs_globals);
-	pr_globals = (float *)pr_global_struct;
+	pr_globals.manage(pr_global_struct, progs->numglobals);
 	
 	pr_edict_size = progs->entityfields * 4 + sizeof (edict_t) - sizeof(entvars_t);
 	
@@ -1023,34 +1032,37 @@ void PR_LoadProgs (void)
 		pr_statements[i].c = LittleShort(pr_statements[i].c);
 	}
 
-	for (i=0 ; i<progs->numfunctions; i++)
+	for (i = 0; i < progs->numfunctions; i++)
 	{
-	pr_functions[i].first_statement = LittleLong (pr_functions[i].first_statement);
-	pr_functions[i].parm_start = LittleLong (pr_functions[i].parm_start);
-	pr_functions[i].s_name = LittleLong (pr_functions[i].s_name);
-	pr_functions[i].s_file = LittleLong (pr_functions[i].s_file);
-	pr_functions[i].numparms = LittleLong (pr_functions[i].numparms);
-	pr_functions[i].locals = LittleLong (pr_functions[i].locals);
-	}	
+		pr_functions[i].first_statement = LittleLong(pr_functions[i].first_statement);
+		pr_functions[i].parm_start = LittleLong(pr_functions[i].parm_start);
+		pr_functions[i].s_name = LittleLong(pr_functions[i].s_name);
+		pr_functions[i].s_file = LittleLong(pr_functions[i].s_file);
+		pr_functions[i].numparms = LittleLong(pr_functions[i].numparms);
+		pr_functions[i].locals = LittleLong(pr_functions[i].locals);
+	}
 
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
-		pr_globaldefs[i].type = static_cast<etype_t>(LittleShort (static_cast<short>(pr_globaldefs[i].type)));
+		pr_globaldefs[i].itype = LittleShort (static_cast<short>(pr_globaldefs[i].itype));
 		pr_globaldefs[i].ofs = LittleShort (pr_globaldefs[i].ofs);
 		pr_globaldefs[i].s_name = LittleLong (pr_globaldefs[i].s_name);
 	}
 
 	for (i=0 ; i<progs->numfielddefs ; i++)
 	{
-		pr_fielddefs[i].type = static_cast<etype_t>(LittleShort(static_cast<short>(pr_fielddefs[i].type))); 
-		if (static_cast<short>(pr_fielddefs[i].type) & DEF_SAVEGLOBAL)
+		pr_fielddefs[i].itype = LittleShort(static_cast<short>(pr_fielddefs[i].itype)); 
+		if (pr_fielddefs[i].itype & DEF_SAVEGLOBAL)
 			Sys_Error ("PR_LoadProgs: pr_fielddefs[i].type & DEF_SAVEGLOBAL");
 		pr_fielddefs[i].ofs = LittleShort (pr_fielddefs[i].ofs);
 		pr_fielddefs[i].s_name = LittleLong (pr_fielddefs[i].s_name);
 	}
 
-	for (i=0 ; i<progs->numglobals ; i++)
-		((int *)pr_globals)[i] = LittleLong (((int *)pr_globals)[i]);
+	for (i = 0; i < progs->numglobals; i++) {
+		int* p = (int *)&pr_globals[i];
+		*p = LittleLong(*p);
+	}
+
 }
 
 

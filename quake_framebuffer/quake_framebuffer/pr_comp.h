@@ -129,12 +129,13 @@ typedef struct
 	union {
 		unsigned short	itype;		// if DEF_SAVEGLOBGAL bit is set
 									// the variable needs to be saved in savegames
-		etype_t type;
+		
 	};
 
 
 	unsigned short	ofs;
 	int			s_name;
+	etype_t type() const { return static_cast<etype_t>(itype); }
 } ddef_t;
 #define	DEF_SAVEGLOBAL	(1<<15)
 

@@ -21,7 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
-#include <glad\glad.h>
+#include "..\glad\debug\include\glad\glad.h"
+
 #include <GLFW\glfw3.h>
 #include "linmath.h"
 #include <assert.h>
@@ -357,7 +358,9 @@ void D_EndDirectRect(int x, int y, int width, int height)
 #ifndef _DEBUG
 #include "../glad/release/src/glad.c"
 #else
+//#include "..\glad\debug\include\glad\glad.h"
 #include "../glad/debug/src/glad.c"
 #endif
 
 
+//#include "..\glad\debug\include\glad\glad.h"

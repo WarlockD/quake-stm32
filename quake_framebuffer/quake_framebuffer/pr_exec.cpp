@@ -262,7 +262,7 @@ void PR_RunError (char *error, ...)
 	vsprintf (string,error,argptr);
 	va_end (argptr);
 
-	PR_PrintStatement (pr_statements + pr_xstatement);
+	PR_PrintStatement (&pr_statements[ pr_xstatement]);
 	PR_StackTrace ();
 	Con_Printf ("%s\n", string);
 	
@@ -302,7 +302,7 @@ int PR_EnterFunction (dfunction_t *f)
 		PR_RunError ("PR_ExecuteProgram: locals stack overflow\n");
 
 	for (i=0 ; i < c ; i++)
-		localstack[localstack_used+i] = ((int *)pr_globals)[f->parm_start + i];
+		localstack[localstack_used+i] = *reinterpret_cast<int*>(&pr_globals[f->parm_start + i]);
 	localstack_used += c;
 
 // copy parameters
@@ -311,7 +311,7 @@ int PR_EnterFunction (dfunction_t *f)
 	{
 		for (j=0 ; j<f->parm_size[i] ; j++)
 		{
-			((int *)pr_globals)[o] = ((int *)pr_globals)[OFS_PARM0+i*3+j];
+			*reinterpret_cast<int*>(&pr_globals[o]) = *reinterpret_cast<int*>(&pr_globals[OFS_PARM0+i*3+j]);
 			o++;
 		}
 	}
@@ -339,7 +339,8 @@ int PR_LeaveFunction (void)
 		PR_RunError ("PR_ExecuteProgram: locals stack underflow\n");
 
 	for (i=0 ; i < c ; i++)
-		((int *)pr_globals)[pr_xfunction->parm_start + i] = localstack[localstack_used+i];
+		*reinterpret_cast<int*>(&pr_globals[pr_xfunction->parm_start + i]) = localstack[localstack_used + i];
+
 
 // up stack
 	pr_depth--;

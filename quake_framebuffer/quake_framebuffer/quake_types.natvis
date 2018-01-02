@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="quake::fixed_array&lt;*&gt;" Inheritable="false">
+    <DisplayString Condition="_size == 0">empty</DisplayString>
+    <DisplayString Condition="_size != 0"> data = {*_data}, size= {_size} </DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>_size</Size>
+        <ValuePointer>_data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="quake::string_view" Inheritable="true">
+    <DisplayString Condition="_size == 0">empty</DisplayString>
+    <DisplayString Condition="_size > 0">[ size={_size}] {_data,[_size]s8}</DisplayString>
+  </Type>
+  
+</AutoVisualizer>
+
+

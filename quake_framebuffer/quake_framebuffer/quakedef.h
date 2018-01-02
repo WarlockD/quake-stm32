@@ -48,7 +48,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <vector>
 #include <algorithm>
 #include <type_traits>
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 
+#include "qvector.h"
 
 #if defined(_WIN32) && !defined(WINDED)
 

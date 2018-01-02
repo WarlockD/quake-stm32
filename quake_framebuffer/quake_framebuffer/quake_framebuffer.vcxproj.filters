@@ -225,6 +225,9 @@
     <ClCompile Include="global.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="qstring.cpp">
+      <Filter>quake</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">
@@ -427,5 +430,11 @@
     <ClInclude Include="globals.h">
       <Filter>quake</Filter>
     </ClInclude>
+    <ClInclude Include="qvector.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="quake_types.natvis" />
   </ItemGroup>
 </Project>

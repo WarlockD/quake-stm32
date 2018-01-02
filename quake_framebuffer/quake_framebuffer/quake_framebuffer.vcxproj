@@ -88,11 +88,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <PrecompiledHeaderFile>quakedef.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -160,7 +161,9 @@
     <ClCompile Include="cl_parse.cpp" />
     <ClCompile Include="cl_tent.cpp" />
     <ClCompile Include="cmd.cpp" />
-    <ClCompile Include="common.cpp" />
+    <ClCompile Include="common.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="conproc.cpp" />
     <ClCompile Include="console.cpp" />
     <ClCompile Include="crc.cpp" />
@@ -194,6 +197,7 @@
     <ClCompile Include="pr_cmds.cpp" />
     <ClCompile Include="pr_edict.cpp" />
     <ClCompile Include="pr_exec.cpp" />
+    <ClCompile Include="qstring.cpp" />
     <ClCompile Include="r_aclip.cpp" />
     <ClCompile Include="r_alias.cpp" />
     <ClCompile Include="r_bsp.cpp" />
@@ -272,6 +276,7 @@
     <ClInclude Include="pr_comp.h" />
     <ClInclude Include="quakeasm.h" />
     <ClInclude Include="quakedef.h" />
+    <ClInclude Include="qvector.h" />
     <ClInclude Include="render.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="r_local.h" />
@@ -291,6 +296,9 @@
     <ClInclude Include="winquake.h" />
     <ClInclude Include="world.h" />
     <ClInclude Include="zone.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="quake_types.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
