@@ -33,17 +33,17 @@ static inline void RETURN_EDICT(edict_t* e) {
 ===============================================================================
 */
 
-char *PF_VarString (int	first)
+const char *PF_VarString (int	first)
 {
 	int		i;
-	static char out[256];
+	static quake::stack_string<256> out;
 	
 	out[0] = 0;
 	for (i=first ; i<pr_argc ; i++)
 	{
-		strcat (out, G_STRING((OFS_PARM0+i*3)));
+		out+= G_STRING((OFS_PARM0+i*3));
 	}
-	return out;
+	return out.c_str();
 }
 
 
@@ -59,10 +59,9 @@ error(value)
 */
 void PF_error (void)
 {
-	char	*s;
 	edict_t	*ed;
 	
-	s = PF_VarString(0);
+	const char* s = PF_VarString(0);
 	Con_Printf ("======SERVER ERROR in %s:\n%s\n"
 	,pr_strings + pr_xfunction->s_name,s);
 	ed = PROG_TO_EDICT(pr_global_struct->self);
@@ -83,10 +82,9 @@ objerror(value)
 */
 void PF_objerror (void)
 {
-	char	*s;
 	edict_t	*ed;
 	
-	s = PF_VarString(0);
+	const char*s = PF_VarString(0);
 	Con_Printf ("======OBJECT ERROR in %s:\n%s\n"
 	,pr_strings + pr_xfunction->s_name,s);
 	ed = PROG_TO_EDICT(pr_global_struct->self);
@@ -273,11 +271,8 @@ broadcast print to everyone on server
 bprint(value)
 =================
 */
-void PF_bprint (void)
-{
-	char		*s;
-
-	s = PF_VarString(0);
+void PF_bprint (void) {
+	const char* s = PF_VarString(0);
 	SV_BroadcastPrintf ("%s", s);
 }
 
@@ -292,12 +287,11 @@ sprint(clientent, value)
 */
 void PF_sprint (void)
 {
-	char		*s;
 	client_t	*client;
 	int			entnum;
 	
 	entnum = G_EDICTNUM(OFS_PARM0);
-	s = PF_VarString(1);
+	const char*s = PF_VarString(1);
 	
 	if (entnum < 1 || entnum > svs.maxclients)
 	{
@@ -323,12 +317,11 @@ centerprint(clientent, value)
 */
 void PF_centerprint (void)
 {
-	char		*s;
 	client_t	*client;
 	int			entnum;
 	
 	entnum = G_EDICTNUM(OFS_PARM0);
-	s = PF_VarString(1);
+	const char*s = PF_VarString(1);
 	
 	if (entnum < 1 || entnum > svs.maxclients)
 	{
@@ -923,7 +916,7 @@ void PF_dprint (void)
 	Con_DPrintf ("%s",PF_VarString(0));
 }
 
-char	pr_string_temp[128];
+quake::stack_string<128> pr_string_temp;
 
 void PF_ftos (void)
 {
@@ -931,10 +924,10 @@ void PF_ftos (void)
 	v = G_FLOAT(OFS_PARM0);
 	
 	if (v == (int)v)
-		sprintf (pr_string_temp, "%d",(int)v);
+		pr_string_temp << (int)v;
 	else
-		sprintf (pr_string_temp, "%5.1f",v);
-	G_INT(OFS_RETURN) = pr_string_temp - pr_strings;
+		pr_string_temp.assign_print("%5.1f",v);
+	G_INT(OFS_RETURN) = pr_string_temp.data() - pr_strings;
 }
 
 void PF_fabs (void)
@@ -946,8 +939,8 @@ void PF_fabs (void)
 
 void PF_vtos (void)
 {
-	sprintf (pr_string_temp, "'%5.1f %5.1f %5.1f'", G_VECTOR(OFS_PARM0)[0], G_VECTOR(OFS_PARM0)[1], G_VECTOR(OFS_PARM0)[2]);
-	G_INT(OFS_RETURN) = pr_string_temp - pr_strings;
+	pr_string_temp.assign_print("'%5.1f %5.1f %5.1f'", G_VECTOR(OFS_PARM0)[0], G_VECTOR(OFS_PARM0)[1], G_VECTOR(OFS_PARM0)[2]);
+	G_INT(OFS_RETURN) = pr_string_temp.data() - pr_strings;
 }
 
 #ifdef QUAKE2

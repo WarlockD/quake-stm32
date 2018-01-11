@@ -145,7 +145,7 @@ CL_EstablishConnection
 Host should be either "local" or a net address to be passed on
 =====================
 */
-void CL_EstablishConnection (char *host)
+void CL_EstablishConnection (const quake::cstring& host)
 {
 	if (cls.state == ca_dedicated)
 		return;
@@ -155,7 +155,7 @@ void CL_EstablishConnection (char *host)
 
 	CL_Disconnect ();
 
-	cls.netcon = NET_Connect (host);
+	cls.netcon = NET_Connect (host.c_str()); // HACK
 	if (!cls.netcon)
 		Host_Error ("CL_Connect: connect failed\n");
 	Con_DPrintf ("CL_EstablishConnection: connected to %s\n", host);
@@ -174,7 +174,7 @@ An svc_signonnum has been received, perform a client side setup
 */
 void CL_SignonReply (void)
 {
-	char 	str[8192];
+	quake::stack_string<8192> str;
 
 Con_DPrintf ("CL_SignonReply: %i\n", cls.signon);
 
@@ -193,7 +193,7 @@ Con_DPrintf ("CL_SignonReply: %i\n", cls.signon);
 		MSG_WriteString (&cls.message, va("color %i %i\n", ((int)cl_color.value)>>4, ((int)cl_color.value)&15));
 	
 		MSG_WriteByte (&cls.message, clc_stringcmd);
-		sprintf (str, "spawn %s", cls.spawnparms);
+		str << "spawn " << cls.spawnparms;
 		MSG_WriteString (&cls.message, str);
 		break;
 		
@@ -218,7 +218,7 @@ Called to play the next demo in the demo loop
 */
 void CL_NextDemo (void)
 {
-	char	str[1024];
+	quake::stack_string<1024> str;
 
 	if (cls.demonum == -1)
 		return;		// don't play demos
@@ -236,7 +236,7 @@ void CL_NextDemo (void)
 		}
 	}
 
-	sprintf (str,"playdemo %s\n", cls.demos[cls.demonum]);
+	str << "playdemo " << cls.demos[cls.demonum] << '\n';
 	Cbuf_InsertText (str);
 	cls.demonum++;
 }

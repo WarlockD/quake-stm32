@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 
 model_t	*loadmodel;
-char	loadname[32];	// for hunk tags
+quake::stack_string<32> loadname;	// for hunk tags
 
 void Mod_LoadSpriteModel (model_t *mod, void *buffer);
 void Mod_LoadBrushModel (model_t *mod, void *buffer);
@@ -182,13 +182,13 @@ Mod_FindName
 
 ==================
 */
-model_t *Mod_FindName (char *name)
+model_t *Mod_FindName (const quake::string_view& name)
 {
 	int		i;
 	model_t	*mod;
 	model_t	*avail = NULL;
 
-	if (!name[0])
+	if (name.empty())
 		Sys_Error ("Mod_ForName: NULL name");
 		
 //
@@ -196,7 +196,7 @@ model_t *Mod_FindName (char *name)
 //
 	for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
 	{
-		if (!strcmp (mod->name, name) )
+		if (name == mod->name)
 			break;
 		if (mod->needload == NL_UNREFERENCED)
 			if (!avail || mod->type != mod_alias)
@@ -219,7 +219,7 @@ model_t *Mod_FindName (char *name)
 		}
 		else
 			mod_numknown++;
-		strcpy (mod->name, name);
+		mod->name[name.copy(mod->name)] = '\0';
 		mod->needload = NL_NEEDS_LOADED;
 	}
 
@@ -232,7 +232,7 @@ Mod_TouchModel
 
 ==================
 */
-void Mod_TouchModel (char *name)
+void Mod_TouchModel (const quake::string_view& name)
 {
 	model_t	*mod;
 	
@@ -289,7 +289,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // allocate a new model
 //
-	COM_FileBase (mod->name, loadname);
+	loadname = COM_FileBase (mod->name);
 	
 	loadmodel = mod;
 
@@ -325,7 +325,7 @@ Mod_ForName
 Loads in a model for the given name
 ==================
 */
-model_t *Mod_ForName (char *name, qboolean crash)
+model_t *Mod_ForName (const quake::string_view& name, qboolean crash)
 {
 	model_t	*mod;
 
@@ -1204,15 +1204,14 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 		mod->radius = RadiusFromBounds (mod->mins, mod->maxs);
 		
 		mod->numleafs = bm->visleafs;
-
+		quake::stack_string<10> name;
 		if (i < mod->numsubmodels-1)
 		{	// duplicate the basic information
-			char	name[10];
-
-			sprintf (name, "*%i", i+1);
+			name.clear();
+			name << (i + 1);
 			loadmodel = Mod_FindName (name);
 			*loadmodel = *mod;
-			strcpy (loadmodel->name, name);
+			Q_strcpy (loadmodel->name, name);
 			mod = loadmodel;
 		}
 	}

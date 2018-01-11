@@ -35,12 +35,12 @@ typedef struct
 typedef struct
 {
 	int		length;
-	char	map[MAX_STYLESTRING];
+	quake::stack_string<MAX_STYLESTRING>	map;
 } lightstyle_t;
 
 typedef struct
 {
-	char	name[MAX_SCOREBOARDNAME];
+	quake::stack_string<MAX_SCOREBOARDNAME>	name;
 	float	entertime;
 	int		frags;
 	int		colors;			// two 4 bit fields
@@ -113,12 +113,12 @@ typedef struct
 	cactive_t	state;
 
 // personalization data sent to server	
-	char		mapstring[MAX_QPATH];
-	char		spawnparms[MAX_MAPSTRING];	// to restart a level
+	quake::stack_string<MAX_QPATH> mapstring; // to restart a level
+	quake::stack_string<MAX_MAPSTRING> spawnparms;	
 
 // demo loop control
 	int			demonum;		// -1 = don't play demos
-	char		demos[MAX_DEMOS][MAX_DEMONAME];		// when not playing
+	quake::stack_string<MAX_DEMONAME>  demos[MAX_DEMOS];		// when not playing
 
 // demo recording info must be here, because record is started before
 // entering a map (and clearing client_state_t)
@@ -209,7 +209,7 @@ typedef struct
 	struct model_s		*model_precache[MAX_MODELS];
 	struct sfx_s		*sound_precache[MAX_SOUNDS];
 
-	char		levelname[40];	// for display on solo scoreboard
+	quake::stack_string<40>		levelname;	// for display on solo scoreboard
 	int			viewentity;		// cl_entitites[cl.viewentity] = player
 	int			maxclients;
 	int			gametype;
@@ -293,7 +293,7 @@ void	CL_DecayLights (void);
 
 void CL_Init (void);
 
-void CL_EstablishConnection (char *host);
+void CL_EstablishConnection (const quake::cstring& host);
 void CL_Signon1 (void);
 void CL_Signon2 (void);
 void CL_Signon3 (void);

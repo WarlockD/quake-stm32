@@ -40,7 +40,7 @@ cachepic_t	menu_cachepics[MAX_CACHED_PICS];
 int			menu_numcachepics;
 
 
-qpic_t	*Draw_PicFromWad (char *name)
+qpic_t	*Draw_PicFromWad (const char *name)
 {
 	return (qpic_t*)W_GetLumpName (name);
 }
@@ -50,7 +50,7 @@ qpic_t	*Draw_PicFromWad (char *name)
 Draw_CachePic
 ================
 */
-qpic_t	*Draw_CachePic (char *path)
+qpic_t	*Draw_CachePic (const char *path)
 {
 	cachepic_t	*pic;
 	int			i;
@@ -217,7 +217,7 @@ void Draw_Character (int x, int y, int num)
 Draw_String
 ================
 */
-void Draw_String (int x, int y, char *str)
+void Draw_String (int x, int y,const  char *str)
 {
 	while (*str)
 	{
@@ -532,14 +532,14 @@ void Draw_ConsoleBackground (int lines)
 	unsigned short	*pusdest;
 	int				f, fstep;
 	qpic_t			*conback;
-	char			ver[100];
+	quake::stack_string<100> ver;
 
 	conback = Draw_CachePic ("gfx/conback.lmp");
 
 // hack the version number directly into the pic
 #ifdef _WIN32
-	sprintf (ver, "(WinQuake) %4.2f", (float)VERSION);
-	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
+	ver <<"(WinQuake) %4.2f" << (float)VERSION;
+	dest = conback->data + 320 * 186 + 320 - 11 - 8 * ver.size();
 #elif defined(X11)
 	sprintf (ver, "(X11 Quake %2.2f) %4.2f", (float)X11_VERSION, (float)VERSION);
 	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
@@ -551,7 +551,7 @@ void Draw_ConsoleBackground (int lines)
 	sprintf (ver, "%4.2f", VERSION);
 #endif
 
-	for (x=0 ; x<strlen(ver) ; x++)
+	for (x=0 ; x<ver.size(); x++)
 		Draw_CharToConback (ver[x], dest+(x<<3));
 	
 // draw the pic

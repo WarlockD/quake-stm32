@@ -27,7 +27,7 @@ key up events are sent even if in console mode
 
 
 #define		MAXCMDLINE	256
-char	key_lines[32][MAXCMDLINE];
+quake::stack_string<MAXCMDLINE>	key_lines[32];
 int		key_linepos;
 int		shift_down=false;
 int		key_lastpress;
@@ -158,13 +158,11 @@ Interactive line editing and console scrollback
 */
 void Key_Console (int key)
 {
-	char	*cmd;
-	
 	if (key == K_ENTER)
 	{
-		Cbuf_AddText (key_lines[edit_line]+1);	// skip the >
+		Cbuf_AddText (key_lines[edit_line].substr(1));	// skip the >
 		Cbuf_AddText ("\n");
-		Con_Printf ("%s\n",key_lines[edit_line]);
+		Con_Printf ("%s\n",key_lines[edit_line].c_str());
 		edit_line = (edit_line + 1) & 31;
 		history_line = edit_line;
 		key_lines[edit_line][0] = ']';
@@ -177,16 +175,14 @@ void Key_Console (int key)
 
 	if (key == K_TAB)
 	{	// command completion
-		cmd = Cmd_CompleteCommand (key_lines[edit_line]+1);
-		if (!cmd)
-			cmd = Cvar_CompleteVariable (key_lines[edit_line]+1);
-		if (cmd)
-		{
-			Q_strcpy (key_lines[edit_line]+1, cmd);
-			key_linepos = Q_strlen(cmd)+1;
-			key_lines[edit_line][key_linepos] = ' ';
-			key_linepos++;
-			key_lines[edit_line][key_linepos] = 0;
+		quake::cstring cmd = Cmd_CompleteCommand (key_lines[edit_line].substr(1));
+		if (cmd.empty())
+			cmd = Cvar_CompleteVariable (key_lines[edit_line].substr(1));
+		if (!cmd.empty()) {
+			key_lines[edit_line].assign(1,key_lines[edit_line].front()); // get the prompt
+			key_lines[edit_line].append(cmd); // append the partial command
+			key_lines[edit_line].push_back(' '); // put in a space
+			key_linepos = key_lines[edit_line].size(); // change the line position
 			return;
 		}
 	}
@@ -207,8 +203,8 @@ void Key_Console (int key)
 				&& !key_lines[history_line][1]);
 		if (history_line == edit_line)
 			history_line = (edit_line+1)&31;
-		Q_strcpy(key_lines[edit_line], key_lines[history_line]);
-		key_linepos = Q_strlen(key_lines[edit_line]);
+		key_lines[edit_line]= key_lines[history_line];
+		key_linepos = key_lines[edit_line].size();
 		return;
 	}
 
@@ -228,8 +224,8 @@ void Key_Console (int key)
 		}
 		else
 		{
-			Q_strcpy(key_lines[edit_line], key_lines[history_line]);
-			key_linepos = Q_strlen(key_lines[edit_line]);
+			key_lines[edit_line] = key_lines[history_line];
+			key_linepos = key_lines[edit_line].size();
 		}
 		return;
 	}
@@ -267,16 +263,14 @@ void Key_Console (int key)
 		
 	if (key_linepos < MAXCMDLINE-1)
 	{
-		key_lines[edit_line][key_linepos] = key;
-		key_linepos++;
-		key_lines[edit_line][key_linepos] = 0;
+		key_lines[edit_line].push_back(key);
 	}
 
 }
 
 //============================================================================
 
-char chat_buffer[32];
+quake::stack_string<32> chat_buffer;
 qboolean team_message = false;
 
 void Key_Message (int key)
@@ -338,13 +332,13 @@ the given string.  Single ascii characters return themselves, while
 the K_* names are matched up.
 ===================
 */
-int Key_StringToKeynum (const char * str)
+int Key_StringToKeynum (const quake::string_view& str)
 {
 	keyname_t	*kn;
 	
-	if (!str || !str[0])
+	if (str.empty())
 		return -1;
-	if (!str[1])
+	if (str.size() == 1)
 		return str[0];
 
 	for (kn=keynames ; kn->name ; kn++)
@@ -367,7 +361,7 @@ FIXME: handle quote special (general escape sequence?)
 char *Key_KeynumToString (int keynum)
 {
 	keyname_t	*kn;	
-	static	char	tinystr[2];
+	static char tinystr[2];
 	
 	if (keynum == -1)
 		return "<KEY NOT FOUND>";
@@ -391,7 +385,7 @@ char *Key_KeynumToString (int keynum)
 Key_SetBinding
 ===================
 */
-void Key_SetBinding (int keynum, char *binding)
+void Key_SetBinding (int keynum, const quake::string_view&binding)
 {
 	char	*new_ptr;
 	int		l;
@@ -407,10 +401,8 @@ void Key_SetBinding (int keynum, char *binding)
 	}
 			
 // allocate memory for new binding
-	l = Q_strlen (binding);	
-	new_ptr = (char*)Z_Malloc (l+1);
-	Q_strcpy (new_ptr, binding);
-	new_ptr[l] = 0;
+	new_ptr = (char*)Z_Malloc (binding.size()+1);
+	new_ptr[binding.copy(new_ptr, binding.size())] = '\0';
 	keybindings[keynum] = new_ptr;
 }
 
@@ -432,7 +424,8 @@ void Key_Unbind_f (void)
 	b = Key_StringToKeynum (Cmd_Argv(1));
 	if (b==-1)
 	{
-		Con_Printf ("\"%s\" isn't a valid key\n", Cmd_Argv(1));
+		quake::stack_string<64> text(Cmd_Argv(1));
+		Con_Printf ("\"%s\" isn't a valid key\n", text.c_str());
 		return;
 	}
 
@@ -457,7 +450,7 @@ Key_Bind_f
 void Key_Bind_f (void)
 {
 	int			i, c, b;
-	char		cmd[1024];
+	quake::stack_string<1024>		cmd;
 	
 	c = Cmd_Argc();
 
@@ -475,20 +468,21 @@ void Key_Bind_f (void)
 
 	if (c == 2)
 	{
+		cmd << '"' << Cmd_Argv(1) << '"';
 		if (keybindings[b])
-			Con_Printf ("\"%s\" = \"%s\"\n", Cmd_Argv(1), keybindings[b] );
+			cmd << '"' << keybindings[b] << '"' << '\n';
 		else
-			Con_Printf ("\"%s\" is not bound\n", Cmd_Argv(1) );
+			cmd <<" is not bound\n";
+		Con_Printf("s%", cmd.c_str());
 		return;
 	}
 	
 // copy the rest of the command line
-	cmd[0] = 0;		// start out with a null string
+
 	for (i=2 ; i< c ; i++)
 	{
-		if (i > 2)
-			strcat (cmd, " ");
-		strcat (cmd, Cmd_Argv(i));
+		if (i > 2) cmd << ' ';
+		cmd << Cmd_Argv(i);
 	}
 
 	Key_SetBinding (b, cmd);
@@ -523,8 +517,7 @@ void Key_Init (void)
 
 	for (i=0 ; i<32 ; i++)
 	{
-		key_lines[i][0] = ']';
-		key_lines[i][1] = 0;
+		key_lines[i] = "]";
 	}
 	key_linepos = 1;
 	
@@ -599,7 +592,7 @@ Should NOT be called during an interrupt!
 void Key_Event (int key, qboolean down)
 {
 	char	*kb;
-	char	cmd[1024];
+	quake::stack_string<1024> cmd;
 
 	keydown[key] = down;
 
@@ -666,7 +659,7 @@ void Key_Event (int key, qboolean down)
 		kb = keybindings[key];
 		if (kb && kb[0] == '+')
 		{
-			sprintf (cmd, "-%s %i\n", kb+1, key);
+			cmd.assign_print( "-%s %i\n", kb+1, key);
 			Cbuf_AddText (cmd);
 		}
 		if (keyshift[key] != key)
@@ -674,7 +667,7 @@ void Key_Event (int key, qboolean down)
 			kb = keybindings[keyshift[key]];
 			if (kb && kb[0] == '+')
 			{
-				sprintf (cmd, "-%s %i\n", kb+1, key);
+				cmd.assign_print("-%s %i\n", kb+1, key);
 				Cbuf_AddText (cmd);
 			}
 		}
@@ -702,7 +695,7 @@ void Key_Event (int key, qboolean down)
 		{
 			if (kb[0] == '+')
 			{	// button commands add keynum as a parm
-				sprintf (cmd, "%s %i\n", kb, key);
+				cmd.assign_print("%s %i\n", kb, key);
 				Cbuf_AddText (cmd);
 			}
 			else

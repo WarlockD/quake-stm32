@@ -34,7 +34,7 @@ void Sys_FileSeek (int handle, int position);
 int Sys_FileRead (int handle, void *dest, int count);
 int Sys_FileWrite (int handle, const void * data, int count);
 int	Sys_FileTime (const char * path);
-void Sys_mkdir (char *path);
+void Sys_mkdir (const char *path);
 
 //
 // memory protection
@@ -44,12 +44,12 @@ void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length);
 //
 // system IO
 //
-void Sys_DebugLog(char *file, char *fmt, ...);
+void Sys_DebugLog(const char *file, const char *fmt, ...);
 
-void Sys_Error (char *error, ...);
+void Sys_Error (const char *error, ...);
 // an error will cause the entire program to exit
 
-void Sys_Printf (char *fmt, ...);
+void Sys_Printf (const char *fmt, ...);
 // send text to the console
 
 void Sys_Quit (void);

@@ -235,8 +235,8 @@ void SV_AddUpdates (void);
 void SV_ClientThink (void);
 void SV_AddClientToServer (struct qsocket_s	*ret);
 
-void SV_ClientPrintf (char *fmt, ...);
-void SV_BroadcastPrintf (char *fmt, ...);
+void SV_ClientPrintf (const char *fmt, ...);
+void SV_BroadcastPrintf (const char *fmt, ...);
 
 void SV_Physics (void);
 
@@ -253,5 +253,5 @@ void SV_SaveSpawnparms ();
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot);
 #else
-void SV_SpawnServer (char *server);
+void SV_SpawnServer (const char *server);
 #endif

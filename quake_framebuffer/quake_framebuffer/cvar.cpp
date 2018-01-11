@@ -29,12 +29,12 @@ char	*cvar_null_string = "";
 Cvar_FindVar
 ============
 */
-cvar_t *Cvar_FindVar (char *var_name)
+cvar_t *Cvar_FindVar (const quake::string_view& var_name)
 {
 	cvar_t	*var;
 	
 	for (var=cvar_vars ; var ; var=var->next)
-		if (!Q_strcmp (var_name, var->name))
+		if (var_name == var->name)
 			return var;
 
 	return NULL;
@@ -45,7 +45,7 @@ cvar_t *Cvar_FindVar (char *var_name)
 Cvar_VariableValue
 ============
 */
-float	Cvar_VariableValue (char *var_name)
+float	Cvar_VariableValue (const quake::string_view& var_name)
 {
 	cvar_t	*var;
 	
@@ -61,13 +61,13 @@ float	Cvar_VariableValue (char *var_name)
 Cvar_VariableString
 ============
 */
-char *Cvar_VariableString (char *var_name)
+quake::string_view Cvar_VariableString (const quake::string_view& var_name)
 {
 	cvar_t *var;
 	
 	var = Cvar_FindVar (var_name);
 	if (!var)
-		return cvar_null_string;
+		return quake::string_view();
 	return var->string;
 }
 
@@ -77,22 +77,19 @@ char *Cvar_VariableString (char *var_name)
 Cvar_CompleteVariable
 ============
 */
-char *Cvar_CompleteVariable (char *partial)
+quake::string_view Cvar_CompleteVariable (const quake::string_view& partial)
 {
 	cvar_t		*cvar;
-	int			len;
-	
-	len = Q_strlen(partial);
-	
-	if (!len)
+	size_t len = partial.size();
+	if (partial.empty())
 		return NULL;
 		
 // check functions
 	for (cvar=cvar_vars ; cvar ; cvar=cvar->next)
-		if (!Q_strncmp (partial,cvar->name, len))
+		if (partial.size() <= cvar->name.size() && partial.compare(0, partial.size(),  cvar->name, 0, partial.size()) == 0)
 			return cvar->name;
 
-	return NULL;
+	return quake::string_view();
 }
 
 
@@ -101,25 +98,19 @@ char *Cvar_CompleteVariable (char *partial)
 Cvar_Set
 ============
 */
-void Cvar_Set (char *var_name, char *value)
-{
-	cvar_t	*var;
-	qboolean changed;
-	
-	var = Cvar_FindVar (var_name);
+void Cvar_Set (const quake::string_view& var_name, const quake::string_view& value) {
+	cvar_t	*var = Cvar_FindVar (var_name);
 	if (!var)
 	{	// there is an error in C code if this happens
 		Con_Printf ("Cvar_Set: variable %s not found\n", var_name);
 		return;
 	}
 
-	changed = Q_strcmp(var->string, value);
+	qboolean changed = value == var->string;
 	
-	Z_Free (var->string);	// free the old value string
-	
-	var->string = (char*)Z_Malloc (Q_strlen(value)+1);
-	Q_strcpy (var->string, value);
-	var->value = Q_atof (var->string);
+	var->string = value;
+	var->value = quake::stof(var->string);
+
 	if (var->server && changed)
 	{
 		if (sv.active)
@@ -132,12 +123,31 @@ void Cvar_Set (char *var_name, char *value)
 Cvar_SetValue
 ============
 */
-void Cvar_SetValue (char *var_name, float value)
-{
-	char	val[32];
-	
-	sprintf (val, "%f",value);
+void Cvar_SetValue (const quake::string_view& var_name, float value) {
+	cvar_t	*var = Cvar_FindVar(var_name);
+	if (!var)
+	{	// there is an error in C code if this happens
+		Con_Printf("Cvar_Set: variable %s not found\n", var_name);
+		return;
+	}
+
+	qboolean changed = value == var->value;
+
+	var->value = value;
+	var->string.clear();
+	var->string << value;
+
+	if (var->server && changed)
+	{
+		if (sv.active)
+			SV_BroadcastPrintf("\"%s\" changed to \"%s\"\n", var->name, var->string);
+	}
+#if 0
+	quake::stack_string<32> val;
+	val << value;
+
 	Cvar_Set (var_name, val);
+#endif
 }
 
 
@@ -166,11 +176,14 @@ void Cvar_RegisterVariable (cvar_t *variable)
 		return;
 	}
 		
-// copy the value off, because future sets will Z_Free it
-	oldstr = variable->string;
-	variable->string = (char*)Z_Malloc (Q_strlen(variable->string)+1);
-	Q_strcpy (variable->string, oldstr);
-	variable->value = Q_atof (variable->string);
+	// copy the value off, because future sets will Z_Free it
+	// we don't have to worry about this untill we get the interning system working
+	if (variable->string.size() == 0U) {
+		variable->string << variable->value; // get the value from string
+	}
+	else {
+		variable->value = Q_atof(variable->string);
+	}
 	
 // link the variable in
 	variable->next = cvar_vars;

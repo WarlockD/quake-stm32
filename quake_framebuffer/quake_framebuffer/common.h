@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <type_traits>
 #include <cassert>
 
+#include "qvector.h"
 #if !defined BYTE_DEFINED
 typedef uint8_t 		byte;
 #define BYTE_DEFINED 1
@@ -49,8 +50,19 @@ void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
 void SZ_Clear (sizebuf_t *buf);
 void *SZ_GetSpace (sizebuf_t *buf, int length);
-void SZ_Write (sizebuf_t *buf, void *data, int length);
-void SZ_Print (sizebuf_t *buf, char *data);	// strcats onto the sizebuf
+void SZ_Write (sizebuf_t *buf, const void *data, int length);
+void SZ_Print (sizebuf_t *buf, const char *data);	// strcats onto the sizebuf
+
+template<typename U>
+static inline void SZ_Print(sizebuf_t *buf, const quake::string_helper<U>& data) {
+	size_t len = data.size() + 1;
+
+	// byte * cast to keep VC++ happy
+	if (buf->data[buf->cursize - 1])
+		Q_memcpy((byte *)SZ_GetSpace(buf, len), data.data(), len); // no trailing 0
+	else
+		Q_memcpy((byte *)SZ_GetSpace(buf, len - 1) - 1, data.data(), len); // write over trailing 0
+}
 
 //============================================================================
 
@@ -106,12 +118,12 @@ void MSG_WriteByte (sizebuf_t *sb, int c);
 // I put some templates here so we can catch some odd balls
 // alot of stuff in sv_main gets converted to bytes.  We are talking floats?  There
 // are enough warnings for me to think about changing the df file
-template<typename T, typename = std::enable_if<!std::is_same<T,int>::value && std::is_arithmetic<T>::value>>
+template<typename T, typename = std::enable_if<!std::is_same<T,int>::value && std::is_arithmetic<T>::value>::type>
 void MSG_WriteChar(sizebuf_t *sb, T c) {
 	//static_assert("Do you REALLY want to convert this to char?");
 	MSG_WriteChar(sb, static_cast<int>(c));
 }
-template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>::type>
 void MSG_WriteByte(sizebuf_t *sb, T c) {
 	//static_assert("Do you REALLY want to convert this to byte?");
 	MSG_WriteByte(sb, static_cast<int>(c));
@@ -119,7 +131,7 @@ void MSG_WriteByte(sizebuf_t *sb, T c) {
 
 
 void MSG_WriteShort (sizebuf_t *sb, int c);
-template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>::type>
 void MSG_WriteShort(sizebuf_t *sb, T c) {
 	//static_assert("Do you REALLY want to convert this to short?");
 	MSG_WriteShort(sb, static_cast<int>(c));
@@ -127,7 +139,7 @@ void MSG_WriteShort(sizebuf_t *sb, T c) {
 
 
 void MSG_WriteLong (sizebuf_t *sb, int c);
-template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>>
+template<typename T, typename = std::enable_if<!std::is_same<T, int>::value && std::is_arithmetic<T>::value>::type>
 void MSG_WriteLong(sizebuf_t *sb, T c) {
 	//static_assert("Do you REALLY want to convert this to long?");
 	MSG_WriteLong(sb, static_cast<int>(c));
@@ -135,7 +147,14 @@ void MSG_WriteLong(sizebuf_t *sb, T c) {
 
 
 void MSG_WriteFloat (sizebuf_t *sb, float f);
-void MSG_WriteString (sizebuf_t *sb, char *s);
+void MSG_WriteString (sizebuf_t *sb, const char *s);
+template<typename U>
+void MSG_WriteString(sizebuf_t *sb, const quake::string_helper<U>& s) {
+	if (!s.empty()) {
+		SZ_Write(sb, s.data(), s.size());
+	}
+	SZ_Write(sb, "", 1);
+}
 void MSG_WriteCoord (sizebuf_t *sb, float f);
 void MSG_WriteAngle (sizebuf_t *sb, float f);
 
@@ -148,7 +167,7 @@ int MSG_ReadByte (void);
 int MSG_ReadShort (void);
 int MSG_ReadLong (void);
 float MSG_ReadFloat (void);
-char *MSG_ReadString (void);
+quake::cstring MSG_ReadString (void);
 
 float MSG_ReadCoord (void);
 float MSG_ReadAngle (void);
@@ -165,7 +184,10 @@ size_t Q_strlen(const char * str);
 void Q_strncpy(char *dest, const char * src, size_t count);
 void Q_strcpy(char *dest, const char * src);
 template<size_t N>
-int Q_strcpy(char(&dest)[N], const char * src) { Q_strncpy(dest, src, N);}
+void Q_strcpy(char(&dest)[N], const char * src) { return Q_strncpy(dest, src, N);}
+template<size_t N,typename U>
+void Q_strcpy(char(&dest)[N], const quake::string_helper<U>& src) { return  Q_strncpy(dest, src.data(), std::min(src.size(),N-1)); }
+
 
 char *Q_strrchr (char *s, char c);
 const char *Q_strrchr(const char *s, char c);
@@ -175,9 +197,31 @@ int Q_strcmp (const char * s1, const char * s2);
 int Q_strncmp (const char * s1, const char * s2, size_t count);
 
 int Q_strcasecmp (const char * s1, const char * s2);
+
+template<typename U>
+static inline int Q_strcasecmp(const quake::string_helper<U>& s1, const quake::string_view& s2) { return quake::detail::str_case_compare(s1.data(), s1.size(), s2.data(), s2.size()); }
+
+
 int Q_strncasecmp (const char * s1, const char * s2, size_t n);
 int	Q_atoi (const char * str);
+
+// just a quick hack
+template<typename U>
+int	Q_atoi(const quake::string_helper<U>& str) { 
+	char* end;
+	int ret = ::strtol(str.data(), &end,0);
+	//assert(end != str.data());
+	return ret;
+}
+
 float Q_atof (const char * str);
+template<typename U>
+int	Q_atof(const quake::string_helper<U>& str) {
+	char* end;
+	float ret = ::strtof(str.data(), &end);
+//	assert(end != str.data());
+	return ret;
+}
 
 int Q_vsprintf(char* buffer, const char* fmt, va_list va);
 int Q_vsnprintf(char* buffer, size_t buffer_size, const char* fmt, va_list va);
@@ -198,28 +242,72 @@ int Q_sprintf(char(&buffer)[N], const char* fmt, ...) {
 
 //============================================================================
 
-extern	char		com_token[1024];
+extern	quake::string_view		com_token;
 extern	qboolean	com_eof;
 
-const char *COM_Parse (const char * data);
+quake::string_view COM_Parse (const quake::string_view& data);
 
 
 extern	int		com_argc;
 extern	char	**com_argv;
 
-int COM_CheckParm (const char * parm);
-void COM_Init (char *path);
-void COM_InitArgv (int argc, char **argv);
-const char *COM_SkipPath(const char *pathname);
-char *COM_SkipPath (char *pathname);
-void COM_StripExtension (const char *in, char *out);
+int COM_CheckParm (const quake::string_view& parm);
+void COM_Init (const quake::string_view& basedir);
+void COM_InitArgv (int argc, const char **argv);
+quake::string_view COM_SkipPath(const quake::string_view& pathname);
+
+quake::string_view  COM_StripExtension (const quake::string_view&in);
+#if 0
 void COM_FileBase (const char *in, char *out,size_t out_size);
 template<size_t N>
 inline void COM_FileBase(const char *in, char(&out)[N]) { COM_FileBase(in, (char*)out, N); }
+#endif
 
-void COM_DefaultExtension (char *path, const char *extension);
+inline quake::string_view COM_FileBase(quake::string_view in);
+/*
+==================
+COM_DefaultExtension
+==================
+*/
+template<typename U,typename UU>
+inline void COM_DefaultExtension(quake::string_builder<U>& path, const quake::string_helper<UU>& extension) {
+	auto dot = path.find_last_of('.');
+	if (dot != quake::string_view::npos) {
+		auto slash = path.find_last_of("/\\");
+		if (slash != quake::string_view::npos && dot > slash) 
+			dot = quake::string_view::npos;
+	}
+	if (dot == quake::string_view::npos) {
+		if (extension.front() != '.') 
+			path.push_back('.'); 
+		path.append(extension);
+	}
+}
+template<typename U>
+inline void COM_DefaultExtension(quake::string_builder<U>& path, const char* extension) { COM_DefaultExtension(path, quake::string_view(extension)); }
+/*
+============
+va
 
-char	*va(char *format, ...);
+does a varargs printf into a temp buffer, so I don't need to have
+varargs versions of all text functions.
+FIXME: make this buffer size safe someday
+============
+*/
+// silly hack till streams work
+class va {
+	char _string[1024];
+	size_t _size;
+public:
+	va() : _string{ 0 }, _size{ 0 } {}
+	va(const char* fmt, ...);
+	operator const char*() const { return _string; }
+	operator quake::string_view() const { return quake::string_view(_string, _size); }
+	size_t size() const { return _size; }
+	va& operator+=(const char* s) { strcat_s(_string, s); return *this; }
+	va& operator+=(char c) { char v[2] = { c,0 }; operator+=(v); return *this; }
+};
+
 // does a varargs printf into a temp buffer
 
 
@@ -228,7 +316,7 @@ char	*va(char *format, ...);
 extern int com_filesize;
 struct cache_user_s;
 
-extern	char	com_gamedir[MAX_OSPATH];
+extern	quake::stack_string<MAX_OSPATH> com_gamedir;
 
 void COM_WriteFile (const char * filename, const void * data, int len);
 int COM_OpenFile (const char * filename, int *hndl);

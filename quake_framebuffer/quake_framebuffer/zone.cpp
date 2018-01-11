@@ -195,6 +195,42 @@ void *Z_TagMalloc (size_t size, int tag)
 	return (void *) ((byte *)base + sizeof(memblock_t));
 }
 
+/*
+========================
+Z_Realloc
+========================
+*/
+void *Z_Realloc(void *ptr, int size)
+{
+	int old_size;
+	void *old_ptr;
+	memblock_t *block;
+
+	if (!ptr)
+		return Z_Malloc(size);
+
+	block = (memblock_t *)((byte *)ptr - sizeof(memblock_t));
+	if (block->id != ZONEID)
+		Sys_Error("Z_Realloc: realloced a pointer without ZONEID");
+	if (block->tag == 0)
+		Sys_Error("Z_Realloc: realloced a freed pointer");
+
+	old_size = block->size;
+	old_size -= (4 + (int)sizeof(memblock_t));	/* see Z_TagMalloc() */
+	old_ptr = ptr;
+
+	Z_Free(ptr);
+	ptr = Z_TagMalloc(size, 1);
+	if (!ptr)
+		Sys_Error("Z_Realloc: failed on allocation of %i bytes", size);
+
+	if (ptr != old_ptr)
+		memmove(ptr, old_ptr, std::min(old_size, size));
+	if (old_size < size)
+		memset((byte *)ptr + old_size, 0, size - old_size);
+
+	return ptr;
+}
 
 /*
 ========================
@@ -254,7 +290,7 @@ typedef struct
 {
 	int		sentinal;
 	size_t		size;		// including sizeof(hunk_t), -1 = not allocated
-	char	name[8];
+	quake::stack_string<8+1> name;
 } hunk_t;
 
 byte	*hunk_base;
@@ -302,7 +338,7 @@ void Hunk_Print (qboolean all)
 	hunk_t	*h, *next, *endlow, *starthigh, *endhigh;
 	int		count, sum;
 	int		totalblocks;
-	char	name[9];
+	quake::stack_string<9> name;
 
 	name[8] = 0;
 	count = 0;
@@ -352,15 +388,15 @@ void Hunk_Print (qboolean all)
 	//
 	// print the single block
 	//
-		memcpy (name, h->name, 8);
+		name = h->name;
 		if (all)
-			Con_Printf ("%8p :%8i %8s\n",h, h->size, name);
+			Con_Printf ("%8p :%8i %8s\n",h, h->size, name.c_str());
 			
 	//
 	// print the total
 	//
 		if (next == endlow || next == endhigh || 
-		strncmp (h->name, next->name, 8) )
+		h->name ==  next->name )
 		{
 			if (!all)
 				Con_Printf ("          :%8i %8s (TOTAL)\n",sum, name);
@@ -381,7 +417,7 @@ void Hunk_Print (qboolean all)
 Hunk_AllocName
 ===================
 */
-void *Hunk_AllocName (int size, char *name)
+void *Hunk_AllocName (int size, const quake::string_view& name)
 {
 	hunk_t	*h;
 	
@@ -406,7 +442,7 @@ void *Hunk_AllocName (int size, char *name)
 	
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	Q_strncpy (h->name, name, 8);
+	h->name = name;
 	
 	return (void *)(h+1);
 }
@@ -464,7 +500,7 @@ void Hunk_FreeToHighMark (int mark)
 Hunk_HighAllocName
 ===================
 */
-void *Hunk_HighAllocName (size_t size, char *name)
+void *Hunk_HighAllocName (size_t size, const quake::string_view& name)
 {
 	hunk_t	*h;
 
@@ -497,7 +533,7 @@ void *Hunk_HighAllocName (size_t size, char *name)
 	memset (h, 0, size);
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	Q_strncpy (h->name, name, 8);
+	h->name = name;
 
 	return (void *)(h+1);
 }
@@ -853,7 +889,7 @@ void *Cache_Check (cache_user_t *c)
 Cache_Alloc
 ==============
 */
-void *Cache_Alloc (cache_user_t *c, int size, char *name)
+void *Cache_Alloc (cache_user_t *c, int size, const quake::string_view& name)
 {
 	cache_system_t	*cs;
 
@@ -871,7 +907,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 		cs = Cache_TryAlloc (size, false);
 		if (cs)
 		{
-			Q_strncpy (cs->name, name, sizeof(cs->name)-1);
+			Q_strncpy (cs->name, name.data(), sizeof(cs->name)-1);
 			c->data = (void *)(cs+1);
 			cs->user = c;
 			break;

@@ -66,10 +66,46 @@ extern	int			wad_numlumps;
 extern	lumpinfo_t	*wad_lumps;
 extern	byte		*wad_base;
 
-void	W_LoadWadFile (char *filename);
-void	W_CleanupName (char *in, char *out);
-lumpinfo_t	*W_GetLumpinfo (char *name);
-void	*W_GetLumpName (char *name);
+void	W_LoadWadFile (const char *filename);
+
+template<typename U1, typename U2>
+void W_CleanupName(const quake::string_helper<U1>& in, quake::string_builder<U2>& out)
+{
+	int		i;
+	int		c;
+	assert(out.capacity() >= 16);
+	for (i = 0; i < 16; i++)
+	{
+		c = in[i];
+		if (!c)
+			break;
+
+		if (c >= 'A' && c <= 'Z')
+			c += ('a' - 'A');
+		out.push_back(c);
+	}
+}
+
+template<size_t U1, size_t U2>
+void W_CleanupName(const char (&in)[U1], char(&out)[U2])
+{
+	int		i;
+	int		c;
+	assert(U1 > 15 && U2 > 15);
+	for (i = 0; i < 16; i++)
+	{
+		c = in[i];
+		if (!c)
+			break;
+
+		if (c >= 'A' && c <= 'Z')
+			c += ('a' - 'A');
+		out[i] = c;
+	}
+	out[i] = '\0';
+}
+lumpinfo_t	*W_GetLumpinfo (const quake::string_view& name);
+void	*W_GetLumpName (const quake::string_view& name);
 void	*W_GetLumpNum (int num);
 
 void SwapPic (qpic_t *pic);

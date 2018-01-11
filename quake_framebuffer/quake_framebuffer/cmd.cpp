@@ -76,19 +76,15 @@ Cbuf_AddText
 Adds command text at the end of the buffer
 ============
 */
-void Cbuf_AddText (char *text)
+void Cbuf_AddText (const quake::string_view& text)
 {
-	int		l;
-	
-	l = Q_strlen (text);
-
-	if (cmd_text.cursize + l >= cmd_text.maxsize)
+	if (cmd_text.cursize + text.size() >= cmd_text.maxsize)
 	{
 		Con_Printf ("Cbuf_AddText: overflow\n");
 		return;
 	}
 
-	SZ_Write (&cmd_text, text, Q_strlen (text));
+	SZ_Write(&cmd_text, text.data(), text.size());
 }
 
 
@@ -101,30 +97,28 @@ Adds a \n to the text
 FIXME: actually change the command buffer to do less copying
 ============
 */
-void Cbuf_InsertText (char *text)
+void Cbuf_InsertText (const quake::string_view& text)
 {
-	char	*temp;
-	int		templen;
-
+	char	*temp = nullptr;
 // copy off any commands still remaining in the exec buffer
-	templen = cmd_text.cursize;
-	if (templen)
-	{
-		temp = (char*)Z_Malloc (templen);
+	int templen = cmd_text.cursize;
+	if (templen) {
+		// instead of zmalloc lets use _alloca
+		//temp = (char*)Z_Malloc (templen);
+		temp = (char*)_alloca(templen);
+		assert(temp);
 		Q_memcpy (temp, cmd_text.data, templen);
 		SZ_Clear (&cmd_text);
 	}
-	else
-		temp = NULL;	// shut up compiler
-		
+
 // add the entire text of the file
 	Cbuf_AddText (text);
 	
 // add the copied off data
-	if (templen)
+	if (templen && temp)
 	{
 		SZ_Write (&cmd_text, temp, templen);
-		Z_Free (temp);
+		//Z_Free (temp);
 	}
 }
 
@@ -137,7 +131,7 @@ void Cbuf_Execute (void)
 {
 	int		i;
 	char	*text;
-	char	line[1024];
+	quake::stack_string<1024> line;
 	int		quotes;
 	
 	while (cmd_text.cursize)
@@ -157,12 +151,11 @@ void Cbuf_Execute (void)
 		}
 			
 				
-		memcpy (line, text, i);
-		line[i] = 0;
-		
-// delete the text from the command buffer and move remaining commands down
-// this is necessary because commands (exec, alias) can insert data at the
-// beginning of the text buffer
+		line.assign(text, i);
+
+		// delete the text from the command buffer and move remaining commands down
+		// this is necessary because commands (exec, alias) can insert data at the
+		// beginning of the text buffer
 
 		if (i == cmd_text.cursize)
 			cmd_text.cursize = 0;
@@ -285,13 +278,14 @@ void Cmd_Exec_f (void)
 	}
 
 	mark = Hunk_LowMark ();
-	f = (char *)COM_LoadHunkFile (Cmd_Argv(1));
+	quake::stack_string<128> filename(Cmd_Argv(1));
+	f = (char *)COM_LoadHunkFile (filename.c_str());
 	if (!f)
 	{
-		Con_Printf ("couldn't exec %s\n",Cmd_Argv(1));
+		Con_Printf ("couldn't exec %s\n", filename.c_str());
 		return;
 	}
-	Con_Printf ("execing %s\n",Cmd_Argv(1));
+	Con_Printf ("execing %s\n", filename.c_str());
 	
 	Cbuf_InsertText (f);
 	Hunk_FreeToLowMark (mark);
@@ -322,7 +316,7 @@ Creates a new command that executes a command string (possibly ; seperated)
 ===============
 */
 
-char *CopyString (char *in)
+char *CopyString (const char *in)
 {
 	char	*out;
 	
@@ -334,9 +328,7 @@ char *CopyString (char *in)
 void Cmd_Alias_f (void)
 {
 	cmdalias_t	*a;
-	char		cmd[1024];
-	int			i, c;
-	char		*s;
+	quake::stack_string<1024>	cmd;;
 
 	if (Cmd_Argc() == 1)
 	{
@@ -346,8 +338,8 @@ void Cmd_Alias_f (void)
 		return;
 	}
 
-	s = Cmd_Argv(1);
-	if (strlen(s) >= MAX_ALIAS_NAME)
+	auto s = Cmd_Argv(1);
+	if (s.size() >= MAX_ALIAS_NAME)
 	{
 		Con_Printf ("Alias name is too long\n");
 		return;
@@ -356,7 +348,7 @@ void Cmd_Alias_f (void)
 	// if the alias allready exists, reuse it
 	for (a = cmd_alias ; a ; a=a->next)
 	{
-		if (!strcmp(s, a->name))
+		if (s ==  a->name)
 		{
 			Z_Free (a->value);
 			break;
@@ -369,20 +361,19 @@ void Cmd_Alias_f (void)
 		a->next = cmd_alias;
 		cmd_alias = a;
 	}
-	strcpy (a->name, s);	
+	a->name[s.copy(a->name)] = '\0';
 
 // copy the rest of the command line
-	cmd[0] = 0;		// start out with a null string
-	c = Cmd_Argc();
-	for (i=2 ; i< c ; i++)
+
+	auto c = Cmd_Argc();
+	for (int i=2 ; i< c ; i++)
 	{
-		strcat (cmd, Cmd_Argv(i));
-		if (i != c)
-			strcat (cmd, " ");
+		cmd += Cmd_Argv(i);
+		if (i != c) cmd += ' ';
 	}
-	strcat (cmd, "\n");
+	cmd += '\n';
 	
-	a->value = CopyString (cmd);
+	a->value = CopyString (cmd.c_str());
 }
 
 /*
@@ -398,9 +389,9 @@ void Cmd_Alias_f (void)
 #define	MAX_ARGS		80
 
 static	int			cmd_argc;
-static	char		*cmd_argv[MAX_ARGS];
+static	quake::string_view cmd_argv[MAX_ARGS];
 static	char		cmd_null_string[1] = { 0 };
-static	char		*cmd_args = NULL;
+static	quake::string_view cmd_args;
 
 cmd_source_t	cmd_source;
 
@@ -440,10 +431,10 @@ int		Cmd_Argc (void)
 Cmd_Argv
 ============
 */
-char	*Cmd_Argv (int arg)
+const quake::string_view& Cmd_Argv (int arg)
 {
 	if ( (unsigned)arg >= cmd_argc )
-		return cmd_null_string;
+		return quake::string_view();
 	return cmd_argv[arg];	
 }
 
@@ -452,7 +443,7 @@ char	*Cmd_Argv (int arg)
 Cmd_Args
 ============
 */
-char		*Cmd_Args (void)
+const quake::string_view&  Cmd_Args (void)
 {
 	return cmd_args;
 }
@@ -465,49 +456,43 @@ Cmd_TokenizeString
 Parses the given string into command line tokens.
 ============
 */
-void Cmd_TokenizeString (char *text)
+void Cmd_TokenizeString(quake::string_view  text)
 {
 	int		i;
-	
-// clear the args from the last string
-	for (i=0 ; i<cmd_argc ; i++)
-		Z_Free (cmd_argv[i]);
-		
+
+	// clear the args from the last string
+	//for (i = 0; i < cmd_argc; i++)
+	//	Z_Free(cmd_argv[i]);
+
 	cmd_argc = 0;
-	cmd_args = NULL;
-	
+	cmd_args = quake::string_view();
+
 	while (1)
 	{
-// skip whitespace up to a /n
-		while (*text && *text <= ' ' && *text != '\n')
-		{
-			text++;
-		}
-		
-		if (*text == '\n')
+		// skip whitespace up to a /n
+		while (!text.empty() && text.front() <= ' ' && text.front() != '\n')
+			text.remove_prefix(1); // works, optimize latter?
+
+
+		if (text.front() == '\n')
 		{	// a newline seperates commands in the buffer
-			text++;
-			break;
+			text.remove_prefix(1); // works, optimize latter?
+			break; // how is this diffrent than below
 		}
 
-		if (!*text)
+		if (text.empty())
 			return;
-	
+
 		if (cmd_argc == 1)
-			 cmd_args = text;
-			
-		text = (char*)COM_Parse (text);
-		if (!text)
+			cmd_args = text;
+
+		text = COM_Parse(text);
+		if (text.empty())
 			return;
 
 		if (cmd_argc < MAX_ARGS)
-		{
-			cmd_argv[cmd_argc] = (char*)Z_Malloc (Q_strlen(com_token)+1);
-			Q_strcpy (cmd_argv[cmd_argc], com_token);
-			cmd_argc++;
-		}
+			cmd_argv[cmd_argc++] = com_token;
 	}
-	
 }
 
 
@@ -516,26 +501,27 @@ void Cmd_TokenizeString (char *text)
 Cmd_AddCommand
 ============
 */
-void	Cmd_AddCommand (char *cmd_name, xcommand_t function)
+void	Cmd_AddCommand (const quake::string_view& cmd_name, xcommand_t function)
 {
 	cmd_function_t	*cmd;
 	
+
 	if (host_initialized)	// because hunk allocation would get stomped
 		Sys_Error ("Cmd_AddCommand after host_initialized");
 		
 // fail if the command is a variable name
-	if (Cvar_VariableString(cmd_name)[0])
+	if (!Cvar_VariableString(cmd_name).empty())
 	{
-		Con_Printf ("Cmd_AddCommand: %s already defined as a var\n", cmd_name);
+		Con_Printf ("Cmd_AddCommand: %s already defined as a var\n", cmd_name.data()); // pray to god that this is what it is
 		return;
 	}
 	
 // fail if the command already exists
 	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
 	{
-		if (!Q_strcmp (cmd_name, cmd->name))
+		if (cmd_name == cmd->name)
 		{
-			Con_Printf ("Cmd_AddCommand: %s already defined\n", cmd_name);
+			Con_Printf ("Cmd_AddCommand: %s already defined\n", cmd_name.data());
 			return;
 		}
 	}
@@ -552,13 +538,13 @@ void	Cmd_AddCommand (char *cmd_name, xcommand_t function)
 Cmd_Exists
 ============
 */
-qboolean	Cmd_Exists (char *cmd_name)
+qboolean	Cmd_Exists (const quake::string_view&cmd_name)
 {
 	cmd_function_t	*cmd;
 
 	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
 	{
-		if (!Q_strcmp (cmd_name,cmd->name))
+		if (cmd_name == cmd->name)
 			return true;
 	}
 
@@ -572,22 +558,19 @@ qboolean	Cmd_Exists (char *cmd_name)
 Cmd_CompleteCommand
 ============
 */
-char *Cmd_CompleteCommand (char *partial)
+quake::string_view Cmd_CompleteCommand(const quake::string_view &partial)
 {
 	cmd_function_t	*cmd;
-	int				len;
-	
-	len = Q_strlen(partial);
-	
-	if (!len)
-		return NULL;
-		
-// check functions
-	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
-		if (!Q_strncmp (partial,cmd->name, len))
-			return cmd->name;
 
-	return NULL;
+
+	if (!partial.empty()) {
+		for (cmd = cmd_functions; cmd; cmd = cmd->next)
+			if (partial.size() <= cmd->name.size() && quake::detail::str_case_compare(partial.begin(), partial.size(), cmd->name.begin(), partial.size()) == 0)
+				return cmd->name;
+	}
+	// check functions
+
+	return quake::string_view();
 }
 
 /*
@@ -598,7 +581,7 @@ A complete command line has been parsed, so try to execute it
 FIXME: lookupnoadd the token to speed search?
 ============
 */
-void	Cmd_ExecuteString (char *text, cmd_source_t src)
+void	Cmd_ExecuteString (const quake::string_view& text, cmd_source_t src)
 {	
 	cmd_function_t	*cmd;
 	cmdalias_t		*a;
@@ -613,8 +596,7 @@ void	Cmd_ExecuteString (char *text, cmd_source_t src)
 // check functions
 	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
 	{
-		if (!Q_strcasecmp (cmd_argv[0],cmd->name))
-		{
+		if (!Q_strcasecmp (cmd_argv[0],cmd->name)) {
 			cmd->function ();
 			return;
 		}
@@ -623,8 +605,7 @@ void	Cmd_ExecuteString (char *text, cmd_source_t src)
 // check alias
 	for (a=cmd_alias ; a ; a=a->next)
 	{
-		if (!Q_strcasecmp (cmd_argv[0], a->name))
-		{
+		if (!Q_strcasecmp (cmd_argv[0], a->name)) {
 			Cbuf_InsertText (a->value);
 			return;
 		}
@@ -677,11 +658,11 @@ where the given parameter apears, or 0 if not present
 ================
 */
 
-int Cmd_CheckParm (char *parm)
+int Cmd_CheckParm (const quake::string_view& parm)
 {
 	int i;
 	
-	if (!parm)
+	if (parm.empty())
 		Sys_Error ("Cmd_CheckParm: NULL");
 
 	for (i = 1; i < Cmd_Argc (); i++)

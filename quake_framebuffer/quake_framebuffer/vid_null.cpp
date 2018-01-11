@@ -129,7 +129,7 @@ void CheckLog(GLuint shader, const char* msg) {
 	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &Result);
 	glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &InfoLogLength);
 	if (InfoLogLength > 0) {
-		char VertexShaderErrorMessage[1024];
+		quake::stack_string<1024> VertexShaderErrorMessage;
 		assert(InfoLogLength < (1024 - 1));
 		glGetShaderInfoLog(shader, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
 		Sys_Printf(NULL, "Shader Error(%s): %s\n", msg, &VertexShaderErrorMessage[0]);

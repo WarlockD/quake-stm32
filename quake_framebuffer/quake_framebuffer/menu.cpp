@@ -120,7 +120,7 @@ void M_DrawCharacter (int cx, int line, int num)
 	Draw_Character ( cx + ((vid.width - 320)>>1), line, num);
 }
 
-void M_Print (int cx, int cy, char *str)
+void M_Print (int cx, int cy, const char *str)
 {
 	while (*str)
 	{
@@ -129,7 +129,15 @@ void M_Print (int cx, int cy, char *str)
 		cx += 8;
 	}
 }
+template<typename U>
+void M_Print(int cx, int cy, const quake::string_helper<U>& str)
+{
+	for (char c : str) {
+		M_DrawCharacter(cx, cy, c+ 128);
+		cx += 8;
 
+	}
+}
 void M_PrintWhite (int cx, int cy, char *str)
 {
 	while (*str)
@@ -446,32 +454,37 @@ void M_SinglePlayer_Key (int key)
 int		load_cursor;		// 0 < load_cursor < MAX_SAVEGAMES
 
 #define	MAX_SAVEGAMES		12
-char	m_filenames[MAX_SAVEGAMES][SAVEGAME_COMMENT_LENGTH+1];
+quake::stack_string<SAVEGAME_COMMENT_LENGTH+1>	m_filenames[MAX_SAVEGAMES];
 int		loadable[MAX_SAVEGAMES];
 
 void M_ScanSaves (void)
 {
-	int		i, j;
-	char	name[MAX_OSPATH];
+	size_t j;
+	quake::stack_string<MAX_OSPATH> name;
 	FILE	*f;
 	int		version;
 
-	for (i=0 ; i<MAX_SAVEGAMES ; i++)
+	for (size_t i=0 ; i<MAX_SAVEGAMES ; i++)
 	{
-		strcpy (m_filenames[i], "--- UNUSED SLOT ---");
+		auto& filename = m_filenames[i];
+		filename = "--- UNUSED SLOT ---";
 		loadable[i] = false;
-		sprintf (name, "%s/s%i.sav", com_gamedir, i);
-		f = fopen (name, "r");
+		name.clear();
+		name << com_gamedir << '/' << i << ".sav";
+		f = fopen (name.c_str(), "r");
 		if (!f)
 			continue;
 		fscanf (f, "%i\n", &version);
 		fscanf (f, "%79s\n", name);
-		strncpy (m_filenames[i], name, sizeof(m_filenames[i])-1);
+		filename = name;
+		j = 0; 	// change _ back to space
+		do {
+			j = filename.find('_',j);
+			if (j == quake::string_view::npos) break;
+			filename[j] = ' ';
 
-	// change _ back to space
-		for (j=0 ; j<SAVEGAME_COMMENT_LENGTH ; j++)
-			if (m_filenames[i][j] == '_')
-				m_filenames[i][j] = ' ';
+		} while (true);
+
 		loadable[i] = true;
 		fclose (f);
 	}
@@ -689,8 +702,8 @@ void M_MultiPlayer_Key (int key)
 int		setup_cursor = 4;
 int		setup_cursor_table[] = {40, 56, 80, 104, 140};
 
-char	setup_hostname[16];
-char	setup_myname[16];
+quake::stack_string<16> setup_hostname;
+quake::stack_string<16> setup_myname;
 int		setup_oldtop;
 int		setup_oldbottom;
 int		setup_top;
@@ -703,8 +716,8 @@ void M_Menu_Setup_f (void)
 	key_dest = key_menu;
 	m_state = m_setup;
 	m_entersound = true;
-	Q_strcpy(setup_myname, cl_name.string);
-	Q_strcpy(setup_hostname, hostname.string);
+	setup_myname= cl_name.string;
+	setup_hostname= hostname.string;
 	setup_top = setup_oldtop = ((int)cl_color.value) >> 4;
 	setup_bottom = setup_oldbottom = ((int)cl_color.value) & 15;
 }
@@ -741,10 +754,10 @@ void M_Setup_Draw (void)
 	M_DrawCharacter (56, setup_cursor_table [setup_cursor], 12+((int)(realtime*4)&1));
 
 	if (setup_cursor == 0)
-		M_DrawCharacter (168 + 8*strlen(setup_hostname), setup_cursor_table [setup_cursor], 10+((int)(realtime*4)&1));
+		M_DrawCharacter (168 + 8* setup_hostname.size(), setup_cursor_table [setup_cursor], 10+((int)(realtime*4)&1));
 
 	if (setup_cursor == 1)
-		M_DrawCharacter (168 + 8*strlen(setup_myname), setup_cursor_table [setup_cursor], 10+((int)(realtime*4)&1));
+		M_DrawCharacter (168 + 8* setup_myname.size(), setup_cursor_table [setup_cursor], 10+((int)(realtime*4)&1));
 }
 
 
@@ -800,9 +813,9 @@ forward:
 			goto forward;
 
 		// setup_cursor == 4 (OK)
-		if (Q_strcmp(cl_name.string, setup_myname) != 0)
-			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname) );
-		if (Q_strcmp(hostname.string, setup_hostname) != 0)
+		if (setup_myname == cl_name.string  )
+			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname.c_str()) );
+		if (setup_hostname == hostname.string)
 			Cvar_Set("hostname", setup_hostname);
 		if (setup_top != setup_oldtop || setup_bottom != setup_oldbottom)
 			Cbuf_AddText( va ("color %i %i\n", setup_top, setup_bottom) );
@@ -813,14 +826,12 @@ forward:
 	case K_BACKSPACE:
 		if (setup_cursor == 0)
 		{
-			if (strlen(setup_hostname))
-				setup_hostname[strlen(setup_hostname)-1] = 0;
+			if (!setup_hostname.empty()) setup_hostname.pop_back();
 		}
 
 		if (setup_cursor == 1)
 		{
-			if (strlen(setup_myname))
-				setup_myname[strlen(setup_myname)-1] = 0;
+			if (!setup_myname.empty()) setup_myname.pop_back();
 		}
 		break;
 
@@ -829,21 +840,13 @@ forward:
 			break;
 		if (setup_cursor == 0)
 		{
-			l = strlen(setup_hostname);
-			if (l < 15)
-			{
-				setup_hostname[l+1] = 0;
-				setup_hostname[l] = k;
-			}
+			if (setup_hostname.size() < 15)
+				setup_hostname.push_back(k);
 		}
 		if (setup_cursor == 1)
 		{
-			l = strlen(setup_myname);
-			if (l < 15)
-			{
-				setup_myname[l+1] = 0;
-				setup_myname[l] = k;
-			}
+			if (setup_myname.size() < 15)
+				setup_myname.push_back(k);
 		}
 	}
 
@@ -1318,7 +1321,7 @@ void M_Options_Key (int k)
 //=============================================================================
 /* KEYS MENU */
 
-char *bindnames[][2] =
+static const char *bindnames[][2] =
 {
 {"+attack", 		"attack"},
 {"impulse 10", 		"change weapon"},
@@ -1353,7 +1356,7 @@ void M_Menu_Keys_f (void)
 }
 
 
-void M_FindKeysForCommand (char *command, int *twokeys)
+void M_FindKeysForCommand (const char *command, int *twokeys)
 {
 	int		count;
 	int		j;
@@ -1379,7 +1382,7 @@ void M_FindKeysForCommand (char *command, int *twokeys)
 	}
 }
 
-void M_UnbindCommand (char *command)
+void M_UnbindCommand (const char *command)
 {
 	int		j;
 	int		l;
@@ -1451,7 +1454,7 @@ void M_Keys_Draw (void)
 
 void M_Keys_Key (int k)
 {
-	char	cmd[80];
+	quake::stack_string<80> cmd;
 	int		keys[2];
 
 	if (bind_grab)
@@ -1463,7 +1466,7 @@ void M_Keys_Key (int k)
 		}
 		else if (k != '`')
 		{
-			sprintf (cmd, "bind \"%s\" \"%s\"\n", Key_KeynumToString (k), bindnames[keys_cursor][0]);
+			cmd << "bind \"" << Key_KeynumToString(k) << "\" \""<< bindnames[keys_cursor][0] << "\"\n"  ;
 			Cbuf_InsertText (cmd);
 		}
 
@@ -1734,7 +1737,7 @@ int serialConfig_baudrate[] = {9600,14400,19200,28800,38400,57600};
 int		serialConfig_comport;
 int		serialConfig_irq ;
 int		serialConfig_baud;
-char	serialConfig_phone[16];
+quake::stack_string<16> serialConfig_phone;
 
 void M_Menu_SerialConfig_f (void)
 {
@@ -1837,7 +1840,7 @@ void M_SerialConfig_Draw (void)
 	M_DrawCharacter (basex-8, serialConfig_cursor_table [serialConfig_cursor], 12+((int)(realtime*4)&1));
 
 	if (serialConfig_cursor == 4)
-		M_DrawCharacter (168 + 8*strlen(serialConfig_phone), serialConfig_cursor_table [serialConfig_cursor], 10+((int)(realtime*4)&1));
+		M_DrawCharacter (168 + 8* serialConfig_phone.size(), serialConfig_cursor_table [serialConfig_cursor], 10+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
 		M_PrintWhite (basex, 148, m_return_reason);
@@ -1976,8 +1979,8 @@ forward:
 	case K_BACKSPACE:
 		if (serialConfig_cursor == 4)
 		{
-			if (strlen(serialConfig_phone))
-				serialConfig_phone[strlen(serialConfig_phone)-1] = 0;
+			if (!serialConfig_phone.empty())
+				serialConfig_phone.pop_back();
 		}
 		break;
 
@@ -1986,12 +1989,8 @@ forward:
 			break;
 		if (serialConfig_cursor == 4)
 		{
-			l = strlen(serialConfig_phone);
-			if (l < 15)
-			{
-				serialConfig_phone[l+1] = 0;
-				serialConfig_phone[l] = key;
-			}
+			if (serialConfig_phone.size() < 15)
+				serialConfig_phone.push_back(key);
 		}
 	}
 
@@ -2016,16 +2015,16 @@ int		modemConfig_cursor_table [] = {40, 56, 88, 120, 156};
 #define NUM_MODEMCONFIG_CMDS	5
 
 char	modemConfig_dialing;
-char	modemConfig_clear [16];
-char	modemConfig_init [32];
-char	modemConfig_hangup [16];
+quake::stack_string<16>	modemConfig_clear;
+quake::stack_string<32>		modemConfig_init;
+quake::stack_string<16>		modemConfig_hangup;
 
 void M_Menu_ModemConfig_f (void)
 {
 	key_dest = key_menu;
 	m_state = m_modemconfig;
 	m_entersound = true;
-	(*GetModemConfig) (0, &modemConfig_dialing, modemConfig_clear, modemConfig_init, modemConfig_hangup);
+	(*GetModemConfig) (0, &modemConfig_dialing, modemConfig_clear.c_str(), modemConfig_init.c_str(), modemConfig_hangup.c_str());
 }
 
 
@@ -2049,19 +2048,19 @@ void M_ModemConfig_Draw (void)
 	M_DrawTextBox (basex, modemConfig_cursor_table[1]+4, 16, 1);
 	M_Print (basex+8, modemConfig_cursor_table[1]+12, modemConfig_clear);
 	if (modemConfig_cursor == 1)
-		M_DrawCharacter (basex+8 + 8*strlen(modemConfig_clear), modemConfig_cursor_table[1]+12, 10+((int)(realtime*4)&1));
+		M_DrawCharacter (basex+8 + 8* modemConfig_clear.size(), modemConfig_cursor_table[1]+12, 10+((int)(realtime*4)&1));
 
 	M_Print (basex, modemConfig_cursor_table[2], "Init");
 	M_DrawTextBox (basex, modemConfig_cursor_table[2]+4, 30, 1);
 	M_Print (basex+8, modemConfig_cursor_table[2]+12, modemConfig_init);
 	if (modemConfig_cursor == 2)
-		M_DrawCharacter (basex+8 + 8*strlen(modemConfig_init), modemConfig_cursor_table[2]+12, 10+((int)(realtime*4)&1));
+		M_DrawCharacter (basex+8 + 8* modemConfig_init.size(), modemConfig_cursor_table[2]+12, 10+((int)(realtime*4)&1));
 
 	M_Print (basex, modemConfig_cursor_table[3], "Hangup");
 	M_DrawTextBox (basex, modemConfig_cursor_table[3]+4, 16, 1);
 	M_Print (basex+8, modemConfig_cursor_table[3]+12, modemConfig_hangup);
 	if (modemConfig_cursor == 3)
-		M_DrawCharacter (basex+8 + 8*strlen(modemConfig_hangup), modemConfig_cursor_table[3]+12, 10+((int)(realtime*4)&1));
+		M_DrawCharacter (basex+8 + 8* modemConfig_hangup.size(), modemConfig_cursor_table[3]+12, 10+((int)(realtime*4)&1));
 
 	M_DrawTextBox (basex, modemConfig_cursor_table[4]-8, 2, 1);
 	M_Print (basex+8, modemConfig_cursor_table[4], "OK");
@@ -2118,7 +2117,7 @@ void M_ModemConfig_Key (int key)
 
 		if (modemConfig_cursor == 4)
 		{
-			(*SetModemConfig) (0, va ("%c", modemConfig_dialing), modemConfig_clear, modemConfig_init, modemConfig_hangup);
+			(*SetModemConfig) (0, va ("%c", modemConfig_dialing), modemConfig_clear.c_str(), modemConfig_init.c_str(), modemConfig_hangup.c_str());
 			m_entersound = true;
 			M_Menu_SerialConfig_f ();
 		}
@@ -2127,20 +2126,20 @@ void M_ModemConfig_Key (int key)
 	case K_BACKSPACE:
 		if (modemConfig_cursor == 1)
 		{
-			if (strlen(modemConfig_clear))
-				modemConfig_clear[strlen(modemConfig_clear)-1] = 0;
+			if (!modemConfig_clear.empty())
+				modemConfig_clear.pop_back();
 		}
 
 		if (modemConfig_cursor == 2)
 		{
-			if (strlen(modemConfig_init))
-				modemConfig_init[strlen(modemConfig_init)-1] = 0;
+			if (!modemConfig_init.empty())
+				modemConfig_init.pop_back();
 		}
 
 		if (modemConfig_cursor == 3)
 		{
-			if (strlen(modemConfig_hangup))
-				modemConfig_hangup[strlen(modemConfig_hangup)-1] = 0;
+			if (!modemConfig_hangup.empty())
+				modemConfig_hangup.pop_back();
 		}
 		break;
 
@@ -2150,32 +2149,17 @@ void M_ModemConfig_Key (int key)
 
 		if (modemConfig_cursor == 1)
 		{
-			l = strlen(modemConfig_clear);
-			if (l < 15)
-			{
-				modemConfig_clear[l+1] = 0;
-				modemConfig_clear[l] = key;
-			}
+			if (modemConfig_clear.size() < 15) modemConfig_clear.pop_back();
 		}
 
 		if (modemConfig_cursor == 2)
 		{
-			l = strlen(modemConfig_init);
-			if (l < 29)
-			{
-				modemConfig_init[l+1] = 0;
-				modemConfig_init[l] = key;
-			}
+			if (modemConfig_init.size() < 15) modemConfig_init.pop_back();
 		}
 
 		if (modemConfig_cursor == 3)
 		{
-			l = strlen(modemConfig_hangup);
-			if (l < 15)
-			{
-				modemConfig_hangup[l+1] = 0;
-				modemConfig_hangup[l] = key;
-			}
+			if (modemConfig_hangup.size() < 15) modemConfig_hangup.pop_back();
 		}
 	}
 }
@@ -2188,8 +2172,8 @@ int		lanConfig_cursor_table [] = {72, 92, 124};
 #define NUM_LANCONFIG_CMDS	3
 
 int 	lanConfig_port;
-char	lanConfig_portname[6];
-char	lanConfig_joinname[22];
+quake::stack_string<6> lanConfig_portname;
+quake::stack_string<22> lanConfig_joinname;
 
 void M_Menu_LanConfig_f (void)
 {
@@ -2206,7 +2190,8 @@ void M_Menu_LanConfig_f (void)
 	if (StartingGame && lanConfig_cursor == 2)
 		lanConfig_cursor = 1;
 	lanConfig_port = DEFAULTnet_hostport;
-	sprintf(lanConfig_portname, "%u", lanConfig_port);
+	lanConfig_portname.clear();
+	lanConfig_portname << (uint16_t)lanConfig_port;
 
 	m_return_onerror = false;
 	m_return_reason[0] = 0;
@@ -2262,10 +2247,10 @@ void M_LanConfig_Draw (void)
 	M_DrawCharacter (basex-8, lanConfig_cursor_table [lanConfig_cursor], 12+((int)(realtime*4)&1));
 
 	if (lanConfig_cursor == 0)
-		M_DrawCharacter (basex+9*8 + 8*strlen(lanConfig_portname), lanConfig_cursor_table [0], 10+((int)(realtime*4)&1));
+		M_DrawCharacter (basex+9*8 + 8* lanConfig_portname.size(), lanConfig_cursor_table [0], 10+((int)(realtime*4)&1));
 
 	if (lanConfig_cursor == 2)
-		M_DrawCharacter (basex+16 + 8*strlen(lanConfig_joinname), lanConfig_cursor_table [2], 10+((int)(realtime*4)&1));
+		M_DrawCharacter (basex+16 + 8*lanConfig_joinname.size(), lanConfig_cursor_table [2], 10+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
 		M_PrintWhite (basex, 148, m_return_reason);
@@ -2321,7 +2306,7 @@ void M_LanConfig_Key (int key)
 			m_return_onerror = true;
 			key_dest = key_game;
 			m_state = m_none;
-			Cbuf_AddText ( va ("connect \"%s\"\n", lanConfig_joinname) );
+			Cbuf_AddText ( va ("connect \"%s\"\n", lanConfig_joinname.c_str()) );
 			break;
 		}
 
@@ -2330,14 +2315,14 @@ void M_LanConfig_Key (int key)
 	case K_BACKSPACE:
 		if (lanConfig_cursor == 0)
 		{
-			if (strlen(lanConfig_portname))
-				lanConfig_portname[strlen(lanConfig_portname)-1] = 0;
+			if (!lanConfig_portname.empty())
+				lanConfig_portname.pop_back();
 		}
 
 		if (lanConfig_cursor == 2)
 		{
-			if (strlen(lanConfig_joinname))
-				lanConfig_joinname[strlen(lanConfig_joinname)-1] = 0;
+			if (!lanConfig_joinname.empty())
+				lanConfig_joinname.pop_back();
 		}
 		break;
 
@@ -2347,24 +2332,14 @@ void M_LanConfig_Key (int key)
 
 		if (lanConfig_cursor == 2)
 		{
-			l = strlen(lanConfig_joinname);
-			if (l < 21)
-			{
-				lanConfig_joinname[l+1] = 0;
-				lanConfig_joinname[l] = key;
-			}
+			if (lanConfig_joinname.size() < 21) lanConfig_joinname.push_back(key);
 		}
 
 		if (key < '0' || key > '9')
 			break;
 		if (lanConfig_cursor == 0)
 		{
-			l = strlen(lanConfig_portname);
-			if (l < 5)
-			{
-				lanConfig_portname[l+1] = 0;
-				lanConfig_portname[l] = key;
-			}
+			if (lanConfig_portname.size() < 21) lanConfig_portname.push_back(key);
 		}
 	}
 
@@ -2374,12 +2349,13 @@ void M_LanConfig_Key (int key)
 		else
 			lanConfig_cursor = 0;
 
-	l =  Q_atoi(lanConfig_portname);
+	l =  Q_atoi(lanConfig_portname.c_str());
 	if (l > 65535)
 		l = lanConfig_port;
 	else
 		lanConfig_port = l;
-	sprintf(lanConfig_portname, "%u", lanConfig_port);
+	lanConfig_portname.clear();
+	lanConfig_portname << (unsigned int)lanConfig_port;
 }
 
 //=============================================================================
@@ -2387,8 +2363,8 @@ void M_LanConfig_Key (int key)
 
 typedef struct
 {
-	char	*name;
-	char	*description;
+	const char	*name;
+	const char	*description;
 } level_t;
 
 level_t		levels[] =

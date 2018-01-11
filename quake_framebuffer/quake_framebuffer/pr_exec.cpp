@@ -131,8 +131,8 @@ char *pr_opnames[] =
 "BITOR"
 };
 
-char *PR_GlobalString (int ofs);
-char *PR_GlobalStringNoContents (int ofs);
+quake::cstring PR_GlobalString (int ofs);
+quake::cstring PR_GlobalStringNoContents (int ofs);
 
 
 //=============================================================================
@@ -256,10 +256,10 @@ Aborts the currently executing function
 void PR_RunError (char *error, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 
 	va_start (argptr,error);
-	vsprintf (string,error,argptr);
+	string.assign_vprint(error,argptr);
 	va_end (argptr);
 
 	PR_PrintStatement (&pr_statements[ pr_xstatement]);

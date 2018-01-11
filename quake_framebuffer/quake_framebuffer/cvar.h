@@ -55,8 +55,8 @@ interface from being ambiguous.
 
 typedef struct cvar_s
 {
-	char	*name;
-	char	*string;
+	quake::cstring name;
+	quake::zstring string;
 	qboolean archive;		// set to true to cause it to be saved to vars.rc
 	qboolean server;		// notifies players when changed
 	float	value;
@@ -67,19 +67,19 @@ void 	Cvar_RegisterVariable (cvar_t *variable);
 // registers a cvar that allready has the name, string, and optionally the
 // archive elements set.
 
-void 	Cvar_Set (char *var_name, char *value);
+void 	Cvar_Set (const quake::string_view& var_name, const quake::string_view& value);
 // equivelant to "<name> <variable>" typed at the console
 
-void	Cvar_SetValue (char *var_name, float value);
+void	Cvar_SetValue (const quake::string_view& var_name, float value);
 // expands value to a string and calls Cvar_Set
 
-float	Cvar_VariableValue (char *var_name);
+float	Cvar_VariableValue (const quake::string_view& var_name);
 // returns 0 if not defined or non numeric
 
-char	*Cvar_VariableString (char *var_name);
+quake::string_view Cvar_VariableString (const quake::string_view& var_name);
 // returns an empty string if not defined
 
-char 	*Cvar_CompleteVariable (char *partial);
+quake::string_view Cvar_CompleteVariable (const quake::string_view& partial);
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 
@@ -92,6 +92,6 @@ void 	Cvar_WriteVariables (FILE *f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
-cvar_t *Cvar_FindVar (char *var_name);
+cvar_t *Cvar_FindVar (const quake::string_view& var_name);
 
 extern cvar_t	*cvar_vars;

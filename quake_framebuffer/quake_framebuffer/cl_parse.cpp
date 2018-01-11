@@ -203,11 +203,10 @@ CL_ParseServerInfo
 */
 void CL_ParseServerInfo (void)
 {
-	char	*str;
 	int		i;
 	int		nummodels, numsounds;
-	char	model_precache[MAX_MODELS][MAX_QPATH];
-	char	sound_precache[MAX_SOUNDS][MAX_QPATH];
+	quake::stack_string<MAX_QPATH>	model_precache[MAX_MODELS];
+	quake::stack_string<MAX_QPATH>	sound_precache[MAX_SOUNDS];
 	
 	Con_DPrintf ("Serverinfo packet received.\n");
 //
@@ -236,12 +235,12 @@ void CL_ParseServerInfo (void)
 	cl.gametype = MSG_ReadByte ();
 
 // parse signon message
-	str = MSG_ReadString ();
-	strncpy (cl.levelname, str, sizeof(cl.levelname)-1);
+	quake::string_view str = MSG_ReadString ();
+	cl.levelname = str;
 
 // seperate the printfs so the server message can have a color
 	Con_Printf("\n\n\35\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\37\n\n");
-	Con_Printf ("%c%s\n", 2, str);
+	Con_Printf ("%c%s\n", 2, cl.levelname.c_str());
 
 //
 // first we go through and touch all of the precache data that still
@@ -261,7 +260,7 @@ void CL_ParseServerInfo (void)
 			Con_Printf ("Server sent too many model precaches\n");
 			return;
 		}
-		strcpy (model_precache[nummodels], str);
+		model_precache[nummodels]= str;
 		Mod_TouchModel (str);
 	}
 
@@ -277,7 +276,7 @@ void CL_ParseServerInfo (void)
 			Con_Printf ("Server sent too many sound precaches\n");
 			return;
 		}
-		strcpy (sound_precache[numsounds], str);
+		sound_precache[numsounds]=str;
 		S_TouchSound (str);
 	}
 
@@ -823,8 +822,8 @@ void CL_ParseServerMessage (void)
 			i = MSG_ReadByte ();
 			if (i >= MAX_LIGHTSTYLES)
 				Sys_Error ("svc_lightstyle > MAX_LIGHTSTYLES");
-			Q_strcpy (cl_lightstyle[i].map,  MSG_ReadString());
-			cl_lightstyle[i].length = Q_strlen(cl_lightstyle[i].map);
+			cl_lightstyle[i].map= MSG_ReadString();
+			cl_lightstyle[i].length = cl_lightstyle[i].map.size();
 			break;
 			
 		case svc_sound:
@@ -841,7 +840,7 @@ void CL_ParseServerMessage (void)
 			i = MSG_ReadByte ();
 			if (i >= cl.maxclients)
 				Host_Error ("CL_ParseServerMessage: svc_updatename > MAX_SCOREBOARD");
-			strcpy (cl.scores[i].name, MSG_ReadString ());
+			cl.scores[i].name= MSG_ReadString ();
 			break;
 			
 		case svc_updatefrags:

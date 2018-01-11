@@ -72,7 +72,7 @@ CENTER PRINTING
 ===============================================================================
 */
 
-char		scr_centerstring[1024];
+quake::stack_string<1024> scr_centerstring;
 float		scr_centertime_start;	// for slow victory printing
 float		scr_centertime_off;
 int			scr_center_lines;
@@ -87,20 +87,15 @@ Called for important messages that should stay in the center of the screen
 for a few moments
 ==============
 */
-void SCR_CenterPrint (char *str)
+void SCR_CenterPrint (const quake::string_view& str)
 {
-	strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
+	scr_centerstring = str;
 	scr_centertime_off = scr_centertime.value;
 	scr_centertime_start = cl.time;
 
 // count the number of lines for centering
 	scr_center_lines = 1;
-	while (*str)
-	{
-		if (*str == '\n')
-			scr_center_lines++;
-		str++;
-	}
+	for(char c : str)  if (c == '\n') scr_center_lines++;
 }
 
 void SCR_EraseCenterString (void)
@@ -124,7 +119,6 @@ void SCR_EraseCenterString (void)
 
 void SCR_DrawCenterString (void)
 {
-	char	*start;
 	int		l;
 	int		j;
 	int		x, y;
@@ -137,7 +131,7 @@ void SCR_DrawCenterString (void)
 		remaining = 9999;
 
 	scr_erase_center = 0;
-	start = scr_centerstring;
+	auto start = scr_centerstring.begin();
 
 	if (scr_center_lines <= 4)
 		y = vid.height*0.35;
@@ -530,12 +524,12 @@ typedef struct
     char	bits_per_pixel;
     unsigned short	xmin,ymin,xmax,ymax;
     unsigned short	hres,vres;
-    unsigned char	palette[48];
+    quake::stack_string<48> palette;
     char	reserved;
     char	color_planes;
     unsigned short	bytes_per_line;
     unsigned short	palette_type;
-    char	filler[58];
+    quake::stack_string<58> filler;
     unsigned char	data;			// unbounded
 } pcx_t;
 
@@ -544,7 +538,7 @@ typedef struct
 WritePCXfile 
 ============== 
 */ 
-void WritePCXfile (char *filename, byte *data, int width, int height,
+void WritePCXfile (const char *filename, byte *data, int width, int height,
 	int rowbytes, byte *palette) 
 {
 	int		i, j, length;
@@ -568,11 +562,11 @@ void WritePCXfile (char *filename, byte *data, int width, int height,
 	pcx->ymax = LittleShort((short)(height-1));
 	pcx->hres = LittleShort((short)width);
 	pcx->vres = LittleShort((short)height);
-	Q_memset (pcx->palette,0,sizeof(pcx->palette));
+	pcx->palette.clear();
 	pcx->color_planes = 1;		// chunky image
 	pcx->bytes_per_line = LittleShort((short)width);
 	pcx->palette_type = LittleShort(2);		// not a grey scale
-	Q_memset (pcx->filler,0,sizeof(pcx->filler));
+	pcx->filler.clear();
 
 // pack the image
 	pack = &pcx->data;
@@ -613,20 +607,21 @@ SCR_ScreenShot_f
 void SCR_ScreenShot_f (void) 
 { 
 	int     i; 
-	char		pcxname[80]; 
-	char		checkname[MAX_OSPATH];
+	quake::stack_string<80> pcxname; 
+	quake::stack_string<MAX_OSPATH> checkname;
 
 // 
 // find a file name to save it to 
 // 
-	strcpy(pcxname,"quake00.pcx");
+	pcxname = "quake00.pcx";
 		
 	for (i=0 ; i<=99 ; i++) 
 	{ 
 		pcxname[5] = i/10 + '0'; 
 		pcxname[6] = i%10 + '0'; 
-		sprintf (checkname, "%s/%s", com_gamedir, pcxname);
-		if (Sys_FileTime(checkname) == -1)
+		checkname.clear();
+		checkname << com_gamedir << '/' << pcxname;
+		if (Sys_FileTime(checkname.c_str()) == -1)
 			break;	// file doesn't exist
 	} 
 	if (i==100) 
@@ -641,7 +636,7 @@ void SCR_ScreenShot_f (void)
 	D_EnableBackBufferAccess ();	// enable direct drawing of console to back
 									//  buffer
 
-	WritePCXfile (pcxname, vid.buffer, vid.width, vid.height, vid.rowbytes,
+	WritePCXfile (pcxname.c_str(), vid.buffer, vid.width, vid.height, vid.rowbytes,
 				  host_basepal);
 
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in

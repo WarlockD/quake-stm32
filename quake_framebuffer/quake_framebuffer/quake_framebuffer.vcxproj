@@ -30,7 +30,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -197,7 +197,7 @@
     <ClCompile Include="pr_cmds.cpp" />
     <ClCompile Include="pr_edict.cpp" />
     <ClCompile Include="pr_exec.cpp" />
-    <ClCompile Include="qstring.cpp" />
+    <ClCompile Include="qvector.cpp" />
     <ClCompile Include="r_aclip.cpp" />
     <ClCompile Include="r_alias.cpp" />
     <ClCompile Include="r_bsp.cpp" />
@@ -274,6 +274,7 @@
     <ClInclude Include="progs.h" />
     <ClInclude Include="protocol.h" />
     <ClInclude Include="pr_comp.h" />
+    <ClInclude Include="qftoa.h" />
     <ClInclude Include="quakeasm.h" />
     <ClInclude Include="quakedef.h" />
     <ClInclude Include="qvector.h" />
@@ -281,6 +282,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="r_local.h" />
     <ClInclude Include="r_shared.h" />
+    <ClInclude Include="safeint3.hpp" />
     <ClInclude Include="sbar.h" />
     <ClInclude Include="screen.h" />
     <ClInclude Include="server.h" />

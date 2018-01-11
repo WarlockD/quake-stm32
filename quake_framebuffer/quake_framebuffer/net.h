@@ -188,7 +188,7 @@ typedef struct
 	int			(*Init) (void);
 	void		(*Listen) (qboolean state);
 	void		(*SearchForHosts) (qboolean xmit);
-	qsocket_t	*(*Connect) (char *host);
+	qsocket_t	*(*Connect) (const char *host);
 	qsocket_t 	*(*CheckNewConnections) (void);
 	int			(*QGetMessage) (qsocket_t *sock);
 	int			(*QSendMessage) (qsocket_t *sock, sizebuf_t *data);
@@ -273,7 +273,7 @@ void		NET_Shutdown (void);
 struct qsocket_s	*NET_CheckNewConnections (void);
 // returns a new connection number if there is one pending, else -1
 
-struct qsocket_s	*NET_Connect (char *host);
+struct qsocket_s	*NET_Connect (const char *host);
 // called by client to connect to a host.  Returns -1 if not able to
 
 qboolean NET_CanSendMessage (qsocket_t *sock);
@@ -323,12 +323,12 @@ void SchedulePollProcedure(PollProcedure *pp, double timeOffset);
 extern	qboolean	serialAvailable;
 extern	qboolean	ipxAvailable;
 extern	qboolean	tcpipAvailable;
-extern	char		my_ipx_address[NET_NAMELEN];
-extern	char		my_tcpip_address[NET_NAMELEN];
+extern	quake::stack_string<NET_NAMELEN>		my_ipx_address;
+extern	quake::stack_string<NET_NAMELEN>		my_tcpip_address;
 extern void (*GetComPortConfig) (int portNumber, int *port, int *irq, int *baud, qboolean *useModem);
 extern void (*SetComPortConfig) (int portNumber, int port, int irq, int baud, qboolean useModem);
-extern void (*GetModemConfig) (int portNumber, char *dialType, char *clear, char *init, char *hangup);
-extern void (*SetModemConfig) (int portNumber, char *dialType, char *clear, char *init, char *hangup);
+extern void (*GetModemConfig) (int portNumber, const char *dialType, const char *clear, const char *init, const char *hangup);
+extern void (*SetModemConfig) (int portNumber, const char *dialType, const char *clear, const char *init, const char *hangup);
 
 extern	qboolean	slistInProgress;
 extern	qboolean	slistSilent;

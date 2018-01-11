@@ -90,15 +90,33 @@ void Memory_Init (void *buf, size_t size);
 void Z_Free (void *ptr);
 void *Z_Malloc (size_t size);			// returns 0 filled memory
 void *Z_TagMalloc (size_t size, int tag);
+void *Z_Realloc(void *ptr, int size);
 
 void Z_DumpHeap (void);
 void Z_CheckHeap (void);
 int Z_FreeMemory (void);
 
 void *Hunk_Alloc (size_t size);		// returns 0 filled memory
-void *Hunk_AllocName (int size, char *name);
+void *Hunk_AllocName (int size, const quake::string_view& name);
 
-void *Hunk_HighAllocName (size_t size, char *name);
+
+template<typename T> 
+typename std::enable_if<std::is_trivially_default_constructible<T>::value,T*>::type
+	Hunk_New() { return (T*)Hunk_Alloc(sizeof(T)); }
+
+
+template<typename T>
+typename std::enable_if<std::is_default_constructible<T>::value, T*>::type
+Hunk_New() {
+	if constexpr (!std::is_trivially_destructible<T>::value) {
+#pragma message ("Hunk_New has a non trivily distrable thing")
+	}
+	return new(Hunk_Alloc(sizeof(T))) T();
+}
+
+
+
+void *Hunk_HighAllocName (size_t size, const quake::string_view& name);
 
 int	Hunk_LowMark (void);
 void Hunk_FreeToLowMark (int mark);
@@ -123,7 +141,7 @@ void *Cache_Check (cache_user_t *c);
 
 void Cache_Free (cache_user_t *c);
 
-void *Cache_Alloc (cache_user_t *c, int size, char *name);
+void *Cache_Alloc (cache_user_t *c, int size, const quake::string_view& name);
 // Returns NULL if all purgable data was tossed and there still
 // wasn't enough room.
 

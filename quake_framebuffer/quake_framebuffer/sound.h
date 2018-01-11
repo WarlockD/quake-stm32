@@ -100,8 +100,8 @@ void S_ClearBuffer (void);
 void S_Update (vec3_t origin, vec3_t v_forward, vec3_t v_right, vec3_t v_up);
 void S_ExtraUpdate (void);
 
-sfx_t *S_PrecacheSound (char *sample);
-void S_TouchSound (char *sample);
+sfx_t *S_PrecacheSound (const quake::string_view& sample);
+void S_TouchSound (const quake::string_view& sample);
 void S_ClearPrecache (void);
 void S_BeginPrecaching (void);
 void S_EndPrecaching (void);

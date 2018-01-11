@@ -196,7 +196,7 @@ record <demoname> <map> [cd track]
 void CL_Record_f (void)
 {
 	int		c;
-	char	name[MAX_OSPATH];
+	quake::stack_string<MAX_OSPATH> name;
 	int		track;
 
 	if (cmd_source != src_command)
@@ -209,7 +209,7 @@ void CL_Record_f (void)
 		return;
 	}
 
-	if (strstr(Cmd_Argv(1), ".."))
+	if (Cmd_Argv(1).find( "..") != quake::string_view::npos)
 	{
 		Con_Printf ("Relative pathnames are not allowed.\n");
 		return;
@@ -224,27 +224,34 @@ void CL_Record_f (void)
 // write the forced cd track number, or -1
 	if (c == 4)
 	{
-		track = atoi(Cmd_Argv(3));
+		track = quake::stoi(Cmd_Argv(3));
 		Con_Printf ("Forcing CD track to %i\n", cls.forcetrack);
 	}
 	else
 		track = -1;	
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
-	
-//
+	//sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	name += com_gamedir;
+	name += '/';
+	name += Cmd_Argv(1);
+
 // start the map up
 //
-	if (c > 2)
-		Cmd_ExecuteString ( va("map %s", Cmd_Argv(2)), src_command);
+	if (c > 2) {
+		quake::stack_string<64> map_string;
+		map_string += "map ";
+		map_string += Cmd_Argv(2);
+		Cmd_ExecuteString(map_string.c_str(), src_command);
+	}
+	
 	
 //
 // open the demo file
 //
 	COM_DefaultExtension (name, ".dem");
 
-	Con_Printf ("recording to %s.\n", name);
-	cls.demofile = fopen (name, "wb");
+	Con_Printf ("recording to %s.\n", name.c_str());
+	cls.demofile = fopen (name.c_str(), "wb");
 	if (!cls.demofile)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
@@ -267,7 +274,7 @@ play [demoname]
 */
 void CL_PlayDemo_f (void)
 {
-	char	name[256];
+	quake::stack_string<256>	name;
 	int c;
 	qboolean neg = false;
 
@@ -288,11 +295,11 @@ void CL_PlayDemo_f (void)
 //
 // open the demo file
 //
-	strcpy (name, Cmd_Argv(1));
+	name = Cmd_Argv(1);
 	COM_DefaultExtension (name, ".dem");
 
-	Con_Printf ("Playing demo from %s.\n", name);
-	COM_FOpenFile (name, &cls.demofile);
+	Con_Printf ("Playing demo from %s.\n", name.c_str());
+	COM_FOpenFile (name.c_str(), &cls.demofile);
 	if (!cls.demofile)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");

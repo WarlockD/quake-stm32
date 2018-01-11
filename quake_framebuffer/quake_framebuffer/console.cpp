@@ -42,7 +42,7 @@ int			con_totallines;		// total lines in console scrollback
 int			con_backscroll;		// lines up from bottom to display
 int			con_current;		// where next message will be printed
 int			con_x;				// offset in current line for next print
-char		*con_text=0;
+quake::fixed_string con_text;
 
 cvar_t		con_notifytime = {"con_notifytime","3"};		//seconds
 
@@ -55,7 +55,7 @@ int			con_vislines;
 qboolean	con_debuglog;
 
 #define		MAXCMDLINE	256
-extern	char	key_lines[32][MAXCMDLINE];
+extern	quake::stack_string<MAXCMDLINE>	key_lines[32];
 extern	int		edit_line;
 extern	int		key_linepos;
 		
@@ -100,8 +100,8 @@ Con_Clear_f
 */
 void Con_Clear_f (void)
 {
-	if (con_text)
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+	if (con_text.capacity() > 0)
+		con_text.assign(CON_TEXTSIZE, ' ');
 }
 
 						
@@ -155,7 +155,7 @@ If the line width has changed, reformat the buffer.
 void Con_CheckResize (void)
 {
 	int		i, j, width, oldwidth, oldtotallines, numlines, numchars;
-	char	tbuf[CON_TEXTSIZE];
+	quake::stack_string<CON_TEXTSIZE> tbuf;
 
 	width = (vid.width >> 3) - 2;
 
@@ -167,7 +167,7 @@ void Con_CheckResize (void)
 		width = 38;
 		con_linewidth = width;
 		con_totallines = CON_TEXTSIZE / con_linewidth;
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+		con_text.assign(CON_TEXTSIZE, ' ');
 	}
 	else
 	{
@@ -185,8 +185,10 @@ void Con_CheckResize (void)
 		if (con_linewidth < numchars)
 			numchars = con_linewidth;
 
-		Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+		tbuf = con_text;
+		con_text.assign(CON_TEXTSIZE, ' ');
+		//Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
+		//Q_memset (con_text, ' ', CON_TEXTSIZE);
 
 		for (i=0 ; i<numlines ; i++)
 		{
@@ -214,22 +216,22 @@ Con_Init
 void Con_Init (void)
 {
 #define MAXGAMEDIRLEN	1000
-	char	temp[MAXGAMEDIRLEN+1];
-	char	*t2 = "/qconsole.log";
+	quake::stack_string<MAXGAMEDIRLEN + 1> temp;
+	const char	*t2 = "/qconsole.log";
 
 	con_debuglog = COM_CheckParm("-condebug");
 
 	if (con_debuglog)
 	{
-		if (strlen (com_gamedir) < (MAXGAMEDIRLEN - strlen (t2)))
+		if (com_gamedir.size() < (MAXGAMEDIRLEN - strlen (t2)))
 		{
-			sprintf (temp, "%s%s", com_gamedir, t2);
-			unlink (temp);
+			temp << com_gamedir << t2;
+			unlink (temp.c_str());
 		}
 	}
 
-	con_text = (char*)Hunk_AllocName (CON_TEXTSIZE, "context");
-	Q_memset (con_text, ' ', CON_TEXTSIZE);
+	con_text.manage(Hunk_AllocName(CON_TEXTSIZE+1, "context"), CON_TEXTSIZE+1);
+	con_text.assign(CON_TEXTSIZE, ' ');
 	con_linewidth = -1;
 	Con_CheckResize ();
 	
@@ -270,55 +272,44 @@ All console printing must go through this in order to be logged to disk
 If no console is visible, the notify window will pop up.
 ================
 */
-void Con_Print (char *txt)
+void Con_Print (const quake::string_view& txt)
 {
 	int		y;
-	int		c, l;
+	int		l;
 	static int	cr;
 	int		mask;
 	
 	con_backscroll = 0;
-
-	if (txt[0] == 1)
+	auto it = txt.begin();
+	if (*it == 1)
 	{
 		mask = 128;		// go to colored text
 		S_LocalSound ("misc/talk.wav");
 	// play talk wav
-		txt++;
+		it++;
 	}
-	else if (txt[0] == 2)
+	else if (*it== 2)
 	{
 		mask = 128;		// go to colored text
-		txt++;
+		it++;
 	}
 	else
 		mask = 0;
 
 
-	while ( (c = *txt) )
-	{
-	// count word length
-		for (l=0 ; l< con_linewidth ; l++)
-			if ( txt[l] <= ' ')
-				break;
-
+	while (it != txt.end()) {
+		for (l = 0; l< con_linewidth && *(it + l) > ' '; l++); // count word length
 	// word wrap
-		if (l != con_linewidth && (con_x + l > con_linewidth) )
-			con_x = 0;
+		if (l != con_linewidth && (con_x + l > con_linewidth)) con_x = 0;
+		int c = *it++;
 
-		txt++;
 
-		if (cr)
-		{
-			con_current--;
-			cr = false;
-		}
+		if (cr) { con_current--; cr = false; }
 
-		
-		if (!con_x)
-		{
-			Con_Linefeed ();
-		// mark time for transparent overlay
+
+		if (!con_x) {
+			Con_Linefeed();
+			// mark time for transparent overlay
 			if (con_current >= 0)
 				con_times[con_current % NUM_CON_TIMES] = realtime;
 		}
@@ -336,13 +327,13 @@ void Con_Print (char *txt)
 
 		default:	// display character and advance
 			y = con_current % con_totallines;
-			con_text[y*con_linewidth+con_x] = c | mask;
+			con_text[y*con_linewidth + con_x] = c | mask;
 			con_x++;
 			if (con_x >= con_linewidth)
 				con_x = 0;
 			break;
 		}
-		
+
 	}
 }
 
@@ -352,7 +343,7 @@ void Con_Print (char *txt)
 Con_DebugLog
 ================
 */
-void Con_DebugLog(char *file, char *fmt, ...)
+void Con_DebugLog(const char *file, const char *fmt, ...)
 {
     va_list argptr; 
     static char data[1024];
@@ -376,10 +367,10 @@ Handles cursor positioning, line wrapping, etc
 */
 #define	MAXPRINTMSG	4096
 // FIXME: make a buffer size safe vsprintf?
-void Con_Printf (char *fmt, ...)
+void Con_Printf (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		msg[MAXPRINTMSG];
+	char msg[MAXPRINTMSG];
 	static qboolean	inupdate;
 	
 	va_start (argptr,fmt);
@@ -423,10 +414,10 @@ Con_DPrintf
 A Con_Printf that only shows up if the "developer" cvar is set
 ================
 */
-void Con_DPrintf (char *fmt, ...)
+void Con_DPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		msg[MAXPRINTMSG];
+	char msg[MAXPRINTMSG];
 		
 	if (!developer.value)
 		return;			// don't confuse non-developers with techie stuff...
@@ -446,10 +437,10 @@ Con_SafePrintf
 Okay to call even when the screen can't be updated
 ==================
 */
-void Con_SafePrintf (char *fmt, ...)
+void Con_SafePrintf (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		msg[1024];
+	char	msg[1024];
 	int			temp;
 		
 	va_start (argptr,fmt);
@@ -483,12 +474,12 @@ void Con_DrawInput (void)
 {
 	int		y;
 	int		i;
-	char	*text;
 
 	if (key_dest != key_console && !con_forcedup)
 		return;		// don't draw anything
+	// we kind of dick around the buffer here humm
 
-	text = key_lines[edit_line];
+	auto& text = key_lines[edit_line];
 	
 // add the cursor frame
 	text[key_linepos] = 10+((int)(realtime*con_cursorspeed)&1);
@@ -522,10 +513,9 @@ Draws the last few lines of output transparently over the game top
 void Con_DrawNotify (void)
 {
 	int		x, v;
-	char	*text;
 	int		i;
 	float	time;
-	extern char chat_buffer[];
+	extern quake::stack_string<32> chat_buffer;
 
 	v = 0;
 	for (i= con_current-NUM_CON_TIMES+1 ; i<=con_current ; i++)
@@ -538,7 +528,7 @@ void Con_DrawNotify (void)
 		time = realtime - time;
 		if (time > con_notifytime.value)
 			continue;
-		text = con_text + (i % con_totallines)*con_linewidth;
+		auto text = con_text.substr((i % con_totallines)*con_linewidth, con_linewidth); 
 		
 		clearnotify = 0;
 		scr_copytop = 1;
@@ -583,7 +573,6 @@ void Con_DrawConsole (int lines, qboolean drawinput)
 {
 	int				i, x, y;
 	int				rows;
-	char			*text;
 	int				j;
 	
 	if (lines <= 0)
@@ -603,8 +592,9 @@ void Con_DrawConsole (int lines, qboolean drawinput)
 		j = i - con_backscroll;
 		if (j<0)
 			j = 0;
-		text = con_text + (j % con_totallines)*con_linewidth;
+		auto text = con_text.substr( (j % con_totallines)*con_linewidth, con_linewidth);
 
+		
 		for (x=0 ; x<con_linewidth ; x++)
 			Draw_Character ( (x+1)<<3, y, text[x]);
 	}

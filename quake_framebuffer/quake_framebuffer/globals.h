@@ -36,7 +36,7 @@ typedef struct cmdalias_s
 typedef struct cmd_function_s
 {
 	struct cmd_function_s	*next;
-	char					*name;
+	quake::cstring			name;
 	xcommand_t				function;
 } cmd_function_t;
 

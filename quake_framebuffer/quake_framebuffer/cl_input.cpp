@@ -58,11 +58,10 @@ int			in_impulse;
 void KeyDown (kbutton_t *b)
 {
 	int		k;
-	char	*c;
 
-	c = Cmd_Argv(1);
-	if (c[0])
-		k = atoi(c);
+	auto c = Cmd_Argv(1);
+	if (!c.empty())
+		k = quake::stoi(c);
 	else
 		k = -1;		// typed manually at the console for continuous down
 
@@ -87,11 +86,10 @@ void KeyDown (kbutton_t *b)
 void KeyUp (kbutton_t *b)
 {
 	int		k;
-	char	*c;
-	
-	c = Cmd_Argv(1);
-	if (c[0])
-		k = atoi(c);
+
+	auto c = Cmd_Argv(1);
+	if (!c.empty())
+		k = quake::stoi(c);
 	else
 	{ // typed manually at the console, assume for unsticking, so clear all
 		b->down[0] = b->down[1] = 0;
@@ -156,7 +154,7 @@ void IN_UseUp (void) {KeyUp(&in_use);}
 void IN_JumpDown (void) {KeyDown(&in_jump);}
 void IN_JumpUp (void) {KeyUp(&in_jump);}
 
-void IN_Impulse (void) {in_impulse=Q_atoi(Cmd_Argv(1));}
+void IN_Impulse (void) {in_impulse=quake::stoi(Cmd_Argv(1));}
 
 /*
 ===============

@@ -386,10 +386,10 @@ V_cshift_f
 */
 void V_cshift_f (void)
 {
-	cshift_empty.destcolor[0] = atoi(Cmd_Argv(1));
-	cshift_empty.destcolor[1] = atoi(Cmd_Argv(2));
-	cshift_empty.destcolor[2] = atoi(Cmd_Argv(3));
-	cshift_empty.percent = atoi(Cmd_Argv(4));
+	cshift_empty.destcolor[0] = Q_atoi(Cmd_Argv(1));
+	cshift_empty.destcolor[1] = Q_atoi(Cmd_Argv(2));
+	cshift_empty.destcolor[2] = Q_atoi(Cmd_Argv(3));
+	cshift_empty.percent = Q_atoi(Cmd_Argv(4));
 }
 
 

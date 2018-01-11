@@ -137,7 +137,7 @@ int     Sys_FileTime (const char * path)
 	return static_cast<int>(s.st_mtime);
 }
 
-void Sys_mkdir (char *path)
+void Sys_mkdir (const char *path)
 {
 	_mkdir(path);
 }
@@ -157,38 +157,38 @@ void Sys_DebugNumber(int y, int val)
 void Sys_DebugLog(const char *file, const char *fmt, ...)
 {
 	va_list argptr;
-	static char data[1024];
+	static quake::stack_string<1024> data;
 	int fd;
 
 	va_start(argptr, fmt);
-	int len = vsprintf(data, fmt, argptr);
+	data.assign_print( fmt, argptr);
 	va_end(argptr);
-	assert(len >0 && len < 1024 - 1);
+	assert(data.size() >0 && data.size() < 1024 - 1);
 	if (file == NULL) {
-		Sys_Printf("DEBUG: %s", data);
+		Sys_Printf("DEBUG: %s", data.c_str());
 	}
 	else {
 		//assert(fwrite(data, 1, len, fd) == len);
 		fd = Sys_FileOpenWrite(file);  
-		assert(Sys_FileWrite(fd, data, len) == len);
+		assert(Sys_FileWrite(fd, data.data(), data.size()) == data.size());
 		Sys_FileClose(fd);
 	}
 };
 
-void Sys_Printf(char *fmt, ...)
+void Sys_Printf(const char *fmt, ...)
 {
 	va_list		argptr;
-	char		text[2048];
+	quake::stack_string<2048> text;
 	unsigned char		*p;
 
 	va_start(argptr, fmt);
-	int len = vsprintf(text, fmt, argptr);
+	text.assign_vprint( fmt, argptr);
 	va_end(argptr);
 
-	if (len <= 0 || len > sizeof(text))
+	if (text.size() <= 0 || text.size() > sizeof(text))
 		Sys_Error("memory overwrite in Sys_Printf");
 	//Con_Print(text);
-	OutputDebugStringA(text);
+	OutputDebugStringA(text.c_str());
 }
 
 void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length)
@@ -229,10 +229,10 @@ void Sys_Init(void)
 	//timeBeginPeriod(1);
 }
 
-void Sys_Error(char *error, ...)
+void Sys_Error(const char *error, ...)
 {
 	va_list     argptr;
-	char        string[1024];
+	char  string[1024];
 
 	// change stdin to non blocking
 
@@ -246,10 +246,10 @@ void Sys_Error(char *error, ...)
 
 }
 
-void Sys_Warn(char *warning, ...)
+void Sys_Warn(const char *warning, ...)
 {
 	va_list     argptr;
-	char        string[1024];
+	char string[1024];
 
 	va_start(argptr, warning);
 	vsprintf(string, warning, argptr);
@@ -302,7 +302,7 @@ void Sys_LowFPPrecision (void)
 
 //=============================================================================
 
-void main (int argc, char **argv)
+void main (int argc, const char **argv)
 {
 	double		time, oldtime, newtime;
 	static quakeparms_t    parms;

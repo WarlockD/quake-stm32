@@ -60,7 +60,7 @@ void Host_Status_f (void)
 	int			minutes;
 	int			hours = 0;
 	int			j;
-	void		(*print) (char *fmt, ...);
+	void		(*print) (const char *fmt, ...);
 	
 	if (cmd_source == src_command)
 	{
@@ -256,7 +256,7 @@ command from the console.  Active clients are kicked off.
 void Host_Map_f (void)
 {
 	int		i;
-	char	name[MAX_QPATH];
+	quake::stack_string<MAX_QPATH> name;
 
 	if (cmd_source != src_command)
 		return;
@@ -269,32 +269,32 @@ void Host_Map_f (void)
 	key_dest = key_game;			// remove console or menu
 	SCR_BeginLoadingPlaque ();
 
-	cls.mapstring[0] = 0;
+	cls.mapstring.clear();
 	for (i=0 ; i<Cmd_Argc() ; i++)
 	{
-		strcat (cls.mapstring, Cmd_Argv(i));
-		strcat (cls.mapstring, " ");
+		cls.mapstring << Cmd_Argv(i) <<' ';
+	
 	}
-	strcat (cls.mapstring, "\n");
+	cls.mapstring += '\n';
 
 	svs.serverflags = 0;			// haven't completed an episode yet
-	strcpy (name, Cmd_Argv(1));
+	name =  Cmd_Argv(1);
 #ifdef QUAKE2
 	SV_SpawnServer (name, NULL);
 #else
-	SV_SpawnServer (name);
+	SV_SpawnServer (name.c_str());
 #endif
 	if (!sv.active)
 		return;
 	
 	if (cls.state != ca_dedicated)
 	{
-		strcpy (cls.spawnparms, "");
+		cls.spawnparms.clear();
 
 		for (i=2 ; i<Cmd_Argc() ; i++)
 		{
-			strcat (cls.spawnparms, Cmd_Argv(i));
-			strcat (cls.spawnparms, " ");
+			cls.spawnparms+=Cmd_Argv(i);
+			cls.spawnparms += ' ';
 		}
 		
 		Cmd_ExecuteString ("connect local", src_command);
@@ -311,8 +311,8 @@ Goes to a new map, taking all clients along
 void Host_Changelevel_f (void)
 {
 #ifdef QUAKE2
-	char	level[MAX_QPATH];
-	char	_startspot[MAX_QPATH];
+	quake::stack_string<MAX_QPATH> level;
+	quake::stack_string<MAX_QPATH> _startspot;
 	char	*startspot;
 
 	if (Cmd_Argc() < 2)
@@ -338,7 +338,7 @@ void Host_Changelevel_f (void)
 	SV_SaveSpawnparms ();
 	SV_SpawnServer (level, startspot);
 #else
-	char	level[MAX_QPATH];
+	quake::stack_string<MAX_QPATH>	level;
 
 	if (Cmd_Argc() != 2)
 	{
@@ -351,8 +351,8 @@ void Host_Changelevel_f (void)
 		return;
 	}
 	SV_SaveSpawnparms ();
-	strcpy (level, Cmd_Argv(1));
-	SV_SpawnServer (level);
+	level = Cmd_Argv(1);
+	SV_SpawnServer (level.c_str());
 #endif
 }
 
@@ -365,9 +365,9 @@ Restarts the current server for a dead player
 */
 void Host_Restart_f (void)
 {
-	char	mapname[MAX_QPATH];
+	quake::stack_string<MAX_QPATH>	mapname;
 #ifdef QUAKE2
-	char	startspot[MAX_QPATH];
+	quake::stack_string<MAX_QPATH> startspot;
 #endif
 
 	if (cls.demoplayback || !sv.active)
@@ -375,13 +375,13 @@ void Host_Restart_f (void)
 
 	if (cmd_source != src_command)
 		return;
-	strcpy (mapname, sv.name);	// must copy out, because it gets cleared
+	mapname =sv.name;	// must copy out, because it gets cleared
 								// in sv_spawnserver
 #ifdef QUAKE2
 	strcpy(startspot, sv.startspot);
 	SV_SpawnServer (mapname, startspot);
 #else
-	SV_SpawnServer (mapname);
+	SV_SpawnServer (mapname.c_str());
 #endif
 }
 
@@ -408,15 +408,14 @@ User command to connect to server
 */
 void Host_Connect_f (void)
 {
-	char	name[MAX_QPATH];
-	
+	quake::stack_string<MAX_QPATH>	name;
 	cls.demonum = -1;		// stop demo loop in case this fails
 	if (cls.demoplayback)
 	{
 		CL_StopPlayback ();
 		CL_Disconnect ();
 	}
-	strcpy (name, Cmd_Argv(1));
+	name= Cmd_Argv(1);
 	CL_EstablishConnection (name);
 	Host_Reconnect_f ();
 }
@@ -442,13 +441,14 @@ Writes a SAVEGAME_COMMENT_LENGTH character comment describing the current
 void Host_SavegameComment (char *text)
 {
 	int		i;
-	char	kills[20];
+	quake::stack_string<20> kills;
 
 	for (i=0 ; i<SAVEGAME_COMMENT_LENGTH ; i++)
 		text[i] = ' ';
-	memcpy (text, cl.levelname, strlen(cl.levelname));
-	sprintf (kills,"kills:%3i/%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
-	memcpy (text+22, kills, strlen(kills));
+	memcpy(text, cl.levelname.data(), cl.levelname.size());
+	kills.assign_print("kills:%3i/%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+	memcpy(text + 22, kills.data(), kills.size());
+
 // convert space to _ to make stdio happy
 	for (i=0 ; i<SAVEGAME_COMMENT_LENGTH ; i++)
 		if (text[i] == ' ')
@@ -464,7 +464,7 @@ Host_Savegame_f
 */
 void Host_Savegame_f (void)
 {
-	char	name[256];
+	quake::stack_string<256> name;
 	FILE	*f;
 	int		i;
 	char	comment[SAVEGAME_COMMENT_LENGTH+1];
@@ -496,7 +496,7 @@ void Host_Savegame_f (void)
 		return;
 	}
 
-	if (strstr(Cmd_Argv(1), ".."))
+	if (Cmd_Argv(1).find( "..") != quake::string_view::npos)
 	{
 		Con_Printf ("Relative pathnames are not allowed.\n");
 		return;
@@ -510,12 +510,11 @@ void Host_Savegame_f (void)
 			return;
 		}
 	}
-
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	name << com_gamedir << '/' << Cmd_Argv(1);
 	COM_DefaultExtension (name, ".sav");
 	
-	Con_Printf ("Saving game to %s...\n", name);
-	f = fopen (name, "w");
+	Con_Printf ("Saving game to %s...\n", name.c_str());
+	f = fopen (name.c_str(), "w");
 	if (!f)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
@@ -560,11 +559,12 @@ Host_Loadgame_f
 */
 void Host_Loadgame_f (void)
 {
-	char	name[MAX_OSPATH];
+	quake::stack_string<MAX_OSPATH>	name;
 	FILE	*f;
-	char	mapname[MAX_QPATH];
+	quake::stack_string<MAX_OSPATH>	mapname;
 	float	time, tfloat;
-	char	str[32768], *start;
+	char str[32768];
+	char *start;
 	int		i, r;
 	edict_t	*ent;
 	int		entnum;
@@ -582,7 +582,7 @@ void Host_Loadgame_f (void)
 
 	cls.demonum = -1;		// stop demo loop in case this fails
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	name << com_gamedir << '/' << Cmd_Argv(1);  
 	COM_DefaultExtension (name, ".sav");
 	
 // we can't call SCR_BeginLoadingPlaque, because too much stack space has
@@ -590,7 +590,7 @@ void Host_Loadgame_f (void)
 //	SCR_BeginLoadingPlaque ();
 
 	Con_Printf ("Loading game from %s...\n", name);
-	f = fopen (name, "r");
+	f = fopen (name.c_str(), "r");
 	if (!f)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
@@ -604,7 +604,7 @@ void Host_Loadgame_f (void)
 		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
 		return;
 	}
-	fscanf (f, "%s\n", str);
+	fscanf (f, "%s\n", str); // the fuck?
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
 		fscanf (f, "%f\n", &spawn_parms[i]);
 // this silliness is so we can load 1.06 save files, which have float skill values
@@ -617,8 +617,9 @@ void Host_Loadgame_f (void)
 	Cvar_SetValue ("coop", 0);
 	Cvar_SetValue ("teamplay", 0);
 #endif
-
-	fscanf (f, "%s\n",mapname);
+	fscanf(f, "%s\n", str);
+	mapname = str;
+	//fscanf (f, "%s\n",mapname);
 	fscanf (f, "%f\n",&time);
 
 	CL_Disconnect_f ();
@@ -626,7 +627,7 @@ void Host_Loadgame_f (void)
 #ifdef QUAKE2
 	SV_SpawnServer (mapname, NULL);
 #else
-	SV_SpawnServer (mapname);
+	SV_SpawnServer (mapname.c_str());
 #endif
 	if (!sv.active)
 	{
@@ -663,6 +664,9 @@ void Host_Loadgame_f (void)
 		}
 		if (i == sizeof(str)-1)
 			Sys_Error ("Loadgame buffer overflow");
+		assert(0);
+		// fix loads
+#if 0
 		str[i] = 0;
 		start = str;
 		start = (char*)COM_Parse(str);
@@ -689,6 +693,7 @@ void Host_Loadgame_f (void)
 		}
 
 		entnum++;
+#endif
 	}
 	
 	sv.num_edicts = entnum;
@@ -709,7 +714,7 @@ void Host_Loadgame_f (void)
 #ifdef QUAKE2
 void SaveGamestate()
 {
-	char	name[256];
+	quake::stack_string<256> name;
 	FILE	*f;
 	int		i;
 	char	comment[SAVEGAME_COMMENT_LENGTH+1];
@@ -760,9 +765,9 @@ void SaveGamestate()
 
 int LoadGamestate(char *level, char *startspot)
 {
-	char	name[MAX_OSPATH];
+	quake::stack_string<MAX_OSPATH> name;
 	FILE	*f;
-	char	mapname[MAX_QPATH];
+	quake::stack_string<MAX_QPATH> mapname;
 	float	time, sk;
 	char	str[32768], *start;
 	int		i, r;
@@ -864,8 +869,8 @@ int LoadGamestate(char *level, char *startspot)
 // changing levels within a unit
 void Host_Changelevel2_f (void)
 {
-	char	level[MAX_QPATH];
-	char	_startspot[MAX_QPATH];
+	quake::stack_string<MAX_QPATH> level;
+	quake::stack_string<MAX_QPATH> _startspot;
 	char	*startspot;
 
 	if (Cmd_Argc() < 2)
@@ -909,7 +914,7 @@ Host_Name_f
 */
 void Host_Name_f (void)
 {
-	char newName[16];
+	quake::stack_string<16> newName;
 
 	if (Cmd_Argc () == 1)
 	{
@@ -917,14 +922,14 @@ void Host_Name_f (void)
 		return;
 	}
 	if (Cmd_Argc() == 2)
-		Q_strcpy(newName, Cmd_Argv(1));
+		newName= Cmd_Argv(1);
 	else
-		Q_strcpy(newName, Cmd_Args());
-	newName[15] = 0;
+		newName= Cmd_Args();
+
 
 	if (cmd_source == src_command)
 	{
-		if (Q_strcmp(cl_name.string, newName) == 0)
+		if (newName == cl_name.string)
 			return;
 		Cvar_Set ("_cl_name", newName);
 		if (cls.state == ca_connected)
@@ -933,9 +938,9 @@ void Host_Name_f (void)
 	}
 
 	if (host_client->name[0] && strcmp(host_client->name, "unconnected") )
-		if (Q_strcmp(host_client->name, newName) != 0)
-			Con_Printf ("%s renamed to %s\n", host_client->name, newName);
-	Q_strcpy (host_client->name, newName);
+		if (newName == host_client->name)
+			Con_Printf ("%s renamed to %s\n", host_client->name, newName.c_str());
+	host_client->name[newName.copy(host_client->name)] = '\0';
 	host_client->edict->v.netname = host_client->name - pr_strings;
 	
 // send notification to all clients
@@ -1010,8 +1015,8 @@ void Host_Say(qboolean teamonly)
 	client_t *client;
 	client_t *save;
 	int		j;
-	char	*p;
-	char	text[64];
+
+	quake::stack_string<64> text;
 	qboolean	fromServer = false;
 
 	if (cmd_source == src_command)
@@ -1033,26 +1038,17 @@ void Host_Say(qboolean teamonly)
 
 	save = host_client;
 
-	p = Cmd_Args();
+	auto p = Cmd_Args();
 // remove quotes if present
-	if (*p == '"')
-	{
-		p++;
-		p[Q_strlen(p)-1] = 0;
-	}
-
+	if (p.front() == '"') p.remove_prefix(1);
+	if (p.back() == '"') p.remove_suffix(1);
 // turn on color set 1
-	if (!fromServer)
-		sprintf (text, "%c%s: ", 1, save->name);
+	if (!fromServer) 
+		text << (char)1 << save->name << ": ";
 	else
-		sprintf (text, "%c<%s> ", 1, hostname.string);
+		text << (char)1 << '<' << hostname.string << "> ";
 
-	j = sizeof(text) - 2 - Q_strlen(text);  // -2 for /n and null terminator
-	if (Q_strlen(p) > j)
-		p[j] = 0;
-
-	Q_strcat (text, p);
-	Q_strcat (text, "\n");
+	text << p << '\n';
 
 	for (j = 0, client = svs.clients; j < svs.maxclients; j++, client++)
 	{
@@ -1061,11 +1057,11 @@ void Host_Say(qboolean teamonly)
 		if (teamplay.value && teamonly && client->edict->v.team != save->edict->v.team)
 			continue;
 		host_client = client;
-		SV_ClientPrintf("%s", text);
+		SV_ClientPrintf("%s", text.c_str());
 	}
 	host_client = save;
 
-	Sys_Printf("%s", &text[1]);
+	Sys_Printf("%s", text.c_str());
 }
 
 
@@ -1086,8 +1082,7 @@ void Host_Tell_f(void)
 	client_t *client;
 	client_t *save;
 	int		j;
-	char	*p;
-	char	text[64];
+	quake::stack_string<64> text;
 
 	if (cmd_source == src_command)
 	{
@@ -1097,36 +1092,32 @@ void Host_Tell_f(void)
 
 	if (Cmd_Argc () < 3)
 		return;
+	text << host_client->name << ": ";
 
-	Q_strcpy(text, host_client->name);
-	Q_strcat(text, ": ");
-
-	p = Cmd_Args();
+	auto p = Cmd_Args();
 
 // remove quotes if present
-	if (*p == '"')
-	{
-		p++;
-		p[Q_strlen(p)-1] = 0;
-	}
+	if (p.front() == '"') p.remove_prefix(1);
+
+	while (p.back() == '"' || p.back() == '\n') p.remove_suffix(1);
 
 // check length & truncate if necessary
+#if 0
 	j = sizeof(text) - 2 - Q_strlen(text);  // -2 for /n and null terminator
 	if (Q_strlen(p) > j)
 		p[j] = 0;
-
-	strcat (text, p);
-	strcat (text, "\n");
+#endif
+	text << p << '\n';
 
 	save = host_client;
 	for (j = 0, client = svs.clients; j < svs.maxclients; j++, client++)
 	{
 		if (!client->active || !client->spawned)
 			continue;
-		if (Q_strcasecmp(client->name, Cmd_Argv(1)))
+		if (Q_strcasecmp( Cmd_Argv(1),client->name))
 			continue;
 		host_client = client;
-		SV_ClientPrintf("%s", text);
+		SV_ClientPrintf("%s", text.c_str());
 		break;
 	}
 	host_client = save;
@@ -1151,11 +1142,11 @@ void Host_Color_f(void)
 	}
 
 	if (Cmd_Argc() == 2)
-		top = bottom = atoi(Cmd_Argv(1));
+		top = bottom = quake::stoi(Cmd_Argv(1));
 	else
 	{
-		top = atoi(Cmd_Argv(1));
-		bottom = atoi(Cmd_Argv(2));
+		top = quake::stoi(Cmd_Argv(1));
+		bottom = quake::stoi(Cmd_Argv(2));
 	}
 	
 	top &= 15;
@@ -1423,8 +1414,8 @@ Kicks a user off of the server
 */
 void Host_Kick_f (void)
 {
-	char		*who;
-	char		*message = NULL;
+	quake::cstring who;
+
 	client_t	*save;
 	int			i;
 	qboolean	byNumber = false;
@@ -1442,9 +1433,9 @@ void Host_Kick_f (void)
 
 	save = host_client;
 
-	if (Cmd_Argc() > 2 && Q_strcmp(Cmd_Argv(1), "#") == 0)
+	if (Cmd_Argc() > 2 && Cmd_Argv(1)== "#" == 0)
 	{
-		i = Q_atof(Cmd_Argv(2)) - 1;
+		i = quake::stof(Cmd_Argv(2)) - 1;
 		if (i < 0 || i >= svs.maxclients)
 			return;
 		if (!svs.clients[i].active)
@@ -1458,7 +1449,7 @@ void Host_Kick_f (void)
 		{
 			if (!host_client->active)
 				continue;
-			if (Q_strcasecmp(host_client->name, Cmd_Argv(1)) == 0)
+			if (Q_strcasecmp(Cmd_Argv(1), host_client->name) == 0)
 				break;
 		}
 	}
@@ -1476,24 +1467,26 @@ void Host_Kick_f (void)
 		// can't kick yourself!
 		if (host_client == save)
 			return;
-
+		quake::stack_string<64> message;
 		if (Cmd_Argc() > 2)
 		{
-			message = (char*)COM_Parse(Cmd_Args());
+			auto parsed = COM_Parse(Cmd_Args());
 			if (byNumber)
 			{
-				message++;							// skip the #
-				while (*message == ' ')				// skip white space
-					message++;
-				message += Q_strlen(Cmd_Argv(2));	// skip the number
+				parsed.remove_prefix(1); // skip the #
+				while (!parsed.empty() && parsed.front() == ' ')
+					parsed.remove_prefix(1); // skip white space
+				parsed.remove_prefix(Cmd_Argv(2).size()); // skip the number
 			}
-			while (*message && *message == ' ')
-				message++;
+			while (!parsed.empty() && parsed.front() == ' ')
+				parsed.remove_prefix(1); // skip white space
+			if (!parsed.empty())message = parsed;
 		}
-		if (message)
+			
+		if (!message.empty())
 			SV_ClientPrintf ("Kicked by %s: %s\n", who, message);
 		else
-			SV_ClientPrintf ("Kicked by %s\n", who);
+			SV_ClientPrintf("Kicked by %s\n", who);
 		SV_DropClient (false);
 	}
 
@@ -1513,71 +1506,70 @@ DEBUGGING TOOLS
 Host_Give_f
 ==================
 */
-void Host_Give_f (void)
+void Host_Give_f(void)
 {
-	char	*t;
-	int		v, w;
+	int		w;
 	eval_t	*val;
 
 	if (cmd_source == src_command)
 	{
-		Cmd_ForwardToServer ();
+		Cmd_ForwardToServer();
 		return;
 	}
 
 	if (pr_global_struct->deathmatch && !host_client->privileged)
 		return;
 
-	t = Cmd_Argv(1);
-	v = atoi (Cmd_Argv(2));
-	
-	switch (t[0])
+	auto t = Cmd_Argv(1);
+	auto v = quake::stoi(Cmd_Argv(2));
+
+	switch (t.front())
 	{
-   case '0':
-   case '1':
-   case '2':
-   case '3':
-   case '4':
-   case '5':
-   case '6':
-   case '7':
-   case '8':
-   case '9':
-      // MED 01/04/97 added hipnotic give stuff
-      if (hipnotic)
-      {
-         if (t[0] == '6')
-         {
-            if (t[1] == 'a')
-               sv_player->v.items = (int)sv_player->v.items | HIT_PROXIMITY_GUN;
-            else
-               sv_player->v.items = (int)sv_player->v.items | IT_GRENADE_LAUNCHER;
-         }
-         else if (t[0] == '9')
-            sv_player->v.items = (int)sv_player->v.items | HIT_LASER_CANNON;
-         else if (t[0] == '0')
-            sv_player->v.items = (int)sv_player->v.items | HIT_MJOLNIR;
-         else if (t[0] >= '2')
-            sv_player->v.items = (int)sv_player->v.items | (IT_SHOTGUN << (t[0] - '2'));
-      }
-      else
-      {
-         if (t[0] >= '2')
-            sv_player->v.items = (int)sv_player->v.items | (IT_SHOTGUN << (t[0] - '2'));
-      }
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		// MED 01/04/97 added hipnotic give stuff
+		if (hipnotic)
+		{
+			if (t[0] == '6')
+			{
+				if (t[1] == 'a')
+					sv_player->v.items = (int)sv_player->v.items | HIT_PROXIMITY_GUN;
+				else
+					sv_player->v.items = (int)sv_player->v.items | IT_GRENADE_LAUNCHER;
+			}
+			else if (t[0] == '9')
+				sv_player->v.items = (int)sv_player->v.items | HIT_LASER_CANNON;
+			else if (t[0] == '0')
+				sv_player->v.items = (int)sv_player->v.items | HIT_MJOLNIR;
+			else if (t[0] >= '2')
+				sv_player->v.items = (int)sv_player->v.items | (IT_SHOTGUN << (t[0] - '2'));
+		}
+		else
+		{
+			if (t[0] >= '2')
+				sv_player->v.items = (int)sv_player->v.items | (IT_SHOTGUN << (t[0] - '2'));
+		}
 		break;
-	
-    case 's':
+
+	case 's':
 		if (rogue)
 		{
-	        val = GetEdictFieldValue(sv_player, "ammo_shells1");
-		    if (val)
-			    val->_float = v;
+			val = GetEdictFieldValue(sv_player, "ammo_shells1");
+			if (val)
+				val->_float = v;
 		}
 
-        sv_player->v.ammo_shells = v;
-        break;		
-    case 'n':
+		sv_player->v.ammo_shells = v;
+		break;
+	case 'n':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_nails1");
@@ -1592,8 +1584,8 @@ void Host_Give_f (void)
 		{
 			sv_player->v.ammo_nails = v;
 		}
-        break;		
-    case 'l':
+		break;
+	case 'l':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_lava_nails");
@@ -1604,8 +1596,8 @@ void Host_Give_f (void)
 					sv_player->v.ammo_nails = v;
 			}
 		}
-        break;
-    case 'r':
+		break;
+	case 'r':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_rockets1");
@@ -1620,8 +1612,8 @@ void Host_Give_f (void)
 		{
 			sv_player->v.ammo_rockets = v;
 		}
-        break;		
-    case 'm':
+		break;
+	case 'm':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_multi_rockets");
@@ -1632,11 +1624,11 @@ void Host_Give_f (void)
 					sv_player->v.ammo_rockets = v;
 			}
 		}
-        break;		
-    case 'h':
-        sv_player->v.health = v;
-        break;		
-    case 'c':
+		break;
+	case 'h':
+		sv_player->v.health = v;
+		break;
+	case 'c':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_cells1");
@@ -1651,8 +1643,8 @@ void Host_Give_f (void)
 		{
 			sv_player->v.ammo_cells = v;
 		}
-        break;		
-    case 'p':
+		break;
+	case 'p':
 		if (rogue)
 		{
 			val = GetEdictFieldValue(sv_player, "ammo_plasma");
@@ -1663,8 +1655,8 @@ void Host_Give_f (void)
 					sv_player->v.ammo_cells = v;
 			}
 		}
-        break;		
-    }
+		break;
+	}
 }
 
 edict_t	*FindViewthing (void)
@@ -1723,7 +1715,7 @@ void Host_Viewframe_f (void)
 		return;
 	m = cl.model_precache[(int)e->v.modelindex];
 
-	f = atoi(Cmd_Argv(1));
+	f = quake::stoi(Cmd_Argv(1));
 	if (f >= m->numframes)
 		f = m->numframes-1;
 
@@ -1822,8 +1814,8 @@ void Host_Startdemos_f (void)
 	}
 	Con_Printf ("%i demo(s) in loop\n", c);
 
-	for (i=1 ; i<c+1 ; i++)
-		strncpy (cls.demos[i-1], Cmd_Argv(i), sizeof(cls.demos[0])-1);
+	for (i = 1; i < c + 1; i++)
+		cls.demos[i - 1] = Cmd_Argv(i);
 
 	if (!sv.active && cls.demonum != -1 && !cls.demoplayback)
 	{

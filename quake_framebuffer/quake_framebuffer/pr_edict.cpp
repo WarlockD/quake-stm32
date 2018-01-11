@@ -22,13 +22,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 
 dprograms_t		*progs;
-quake::fixed_array<dfunction_t>		pr_functions;
-char			*					pr_strings;
-quake::fixed_array<ddef_t>			pr_globaldefs;
-quake::fixed_array<ddef_t>			pr_fielddefs;
-quake::fixed_array<dstatement_t>	pr_statements;
+quake::array_view<dfunction_t>		pr_functions;
+ char			*					pr_strings;
+quake::array_view<ddef_t>			pr_globaldefs;
+quake::array_view<ddef_t>			pr_fielddefs;
+quake::array_view<dstatement_t>	pr_statements;
 globalvars_t*	pr_global_struct;
-quake::fixed_array<float>			pr_globals;			// same as pr_global_struct
+quake::array_view<float>			pr_globals;			// same as pr_global_struct
 #if 0
 dfunction_t		*pr_functions;
 char			*pr_strings;
@@ -45,7 +45,7 @@ unsigned short		pr_crc;
 int		type_size[8] = {1,sizeof(string_t)/4,1,3,1,1,sizeof(func_t)/4,sizeof(void *)/4};
 
 ddef_t *ED_FieldAtOfs (int ofs);
-qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s);
+qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
 cvar_t	gamecfg = {"gamecfg", "0"};
@@ -186,7 +186,7 @@ ddef_t *ED_FieldAtOfs (int ofs)
 ED_FindField
 ============
 */
-ddef_t *ED_FindField (char *name)
+ddef_t *ED_FindField (const quake::string_view& name)
 {
 	ddef_t		*def;
 	int			i;
@@ -194,7 +194,7 @@ ddef_t *ED_FindField (char *name)
 	for (i=0 ; i<progs->numfielddefs ; i++)
 	{
 		def = &pr_fielddefs[i];
-		if (!strcmp(pr_strings + def->s_name,name) )
+		if (name == (pr_strings + def->s_name))
 			return def;
 	}
 	return NULL;
@@ -206,7 +206,7 @@ ddef_t *ED_FindField (char *name)
 ED_FindGlobal
 ============
 */
-ddef_t *ED_FindGlobal (const char * name)
+ddef_t *ED_FindGlobal (const quake::string_view& name)
 {
 	ddef_t		*def;
 	int			i;
@@ -214,7 +214,7 @@ ddef_t *ED_FindGlobal (const char * name)
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
 		def = &pr_globaldefs[i];
-		if (!strcmp(pr_strings + def->s_name,name) )
+		if (name == (pr_strings + def->s_name) )
 			return def;
 	}
 	return NULL;
@@ -226,7 +226,7 @@ ddef_t *ED_FindGlobal (const char * name)
 ED_FindFunction
 ============
 */
-dfunction_t *ED_FindFunction (char *name)
+dfunction_t *ED_FindFunction (const quake::string_view& name)
 {
 	dfunction_t		*func;
 	int				i;
@@ -234,7 +234,7 @@ dfunction_t *ED_FindFunction (char *name)
 	for (i=0 ; i<progs->numfunctions ; i++)
 	{
 		func = &pr_functions[i];
-		if (!strcmp(pr_strings + func->s_name,name) )
+		if (name == (pr_strings + func->s_name) )
 			return func;
 	}
 	return NULL;
@@ -280,44 +280,47 @@ PR_ValueString
 Returns a string describing *data in a type specific manner
 =============
 */
-char *PR_ValueString (etype_t type, eval_t *val)
+quake::cstring  PR_ValueString (etype_t type, eval_t *val)
 {
-	static char	line[256];
+	static quake::stack_string<256> line;
 	ddef_t		*def;
 	dfunction_t	*f;
 	
 	type =  static_cast<etype_t>(static_cast<unsigned int>(type) & ~DEF_SAVEGLOBAL);
-
+	
 	switch (type)
 	{
 	case ev_string:
-		Q_sprintf (line, "%s", pr_strings + val->string);
+		line = pr_strings + val->string;
 		break;
 	case ev_entity:	
-		sprintf (line, "entity %i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
+		line.clear();
+		line << "entity " << NUM_FOR_EDICT(PROG_TO_EDICT(val->edict));
 		break;
 	case ev_function:
 		f = &pr_functions[val->function];
-		Q_sprintf (line, "%s()", pr_strings + f->s_name);
+		line.clear();
+		line << pr_strings + f->s_name << "()";
 		break;
 	case ev_field:
 		def = ED_FieldAtOfs ( val->_int );
-		Q_sprintf (line, ".%s", pr_strings + def->s_name);
+		line.clear();
+		line << '.' << pr_strings + def->s_name;
 		break;
 	case ev_void:
-		Q_sprintf (line, "void");
+		line = "void";
 		break;
 	case ev_float:
-		Q_sprintf (line, "%5.1f", val->_float);
+		line.assign_print( "%5.1f", val->_float);
 		break;
 	case ev_vector:
-		Q_sprintf (line, "'%5.1f %5.1f %5.1f'", val->vector[0], val->vector[1], val->vector[2]);
+		line.assign_print("'%5.1f %5.1f %5.1f'", val->vector[0], val->vector[1], val->vector[2]);
 		break;
 	case ev_pointer:
-		Q_sprintf (line, "pointer");
+		line="pointer";
 		break;
 	default:
-		Q_sprintf (line, "bad type %i", type);
+		line= "bad type %i", type;
 		break;
 	}
 	
@@ -332,9 +335,9 @@ Returns a string describing *data in a type specific manner
 Easier to parse than PR_ValueString
 =============
 */
-char *PR_UglyValueString (etype_t type, eval_t *val)
+quake::cstring  PR_UglyValueString (etype_t type, eval_t *val)
 {
-	static char	line[256];
+	static quake::stack_string<256> line;
 	ddef_t		*def;
 	dfunction_t	*f;
 	
@@ -343,30 +346,31 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 	switch (type)
 	{
 	case ev_string:
-		Q_sprintf (line, "%s", pr_strings + val->string);
+		line = pr_strings + val->string;
 		break;
 	case ev_entity:	
-		Q_sprintf (line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+		line.clear();
+		line << NUM_FOR_EDICT(PROG_TO_EDICT(val->edict));
 		break;
 	case ev_function:
 		f = &pr_functions[val->function]  ;
-		Q_sprintf (line, "%s", pr_strings + f->s_name);
+		line =  pr_strings + f->s_name;
 		break;
 	case ev_field:
 		def = ED_FieldAtOfs ( val->_int );
-		Q_sprintf (line, "%s", pr_strings + def->s_name);
+		line =   pr_strings + def->s_name;
 		break;
 	case ev_void:
-		Q_sprintf (line, "void");
+		line = "void";
 		break;
 	case ev_float:
-		Q_sprintf (line, "%f", val->_float);
+		line.assign_print("%f", val->_float);
 		break;
 	case ev_vector:
-		Q_sprintf (line, "%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
+		line.assign_print("%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
 		break;
 	default:
-		Q_sprintf (line, "bad type %i", type);
+		line.assign_print("bad type %i", type);
 		break;
 	}
 	
@@ -381,48 +385,44 @@ Returns a string with a description and the contents of a global,
 padded to 20 field width
 ============
 */
-char *PR_GlobalString (int ofs)
+quake::cstring  PR_GlobalString (int ofs)
 {
-	char	*s;
 	int		i;
 	ddef_t	*def;
 	void	*val;
-	static char	line[128];
+	static quake::stack_string<128> line;
 	
 	val = (void *)&pr_globals[ofs];
 	def = ED_GlobalAtOfs(ofs);
 	if (!def)
-		sprintf (line,"%i(???)", ofs);
+		line << ofs << "(???)";
 	else
 	{
-		s = PR_ValueString (def->type(), (eval_t*)val);
-		Q_sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
+		auto s = PR_ValueString (def->type(), (eval_t*)val);
+		line << ofs << '(' << pr_strings + def->s_name << ')' << s;
 	}
-	
-	i = Q_strlen(line);
-	for ( ; i<20 ; i++)
-		Q_strcat (line," ");
-	Q_strcat (line," ");
+	if (line.size() < 20) line.append(' ', 20 - line.size());
+	line.push_back(' ');
+
 		
 	return line;
 }
 
-char *PR_GlobalStringNoContents (int ofs)
+quake::cstring PR_GlobalStringNoContents (int ofs)
 {
 	int		i;
 	ddef_t	*def;
-	static char	line[128];
+	static quake::stack_string<128> line;
 	
 	def = ED_GlobalAtOfs(ofs);
 	if (!def)
-		Q_sprintf (line,"%i(???)", ofs);
+		line << ofs << "(???)";
 	else
-		Q_sprintf (line,"%i(%s)", ofs, pr_strings + def->s_name);
-	
-	i = Q_strlen(line);
-	for ( ; i<20 ; i++)
-		Q_strcat (line," ");
-	Q_strcat (line," ");
+
+		line << ofs << '(' << pr_strings + def->s_name << ')';
+
+	if (line.size() < 20) line.append(' ', 20 - line.size());
+	line.push_back(' ');
 		
 	return line;
 }
@@ -474,7 +474,7 @@ void ED_Print (edict_t *ed)
 		while (l++ < 15)
 			Con_Printf (" ");
 
-		Con_Printf ("%s\n", PR_ValueString(d->type(), (eval_t *)v));		
+		Con_Printf ("%s\n", PR_ValueString(d->type(), (eval_t *)v).c_str());		
 	}
 }
 
@@ -519,7 +519,7 @@ void ED_Write (FILE *f, edict_t *ed)
 			continue;
 	
 		fprintf (f,"\"%s\" ",name);
-		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type(), (eval_t *)v));		
+		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type(), (eval_t *)v).c_str());		
 	}
 
 	fprintf (f, "}\n");
@@ -557,7 +557,7 @@ void ED_PrintEdict_f (void)
 {
 	int		i;
 	
-	i = Q_atoi (Cmd_Argv(1));
+	i = quake::stoi(Cmd_Argv(1));
 	if (i >= sv.num_edicts)
 	{
 		Con_Printf("Bad edict number\n");
@@ -649,9 +649,9 @@ void ED_WriteGlobals (FILE *f)
 ED_ParseGlobals
 =============
 */
-void ED_ParseGlobals (const char * data)
+void ED_ParseGlobals (const quake::string_view& text)
 {
-	char	keyname[64];
+	quake::string_view data;
 	ddef_t	*key;
 
 	while (1)
@@ -660,14 +660,14 @@ void ED_ParseGlobals (const char * data)
 		data = COM_Parse (data);
 		if (com_token[0] == '}')
 			break;
-		if (!data)
+		if (data.empty())
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
-		strcpy (keyname, com_token);
+		auto keyname = com_token;;
 
 	// parse value	
 		data = COM_Parse (data);
-		if (!data)
+		if (data.empty())
 			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
 		if (com_token[0] == '}')
@@ -693,12 +693,12 @@ void ED_ParseGlobals (const char * data)
 ED_NewString
 =============
 */
-char *ED_NewString (char *string)
+quake::cstring ED_NewString(const quake::string_view& string)
 {
 	char	*new_ptr, *new_p;
 	int		i,l;
 	
-	l = strlen(string) + 1;
+	l = string.size() + 1;
 	new_ptr = (char*)Hunk_Alloc (l);
 	new_p = new_ptr;
 
@@ -716,7 +716,7 @@ char *ED_NewString (char *string)
 			*new_p++ = string[i];
 	}
 	
-	return new_ptr;
+	return quake::cstring(new_ptr);
 }
 
 
@@ -728,12 +728,12 @@ Can parse either fields or globals
 returns false if error
 =============
 */
-qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
+qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s)
 {
 	int		i;
-	char	string[128];
+	quake::stack_string<128> string;
 	ddef_t	*def;
-	char	*v, *w;
+	const char	*v, *w;
 	void	*d;
 	dfunction_t	*func;
 	
@@ -742,29 +742,30 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 	switch (key->type() & ~DEF_SAVEGLOBAL)
 	{
 	case ev_string:
-		*(string_t *)d = ED_NewString (s) - pr_strings;
+		*(string_t *)d = ED_NewString (s).c_str() - pr_strings;
 		break;
 		
 	case ev_float:
-		*(float *)d = atof (s);
+		*(float *)d = Q_atof (s);
 		break;
 		
 	case ev_vector:
-		strcpy (string, s);
-		v = string;
-		w = string;
-		for (i=0 ; i<3 ; i++)
+		for (i = 0; i < 3; i++)
 		{
-			while (*v && *v != ' ')
-				v++;
-			*v = 0;
-			((float *)d)[i] = atof (w);
-			w = v = v+1;
+			char* end;
+			float f = ::strtof(s.data(), &end);
+			if (end != s.data()) {
+				((float *)d)[i] = f;
+
+			}
+			else {
+				assert(0); // bad value
+			}
 		}
 		break;
 		
 	case ev_entity:
-		*(int *)d = EDICT_TO_PROG(EDICT_NUM(atoi (s)));
+		*(int *)d = EDICT_TO_PROG(EDICT_NUM(Q_atoi (s)));
 		break;
 		
 	case ev_field:
@@ -802,85 +803,81 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
-char *ED_ParseEdict (char *data, edict_t *ent)
+quake::string_view ED_ParseEdict(quake::string_view data, edict_t *ent)
 {
 	ddef_t		*key;
 	qboolean	anglehack;
 	qboolean	init;
-	char		keyname[256];
+	quake::stack_string<256> keyname;
 	int			n;
 
 	init = false;
 
-// clear it
+	// clear it
 	if (ent != sv.edicts)	// hack
-		memset (&ent->v, 0, progs->entityfields * 4);
+		memset(&ent->v, 0, progs->entityfields * 4);
 
-// go through all the dictionary pairs
+	// go through all the dictionary pairs
 	while (1)
-	{	
-	// parse key
-		data = (char*)COM_Parse (data);
+	{
+		// parse key
+		data = COM_Parse(data);
 		if (com_token[0] == '}')
 			break;
-		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
-		
-// anglehack is to allow QuakeEd to write single scalar angles
-// and allow them to be turned into vectors. (FIXME...)
-if (!strcmp(com_token, "angle"))
-{
-	strcpy (com_token, "angles");
-	anglehack = true;
-}
-else
-	anglehack = false;
+		if (data.empty())
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
-// FIXME: change light to _light to get rid of this hack
-if (!strcmp(com_token, "light"))
-	strcpy (com_token, "light_lev");	// hack for single light def
-
-		strcpy (keyname, com_token);
-
-		// another hack to fix heynames with trailing spaces
-		n = strlen(keyname);
-		while (n && keyname[n-1] == ' ')
+		// anglehack is to allow QuakeEd to write single scalar angles
+		// and allow them to be turned into vectors. (FIXME...)
+		if (com_token == "angle")
 		{
-			keyname[n-1] = 0;
-			n--;
+			com_token = "angles";
+			anglehack = true;
 		}
+		else
+			anglehack = false;
 
-	// parse value	
-		data = (char*)COM_Parse (data);
-		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
+		// FIXME: change light to _light to get rid of this hack
+		if (com_token == "light")
+			com_token = "light_lev";	// hack for single light def
+									// another hack to fix heynames with trailing spaces
+		keyname = com_token;
+		while (keyname.back() == ' ') keyname.pop_back();
+
+
+
+		// parse value	
+		data = COM_Parse(data);
+		if (data.empty())
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
 		if (com_token[0] == '}')
-			Sys_Error ("ED_ParseEntity: closing brace without data");
+			Sys_Error("ED_ParseEntity: closing brace without data");
 
-		init = true;	
+		init = true;
 
-// keynames with a leading underscore are used for utility comments,
-// and are immediately discarded by quake
+		// keynames with a leading underscore are used for utility comments,
+		// and are immediately discarded by quake
 		if (keyname[0] == '_')
 			continue;
-		
-		key = ED_FindField (keyname);
+
+		key = ED_FindField(keyname);
 		if (!key)
 		{
-			Con_Printf ("'%s' is not a field\n", keyname);
+			Con_Printf("'%s' is not a field\n", keyname.c_str());
 			continue;
 		}
 
-if (anglehack)
-{
-char	temp[32];
-strcpy (temp, com_token);
-sprintf (com_token, "0 %s 0", temp);
-}
+		if (anglehack)
+		{
+			static quake::stack_string<32> temp;
+			temp.clear();
+			temp << "0 " << com_token << " 0";
+			com_token = temp;
+		}
 
-		if (!ED_ParseEpair ((void *)&ent->v, key, com_token))
-			Host_Error ("ED_ParseEdict: parse error");
+		if (!ED_ParseEpair((void *)&ent->v, key, com_token))
+			Host_Error("ED_ParseEdict: parse error");
 	}
 
 	if (!init)
@@ -905,7 +902,7 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
-void ED_LoadFromFile (char *data)
+void ED_LoadFromFile (quake::string_view data)
 {	
 	edict_t		*ent;
 	int			inhibit;
@@ -919,8 +916,8 @@ void ED_LoadFromFile (char *data)
 	while (1)
 	{
 // parse the opening brace	
-		data = (char*)COM_Parse (data);
-		if (!data)
+		data = COM_Parse (data);
+		if (data.empty())
 			break;
 		if (com_token[0] != '{')
 			Sys_Error ("ED_LoadFromFile: found %s when expecting {",com_token);

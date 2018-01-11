@@ -189,10 +189,10 @@ This will be sent on the initial connection and upon each server load.
 void SV_SendServerinfo (client_t *client)
 {
 	char			**s;
-	char			message[2048];
+	quake::stack_string<2048> message;
 
 	MSG_WriteByte (&client->message, svc_print);
-	Q_sprintf (message, "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, pr_crc);
+	message.assign_print( "%c\nVERSION %4.2f SERVER (%i CRC)", 2, VERSION, pr_crc);
 	MSG_WriteString (&client->message,message);
 
 	MSG_WriteByte (&client->message, svc_serverinfo);
@@ -204,7 +204,7 @@ void SV_SendServerinfo (client_t *client)
 	else
 		MSG_WriteByte (&client->message, GAME_COOP);
 
-	Q_sprintf (message, pr_strings+sv.edicts->v.message);
+	message.assign_print(pr_strings+sv.edicts->v.message);
 
 	MSG_WriteString (&client->message,message);
 
@@ -1044,7 +1044,7 @@ extern float		scr_centertime_off;
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
 #else
-void SV_SpawnServer (char *server)
+void SV_SpawnServer (const char *server)
 #endif
 {
 	edict_t		*ent;

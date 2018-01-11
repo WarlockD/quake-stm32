@@ -42,7 +42,7 @@ void S_Shutdown (void)
 {
 }
 
-void S_TouchSound (char *sample)
+void S_TouchSound (const quake::string_view& sample)
 {
 }
 
@@ -62,7 +62,7 @@ void S_StopSound (int entnum, int entchannel)
 {
 }
 
-sfx_t *S_PrecacheSound (char *sample)
+sfx_t *S_PrecacheSound (const quake::string_view& sample)
 {
 	return NULL;
 }

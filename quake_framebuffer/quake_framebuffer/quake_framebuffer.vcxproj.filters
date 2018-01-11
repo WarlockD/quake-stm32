@@ -225,7 +225,7 @@
     <ClCompile Include="global.cpp">
       <Filter>quake</Filter>
     </ClCompile>
-    <ClCompile Include="qstring.cpp">
+    <ClCompile Include="qvector.cpp">
       <Filter>quake</Filter>
     </ClCompile>
   </ItemGroup>
@@ -431,6 +431,12 @@
       <Filter>quake</Filter>
     </ClInclude>
     <ClInclude Include="qvector.h">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="safeint3.hpp">
+      <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="qftoa.h">
       <Filter>quake</Filter>
     </ClInclude>
   </ItemGroup>

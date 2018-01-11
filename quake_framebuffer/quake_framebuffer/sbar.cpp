@@ -298,7 +298,7 @@ void Sbar_DrawCharacter (int x, int y, int num)
 Sbar_DrawString
 ================
 */
-void Sbar_DrawString (int x, int y, char *str)
+void Sbar_DrawString (int x, int y, const char *str)
 {
 	if (cl.gametype == GAME_DEATHMATCH)
 		Draw_String (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
@@ -306,22 +306,28 @@ void Sbar_DrawString (int x, int y, char *str)
 		Draw_String (x + ((vid.width - 320)>>1), y+ vid.height-SBAR_HEIGHT, str);
 }
 
+template<typename U>
+void Sbar_DrawString(int x, int y, const quake::string_helper<U>& str)
+{
+	if (cl.gametype == GAME_DEATHMATCH)
+		Draw_String(x /*+ ((vid.width - 320)>>1)*/, y + vid.height - SBAR_HEIGHT, str);
+	else
+		Draw_String(x + ((vid.width - 320) >> 1), y + vid.height - SBAR_HEIGHT, str);
+}
 /*
 =============
 Sbar_itoa
 =============
 */
-int Sbar_itoa (int num, char *buf)
+template<typename U>
+int Sbar_itoa (int num,  quake::string_builder<U>& buf)
 {
-	char	*str;
 	int		pow10;
 	int		dig;
-
-	str = buf;
-
+	auto start = buf.end();
 	if (num < 0)
 	{
-		*str++ = '-';
+		buf.push_back('-');
 		num = -num;
 	}
 
@@ -332,13 +338,11 @@ int Sbar_itoa (int num, char *buf)
 	{
 		pow10 /= 10;
 		dig = num/pow10;
-		*str++ = '0'+dig;
+		buf.push_back('0' + dig);
 		num -= dig*pow10;
 	} while (pow10 != 1);
 
-	*str = 0;
-
-	return str-buf;
+	return start -buf.begin();
 }
 
 
@@ -349,28 +353,27 @@ Sbar_DrawNum
 */
 void Sbar_DrawNum (int x, int y, int num, int digits, int color)
 {
-	char			str[12];
+	quake::stack_string<12> str;
 	char			*ptr;
 	int				l, frame;
 
 	l = Sbar_itoa (num, str);
-	ptr = str;
+
 	if (l > digits)
-		ptr += (l-digits);
+		str.erase(str.begin(), str.begin() + (l - digits));
 	if (l < digits)
 		x += (digits-l)*24;
 
-	while (*ptr)
-	{
-		if (*ptr == '-')
+	for (char c : str) {
+		if (c = '-')
 			frame = STAT_MINUS;
 		else
-			frame = *ptr -'0';
+			frame = c - '0';
 
-		Sbar_DrawTransPic (x,y,sb_nums[color][frame]);
+		Sbar_DrawTransPic(x, y, sb_nums[color][frame]);
 		x += 24;
-		ptr++;
 	}
+
 }
 
 //=============================================================================
@@ -456,14 +459,14 @@ Sbar_SoloScoreboard
 */
 void Sbar_SoloScoreboard (void)
 {
-	char	str[80];
+	quake::stack_string<80> str;
 	int		minutes, seconds, tens, units;
 	int		l;
 
-	sprintf (str,"Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+	str.assign_print("Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
 	Sbar_DrawString (8, 4, str);
 
-	sprintf (str,"Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
+	str.assign_print("Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
 	Sbar_DrawString (8, 12, str);
 
 // time
@@ -471,12 +474,11 @@ void Sbar_SoloScoreboard (void)
 	seconds = cl.time - 60*minutes;
 	tens = seconds / 10;
 	units = seconds - 10*tens;
-	sprintf (str,"Time :%3i:%i%i", minutes, tens, units);
+	str.assign_print("Time :%3i:%i%i", minutes, tens, units);
 	Sbar_DrawString (184, 4, str);
 
 // draw level name
-	l = strlen (cl.levelname);
-	Sbar_DrawString (232 - l*4, 12, cl.levelname);
+	Sbar_DrawString (232 - cl.levelname.size()*4, 12, cl.levelname);
 }
 
 /*
@@ -546,7 +548,7 @@ Sbar_DrawInventory
 void Sbar_DrawInventory (void)
 {
 	int		i;
-	char	num[6];
+	quake::stack_string<6> num;
 	float	time;
 	int		flashon;
 
@@ -661,7 +663,7 @@ void Sbar_DrawInventory (void)
 // ammo counts
 	for (i=0 ; i<4 ; i++)
 	{
-		sprintf (num, "%3i",cl.stats[STAT_SHELLS+i] );
+		num.assign_print("%3i",cl.stats[STAT_SHELLS+i] );
 		if (num[0] != ' ')
 			Sbar_DrawCharacter ( (6*i+1)*8 - 2, -24, 18 + num[0] - '0');
 		if (num[1] != ' ')
@@ -769,7 +771,7 @@ void Sbar_DrawFrags (void)
 	int				top, bottom;
 	int				x, y, f;
 	int				xofs;
-	char			num[12];
+	quake::stack_string<12> num;
 	scoreboard_t	*s;
 
 	Sbar_SortFrags ();
@@ -802,7 +804,7 @@ void Sbar_DrawFrags (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		num.assign_print( "%3i",f);
 
 		Sbar_DrawCharacter ( (x+1)*8 , -24, num[0]);
 		Sbar_DrawCharacter ( (x+2)*8 , -24, num[1]);
@@ -838,7 +840,7 @@ void Sbar_DrawFace (void)
 	{
 		int				top, bottom;
 		int				xofs;
-		char			num[12];
+		quake::stack_string<12> num;
 		scoreboard_t	*s;
 		
 		s = &cl.scores[cl.viewentity - 1];
@@ -859,7 +861,7 @@ void Sbar_DrawFace (void)
 
 		// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		num.assign_print( "%3i",f);
 
 		if (top==8)
 		{
@@ -1051,30 +1053,28 @@ Sbar_IntermissionNumber
 
 ==================
 */
-void Sbar_IntermissionNumber (int x, int y, int num, int digits, int color)
+void Sbar_IntermissionNumber(int x, int y, int num, int digits, int color)
 {
-	char			str[12];
-	char			*ptr;
+	quake::stack_string<12> str;
 	int				l, frame;
 
-	l = Sbar_itoa (num, str);
-	ptr = str;
-	if (l > digits)
-		ptr += (l-digits);
-	if (l < digits)
-		x += (digits-l)*24;
+	l = Sbar_itoa(num, str);
 
-	while (*ptr)
-	{
-		if (*ptr == '-')
+	if (l > digits)
+		str.erase(str.begin(), str.begin() + (l - digits));
+	if (l < digits)
+		x += (digits - l) * 24;
+
+	for (char c : str) {
+		if (c = '-')
 			frame = STAT_MINUS;
 		else
-			frame = *ptr -'0';
+			frame = c - '0';
 
-		Draw_TransPic (x,y,sb_nums[color][frame]);
+		Draw_TransPic(x, y, sb_nums[color][frame]);
 		x += 24;
-		ptr++;
 	}
+
 }
 
 /*
@@ -1089,7 +1089,7 @@ void Sbar_DeathmatchOverlay (void)
 	int				i, k, l;
 	int				top, bottom;
 	int				x, y, f;
-	char			num[12];
+	quake::stack_string<12> num;
 	scoreboard_t	*s;
 
 	scr_copyeverything = 1;
@@ -1124,7 +1124,7 @@ void Sbar_DeathmatchOverlay (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		num.assign_print( "%3i",f);
 
 		Draw_Character ( x+8 , y, num[0]);
 		Draw_Character ( x+16 , y, num[1]);
@@ -1170,7 +1170,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 	int				i, k, l;
 	int				top, bottom;
 	int				x, y, f;
-	char			num[12];
+	quake::stack_string<12> num;
 	scoreboard_t	*s;
 	int				numlines;
 
@@ -1224,7 +1224,7 @@ void Sbar_MiniDeathmatchOverlay (void)
 
 	// draw number
 		f = s->frags;
-		sprintf (num, "%3i",f);
+		num.assign_print("%3i",f);
 
 		Draw_Character ( x+8 , y, num[0]);
 		Draw_Character ( x+16 , y, num[1]);

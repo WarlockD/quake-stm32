@@ -90,18 +90,20 @@ Host_EndGame
 void Host_EndGame (char *message, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 	
+	string.append("Host_EndGame: ");
 	va_start (argptr,message);
-	vsprintf (string,message,argptr);
+	string.append_vprint( message, argptr);
 	va_end (argptr);
-	Con_DPrintf ("Host_EndGame: %s\n",string);
+	string.push_back('\n');
+	Con_DPrintf (string.c_str());
 	
 	if (sv.active)
 		Host_ShutdownServer (false);
 
 	if (cls.state == ca_dedicated)
-		Sys_Error ("Host_EndGame: %s\n",string);	// dedicated servers exit
+		Sys_Error (string.c_str());	// dedicated servers exit
 	
 	if (cls.demonum != -1)
 		CL_NextDemo ();
@@ -121,7 +123,7 @@ This shuts down both the client and server
 void Host_Error (char *error, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 	static	qboolean inerror = false;
 	
 	if (inerror)
@@ -129,17 +131,18 @@ void Host_Error (char *error, ...)
 	inerror = true;
 	
 	SCR_EndLoadingPlaque ();		// reenable screen updates
-
+	string.assign("Host Error: ");
 	va_start (argptr,error);
-	vsprintf (string,error,argptr);
+	string.append_vprint(error, argptr);
 	va_end (argptr);
-	Con_Printf ("Host_Error: %s\n",string);
-	
+	string.push_back('\n');
+	Con_DPrintf(string.c_str());
+
 	if (sv.active)
 		Host_ShutdownServer (false);
 
 	if (cls.state == ca_dedicated)
-		Sys_Error ("Host_Error: %s\n",string);	// dedicated servers exit
+		Sys_Error (string.c_str());	// dedicated servers exit
 
 	CL_Disconnect ();
 	cls.demonum = -1;
@@ -274,13 +277,13 @@ Sends text across to be displayed
 FIXME: make this just a stuffed echo?
 =================
 */
-void SV_ClientPrintf (char *fmt, ...)
+void SV_ClientPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	string.assign_vprint(fmt, argptr);
 	va_end (argptr);
 	
 	MSG_WriteByte (&host_client->message, svc_print);
@@ -294,14 +297,14 @@ SV_BroadcastPrintf
 Sends text to all active clients
 =================
 */
-void SV_BroadcastPrintf (char *fmt, ...)
+void SV_BroadcastPrintf (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 	int			i;
 	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	string.assign_vprint(fmt,argptr);
 	va_end (argptr);
 	
 	for (i=0 ; i<svs.maxclients ; i++)
@@ -319,13 +322,13 @@ Host_ClientCommands
 Send text over to the client to be executed
 =================
 */
-void Host_ClientCommands (char *fmt, ...)
+void Host_ClientCommands (const char *fmt, ...)
 {
 	va_list		argptr;
-	char		string[1024];
+	quake::stack_string<1024> string;
 	
 	va_start (argptr,fmt);
-	vsprintf (string, fmt,argptr);
+	string.assign_vprint(fmt,argptr);
 	va_end (argptr);
 	
 	MSG_WriteByte (&host_client->message, svc_stufftext);
@@ -407,7 +410,7 @@ void Host_ShutdownServer(qboolean crash)
 	int		i;
 	int		count;
 	sizebuf_t	buf;
-	char		message[4];
+	byte message[4];
 	double	start;
 
 	if (!sv.active)
