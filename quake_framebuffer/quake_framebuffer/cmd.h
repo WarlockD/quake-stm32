@@ -102,10 +102,11 @@ int Cmd_CheckParm (const quake::string_view& parm);
 // Returns the position (1 to argc-1) in the command's argument list
 // where the given parameter apears, or 0 if not present
 
-void Cmd_TokenizeString (quake::string_view text);
+void Cmd_TokenizeString(quake::string_view text);
+bool Cmd_TokenizeString(COM_Parser& parser);
 // Takes a null terminated string.  Does not need to be /n terminated.
 // breaks the string up into arg tokens.
-
+void Cmd_ExecuteArgs(cmd_source_t src);
 void	Cmd_ExecuteString (const quake::string_view& text, cmd_source_t src);
 // Parses a single line of text into arguments and tries to execute it.
 // The text can come from the command buffer, a remote client, or stdin.

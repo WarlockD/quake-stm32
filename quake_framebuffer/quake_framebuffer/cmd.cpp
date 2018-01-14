@@ -85,7 +85,9 @@ void Cbuf_AddText (const quake::string_view& text)
 	}
 
 	SZ_Write(&cmd_text, text.data(), text.size());
+	cmd_text.data[cmd_text.cursize] = '\0';
 }
+
 
 
 /*
@@ -120,6 +122,7 @@ void Cbuf_InsertText (const quake::string_view& text)
 		SZ_Write (&cmd_text, temp, templen);
 		//Z_Free (temp);
 	}
+	cmd_text.data[cmd_text.cursize] = '\0';
 }
 
 /*
@@ -133,11 +136,31 @@ void Cbuf_Execute (void)
 	char	*text;
 	quake::stack_string<1024> line;
 	int		quotes;
+	quake::zstring lines;
+	lines.assign((char *)cmd_text.data, cmd_text.cursize);
+	cmd_text.cursize = 0;
+
 	
-	while (cmd_text.cursize)
-	{
-// find a \n or ; line break
-		text = (char *)cmd_text.data;
+	COM_Parser parser(lines);
+	while (Cmd_TokenizeString(parser)) {
+		Cmd_ExecuteArgs(src_command);
+		Cmd_TokenizeString(parser);
+		if (cmd_wait)
+		{	// skip out while text still remains in buffer, leaving it
+			// for next frame
+			cmd_wait = false;
+			break;
+		}
+	}
+#if 0
+		Cmd_ExecuteString(line, src_command);
+
+		if (cmd_wait)
+		{	// skip out while text still remains in buffer, leaving it
+			// for next frame
+			cmd_wait = false;
+			break;
+		}
 
 		quotes = 0;
 		for (i=0 ; i< cmd_text.cursize ; i++)
@@ -163,19 +186,15 @@ void Cbuf_Execute (void)
 		{
 			i++;
 			cmd_text.cursize -= i;
-			Q_memcpy (text, text+i, cmd_text.cursize);
+			::memmove(text, text+i, cmd_text.cursize);
 		}
 
 // execute the command line
 		Cmd_ExecuteString (line, src_command);
 		
-		if (cmd_wait)
-		{	// skip out while text still remains in buffer, leaving it
-			// for next frame
-			cmd_wait = false;
-			break;
-		}
+	
 	}
+#endif
 }
 
 /*
@@ -456,15 +475,14 @@ Cmd_TokenizeString
 Parses the given string into command line tokens.
 ============
 */
-void Cmd_TokenizeString(quake::string_view  text)
-{
-	COM_Parser parser(text);
+bool Cmd_TokenizeString(COM_Parser& parser) {
 	quake::string_view token;
 	cmd_argc = 0;
 	cmd_args = quake::string_view();
-
-	while (parser.Next(token, true)) {
-		if (token.empty()) break;
+	
+	while (true) {
+		if (!parser.Next(token, true)) return false;
+		if (token.empty()) return false;
 		if (token[0] == '\n')  break;
 		if (cmd_argc == 0)
 			cmd_args = parser.remaining();
@@ -477,7 +495,12 @@ void Cmd_TokenizeString(quake::string_view  text)
 		for (int i = 1; i < cmd_argc; i++) Sys_Printf("(%s)", va(cmd_argv[i]).c_str());
 		Sys_Printf("\n");
 	}
-
+	return true;
+}
+void Cmd_TokenizeString(quake::string_view  text)
+{
+	COM_Parser parser(text);
+	Cmd_TokenizeString(parser);
 }
 
 void Old_Cmd_TokenizeString(quake::string_view  text)
@@ -606,40 +629,44 @@ A complete command line has been parsed, so try to execute it
 FIXME: lookupnoadd the token to speed search?
 ============
 */
-void	Cmd_ExecuteString (const quake::string_view& text, cmd_source_t src)
-{	
+void Cmd_ExecuteArgs(cmd_source_t src) {
 	cmd_function_t	*cmd;
 	cmdalias_t		*a;
 
 	cmd_source = src;
-	Cmd_TokenizeString (text);
-			
-// execute the command line
+
+	// execute the command line
 	if (!Cmd_Argc())
 		return;		// no tokens
 
-// check functions
-	for (cmd=cmd_functions ; cmd ; cmd=cmd->next)
+					// check functions
+	for (cmd = cmd_functions; cmd; cmd = cmd->next)
 	{
-		if (!Q_strcasecmp (cmd_argv[0],cmd->name)) {
-			cmd->function ();
+		if (!Q_strcasecmp(cmd_argv[0], cmd->name)) {
+			cmd->function();
 			return;
 		}
 	}
 
-// check alias
-	for (a=cmd_alias ; a ; a=a->next)
+	// check alias
+	for (a = cmd_alias; a; a = a->next)
 	{
-		if (!Q_strcasecmp (cmd_argv[0], a->name)) {
-			Cbuf_InsertText (a->value);
+		if (!Q_strcasecmp(cmd_argv[0], a->name)) {
+			Cbuf_InsertText(a->value);
 			return;
 		}
 	}
-	
-// check cvars
-	if (!Cvar_Command ())
-		Con_Printf ("Unknown command \"%s\"\n", Cmd_Argv(0));
-	
+
+	// check cvars
+	if (!Cvar_Command())
+		Con_Printf("Unknown command \"%s\"\n", Cmd_Argv(0));
+
+}
+void Cmd_ExecuteString(const quake::string_view& text, cmd_source_t src)
+{
+
+	Cmd_TokenizeString(text);
+	Cmd_ExecuteArgs(src);
 }
 
 
