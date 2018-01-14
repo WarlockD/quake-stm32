@@ -1470,7 +1470,8 @@ void Host_Kick_f (void)
 		quake::stack_string<64> message;
 		if (Cmd_Argc() > 2)
 		{
-			auto parsed = COM_Parse(Cmd_Args());
+			auto parsed = Cmd_Args();
+			while (parsed.front() <= ' ' && !parsed.empty()) parsed.remove_prefix(1);
 			if (byNumber)
 			{
 				parsed.remove_prefix(1); // skip the #

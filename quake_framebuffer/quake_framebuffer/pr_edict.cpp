@@ -22,13 +22,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 
 dprograms_t		*progs;
-quake::array_view<dfunction_t>		pr_functions;
+quake::fixed_managed_array<dfunction_t>		pr_functions;
  char			*					pr_strings;
-quake::array_view<ddef_t>			pr_globaldefs;
-quake::array_view<ddef_t>			pr_fielddefs;
-quake::array_view<dstatement_t>	pr_statements;
+quake::fixed_managed_array<ddef_t>			pr_globaldefs;
+quake::fixed_managed_array<ddef_t>			pr_fielddefs;
+quake::fixed_managed_array<dstatement_t>	pr_statements;
 globalvars_t*	pr_global_struct;
-quake::array_view<float>			pr_globals;			// same as pr_global_struct
+quake::fixed_managed_array<float>			pr_globals;			// same as pr_global_struct
 #if 0
 dfunction_t		*pr_functions;
 char			*pr_strings;
@@ -649,39 +649,32 @@ void ED_WriteGlobals (FILE *f)
 ED_ParseGlobals
 =============
 */
-void ED_ParseGlobals (const quake::string_view& text)
+void ED_ParseGlobals(COM_Parser& parser)
 {
-	quake::string_view data;
-	ddef_t	*key;
+	quake::string_view keyname, value;
+	while (parser.Next(keyname))
+	{
+		if (keyname.empty())
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
-	while (1)
-	{	
-	// parse key
-		data = COM_Parse (data);
-		if (com_token[0] == '}')
+		if (keyname[0] == '}')
 			break;
-		if (data.empty())
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
 
-		auto keyname = com_token;;
+		if (parser.Next(value))
+			Sys_Error("ED_ParseEntity: closing brace without data");
 
-	// parse value	
-		data = COM_Parse (data);
-		if (data.empty())
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
-
-		if (com_token[0] == '}')
-			Sys_Error ("ED_ParseEntity: closing brace without data");
-
-		key = ED_FindGlobal (keyname);
+		if (value[0] == '}')
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
+		auto key = ED_FindGlobal(keyname);
 		if (!key)
 		{
-			Con_Printf ("'%s' is not a global\n", keyname);
+
+			Con_Printf("'%s' is not a global\n", va(keyname));
 			continue;
 		}
 
-		if (!ED_ParseEpair ((void *)&pr_globals[0], key, com_token))
-			Host_Error ("ED_ParseGlobals: parse error");
+		if (!ED_ParseEpair((void *)&pr_globals[0], key, com_token))
+			Host_Error("ED_ParseGlobals: parse error");
 	}
 }
 
@@ -702,9 +695,9 @@ quake::cstring ED_NewString(const quake::string_view& string)
 	new_ptr = (char*)Hunk_Alloc (l);
 	new_p = new_ptr;
 
-	for (i=0 ; i< l ; i++)
+	for (i=0 ; i< string.size(); i++)
 	{
-		if (string[i] == '\\' && i < l-1)
+		if (string[i] == '\\' && i != (string.size()-1))
 		{
 			i++;
 			if (string[i] == 'n')
@@ -715,6 +708,7 @@ quake::cstring ED_NewString(const quake::string_view& string)
 		else
 			*new_p++ = string[i];
 	}
+	*new_p  = '\0';
 	
 	return quake::cstring(new_ptr);
 }
@@ -737,7 +731,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s)
 	void	*d;
 	dfunction_t	*func;
 	
-	d = (void *)((int *)base + key->ofs);
+	d = (void *)(reinterpret_cast<int*>(base) + key->ofs);
 	
 	switch (key->type() & ~DEF_SAVEGLOBAL)
 	{
@@ -794,6 +788,83 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, const quake::string_view& s)
 	return true;
 }
 
+
+edict_t * ED_ParseEdict(COM_Parser& parser, edict_t *ent) {
+	quake::string_view keyname, value;
+	// clear it
+	//if (ent)  std::memset(&ent->v, 0, vm.progs->entityfields * 4);
+	//assert(!vm.is_edict_free(ent)); 		// hack
+
+	// go through all the dictionary pairs
+	// debugging
+	edict_t * init = nullptr;
+
+	// clear it
+	if (ent != sv.edicts)	// hack
+		memset(&ent->v, 0, progs->entityfields * 4);
+
+	while (1)
+	{
+		if (!parser.Next(keyname))
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
+
+		if (keyname[0] == '}') break;
+		// anglehack is to allow QuakeEd to write single scalar angles
+		// and allow them to be turned into vectors. (FIXME...)
+		qboolean anglehack = false;
+
+		if (keyname == "angle") {
+			keyname = "angles";
+			anglehack = true;
+		}
+		// FIXME: change light to _light to get rid of this hack
+		else if (keyname == "light") {
+			keyname = "light_lev"; // hack for single light def
+		}
+		// another hack to fix heynames with trailing spaces
+		// this shouldn't happen with the parser
+		assert(keyname.back() != ' ');
+
+		// parse value	
+		if (!parser.Next(value) || value[0] == '}')
+			Sys_Error("ED_ParseEntity: EOF without closing brace");
+		if (!init) {
+			//	if (ent && !ent->free)
+			init = ent;
+			//	else init = vm.ED_Alloc(false, ent);
+		}
+		// keynames with a leading underscore are used for utility comments,
+		// and are immediately discarded by quake
+		if (keyname.front() == '_')
+			continue;
+
+		auto key = ED_FindField(keyname);
+		if (key == nullptr) {
+
+			Con_Printf("'%s' is not a field\n", va(keyname));
+			continue;
+		}
+
+		if (anglehack)
+		{
+			quake::stack_string<128> buf;
+
+			buf << "0 " << value << " 0";
+			if (!ED_ParseEpair((void *)&ent->v, key, buf.c_str()))
+				Host_Error("ED_ParseEdict: parse error");
+		}
+		else {
+			if (!ED_ParseEpair((void *)&ent->v, key, value))
+				Host_Error("ED_ParseEdict: parse error");
+		}
+		//assert(!init->v.classname.empty());
+	}
+	if (init) {
+		//	loaded_edicts[init->v.classname] = init;
+		return init;
+	}
+	return nullptr;
+}
 /*
 ====================
 ED_ParseEdict
@@ -803,7 +874,7 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
-quake::string_view ED_ParseEdict(quake::string_view data, edict_t *ent)
+quake::string_view Old_ED_ParseEdict(quake::string_view data, edict_t *ent)
 {
 	ddef_t		*key;
 	qboolean	anglehack;
@@ -821,7 +892,7 @@ quake::string_view ED_ParseEdict(quake::string_view data, edict_t *ent)
 	while (1)
 	{
 		// parse key
-		data = COM_Parse(data);
+		//data = COM_Parse(data);
 		if (com_token[0] == '}')
 			break;
 		if (data.empty())
@@ -847,7 +918,7 @@ quake::string_view ED_ParseEdict(quake::string_view data, edict_t *ent)
 
 
 		// parse value	
-		data = COM_Parse(data);
+	//	data = COM_Parse(data);
 		if (data.empty())
 			Sys_Error("ED_ParseEntity: EOF without closing brace");
 
@@ -902,7 +973,84 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
-void ED_LoadFromFile (quake::string_view data)
+void ED_LoadFromFile(quake::string_view data)
+{
+	edict_t		*ent;
+	int			inhibit;
+	dfunction_t	*func;
+	COM_Parser parser(data);
+	quake::string_view token;
+	ent = NULL;
+	inhibit = 0;
+	pr_global_struct->time = sv.time;
+
+	// parse ents
+	while (1)
+	{
+		// parse the opening brace	
+		if (!parser.Next(token, false)) break;
+
+
+		if (token[0] != '{')
+			Sys_Error("ED_LoadFromFile: found %s when expecting {", va(token));
+
+		if (!ent)
+			ent = EDICT_NUM(0);
+		else
+			ent = ED_Alloc();
+		if (!ED_ParseEdict(parser, ent)) continue;
+
+		// remove things from different skill levels or deathmatch
+		if (deathmatch.value)
+		{
+			if (((int)ent->v.spawnflags & SPAWNFLAG_NOT_DEATHMATCH))
+			{
+				ED_Free(ent);
+				inhibit++;
+				continue;
+			}
+		}
+		else if ((current_skill == 0 && ((int)ent->v.spawnflags & SPAWNFLAG_NOT_EASY))
+			|| (current_skill == 1 && ((int)ent->v.spawnflags & SPAWNFLAG_NOT_MEDIUM))
+			|| (current_skill >= 2 && ((int)ent->v.spawnflags & SPAWNFLAG_NOT_HARD)))
+		{
+			ED_Free(ent);
+			inhibit++;
+			continue;
+		}
+
+		//
+		// immediately call spawn function
+		//
+		if (!ent->v.classname)
+		{
+			Con_Printf("No classname for:\n");
+			ED_Print(ent);
+			ED_Free(ent);
+			continue;
+		}
+
+		// look for the spawn function
+		func = ED_FindFunction(pr_strings + ent->v.classname);
+
+		if (!func)
+		{
+			Con_Printf("No spawn function for:\n");
+			ED_Print(ent);
+			ED_Free(ent);
+			continue;
+		}
+
+		pr_global_struct->self = EDICT_TO_PROG(ent);
+		PR_ExecuteProgram(pr_functions.indexof(func));
+	}
+
+	Con_DPrintf("%i entities inhibited\n", inhibit);
+
+}
+
+
+void Old_ED_LoadFromFile (quake::string_view data)
 {	
 	edict_t		*ent;
 	int			inhibit;
@@ -911,12 +1059,12 @@ void ED_LoadFromFile (quake::string_view data)
 	ent = NULL;
 	inhibit = 0;
 	pr_global_struct->time = sv.time;
-	
+
 // parse ents
 	while (1)
 	{
 // parse the opening brace	
-		data = COM_Parse (data);
+		//data = COM_Parse (data);
 		if (data.empty())
 			break;
 		if (com_token[0] != '{')
@@ -926,7 +1074,7 @@ void ED_LoadFromFile (quake::string_view data)
 			ent = EDICT_NUM(0);
 		else
 			ent = ED_Alloc ();
-		data = ED_ParseEdict (data, ent);
+		data = Old_ED_ParseEdict (data, ent);
 
 // remove things from different skill levels or deathmatch
 		if (deathmatch.value)
@@ -1023,7 +1171,7 @@ void PR_LoadProgs (void)
 // byte swap the lumps
 	for (i=0 ; i<progs->numstatements ; i++)
 	{
-		pr_statements[i].op = LittleShort(pr_statements[i].op);
+		pr_statements[i].op = static_cast<OP_CODES>(static_cast<unsigned short>(LittleShort(pr_statements[i].op)));
 		pr_statements[i].a = LittleShort(pr_statements[i].a);
 		pr_statements[i].b = LittleShort(pr_statements[i].b);
 		pr_statements[i].c = LittleShort(pr_statements[i].c);

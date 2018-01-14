@@ -482,11 +482,13 @@ void Con_DrawInput (void)
 	auto& text = key_lines[edit_line];
 	
 // add the cursor frame
-	text[key_linepos] = 10+((int)(realtime*con_cursorspeed)&1);
+	auto start = text.size();
+	text.push_back(10+((int)(realtime*con_cursorspeed)&1));
 	
 // fill out remainder with spaces
-	for (i=key_linepos+1 ; i< con_linewidth ; i++)
-		text[i] = ' ';
+	for (i = key_linepos + 1; i < con_linewidth; i++)
+		text.push_back(' '); // text[i] = ' ';
+		
 		
 //	prestep if horizontally scrolling
 	if (key_linepos >= con_linewidth)
@@ -499,7 +501,8 @@ void Con_DrawInput (void)
 		Draw_Character ( (i+1)<<3, con_vislines - 16, text[i]);
 
 // remove cursor
-	key_lines[edit_line][key_linepos] = 0;
+	text.resize(start);
+	//key_lines[edit_line][key_linepos] = 0;
 }
 
 

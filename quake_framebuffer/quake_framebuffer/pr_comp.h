@@ -39,7 +39,7 @@ enum etype_t  {ev_void, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_
 #define	RESERVED_OFS	28
 
 
-enum {
+enum OP_CODES : unsigned short {
 	OP_DONE,
 	OP_MUL_F,
 	OP_MUL_V,
@@ -120,7 +120,8 @@ enum {
 
 typedef struct statement_s
 {
-	unsigned short	op;
+	//unsigned short	op;
+	OP_CODES op;
 	short	a,b,c;
 } dstatement_t;
 

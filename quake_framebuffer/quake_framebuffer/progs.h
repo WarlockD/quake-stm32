@@ -51,13 +51,13 @@ typedef struct edict_s
 //============================================================================
 
 extern	dprograms_t*		progs;
-extern  quake::array_view<dfunction_t>		pr_functions;
+extern  quake::fixed_managed_array<dfunction_t>		pr_functions;
 extern	char			*					pr_strings;
-extern	quake::array_view<ddef_t>			pr_globaldefs;
-extern	quake::array_view<ddef_t>			pr_fielddefs;
-extern	quake::array_view<dstatement_t>	pr_statements;
+extern	quake::fixed_managed_array<ddef_t>			pr_globaldefs;
+extern	quake::fixed_managed_array<ddef_t>			pr_fielddefs;
+extern	quake::fixed_managed_array<dstatement_t>	pr_statements;
 extern	globalvars_t*	pr_global_struct;
-extern	quake::array_view<float>			pr_globals;			// same as pr_global_struct
+extern	quake::fixed_managed_array<float>			pr_globals;			// same as pr_global_struct
 
 extern	int				pr_edict_size;	// in bytes
 
@@ -78,10 +78,11 @@ quake::cstring ED_NewString (const quake::string_view& string);
 
 void ED_Print (edict_t *ed);
 void ED_Write (FILE *f, edict_t *ed);
-quake::string_view ED_ParseEdict (quake::string_view data, edict_t *ent);
+edict_t * ED_ParseEdict(COM_Parser& parser, edict_t *ent);
+quake::string_view Old_ED_ParseEdict (quake::string_view data, edict_t *ent);
 
 void ED_WriteGlobals (FILE *f);
-void ED_ParseGlobals (const quake::string_view& data);
+void ED_ParseGlobals (COM_Parser& data);
 
 void ED_LoadFromFile (quake::string_view data);
 
@@ -93,7 +94,9 @@ int NUM_FOR_EDICT(edict_t *e);
 
 #define	NEXT_EDICT(e) ((edict_t *)( (byte *)e + pr_edict_size))
 
+//static inline size_t EDICT_TO_PROG(const edict_t* e) { return reinterpret_cast<const byte*>(e) - reinterpret_cast<const byte*>(sv.edicts); }
 #define	EDICT_TO_PROG(e) ((byte *)e - (byte *)sv.edicts)
+//static inline edict_t* PROG_TO_EDICT(size_t e) { return reinterpret_cast<edict_t*>(reinterpret_cast<byte*>(sv.edicts)+e); }
 #define PROG_TO_EDICT(e) ((edict_t *)((byte *)sv.edicts + e))
 
 //============================================================================

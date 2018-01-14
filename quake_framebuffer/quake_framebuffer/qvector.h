@@ -76,6 +76,84 @@ namespace quake {
 	}
 #endif
 	namespace detail {
+
+
+		template <class _Tp>
+		struct __has_iterator_category
+		{
+		private:
+			struct __two { char __lx; char __lxx; };
+			template <class _Up> static __two __test(...);
+			template <class _Up> static char __test(typename _Up::iterator_category* = 0);
+		public:
+			static const bool value = sizeof(__test<_Tp>(0)) == 1;
+		};
+
+		template <class _Iter, bool> struct __iterator_traits_impl {};
+
+		template <class _Iter>
+		struct __iterator_traits_impl<_Iter, true>
+		{
+			typedef typename _Iter::difference_type   difference_type;
+			typedef typename _Iter::value_type        value_type;
+			typedef typename _Iter::pointer           pointer;
+			typedef typename _Iter::reference         reference;
+			typedef typename _Iter::iterator_category iterator_category;
+		};
+		// help from libc
+		template <class _Iter, bool> struct __iterator_traits {};
+
+		template <class _Iter>
+		struct __iterator_traits<_Iter, true>
+			: __iterator_traits_impl
+			<
+			_Iter,
+			std::is_convertible<typename _Iter::iterator_category, std::input_iterator_tag>::value ||
+			std::is_convertible<typename _Iter::iterator_category, std::output_iterator_tag>::value
+			>
+		{};
+
+		// iterator_traits<Iterator> will only have the nested types if Iterator::iterator_category
+		//    exists.  Else iterator_traits<Iterator> will be an empty class.  This is a
+		//    conforming extension which allows some programs to compile and behave as
+		//    the client expects instead of failing at compile time.
+
+		template <class _Iter> struct  iterator_traits : __iterator_traits<_Iter, __has_iterator_category<_Iter>::value> {};
+		template<class _Tp>
+		struct  iterator_traits<_Tp*>
+		{
+			typedef ptrdiff_t difference_type;
+			typedef typename std::remove_cv<_Tp>::type value_type;
+			typedef _Tp* pointer;
+			typedef _Tp& reference;
+			typedef std::random_access_iterator_tag iterator_category;
+		};
+		template <class _Tp, class _Up, bool = __has_iterator_category<iterator_traits<_Tp> >::value>
+		struct __has_iterator_category_convertible_to
+			: public std::integral_constant<bool, std::is_convertible<typename iterator_traits<_Tp>::iterator_category, _Up>::value>
+		{};
+
+
+		template <class _Tp, class _Up>
+		struct __has_iterator_category_convertible_to<_Tp, _Up, false> :  std::false_type {};
+
+		template <class _Tp>
+		struct __is_input_iterator : public __has_iterator_category_convertible_to<_Tp, std::input_iterator_tag> {};
+
+		template <class _Tp>
+		struct __is_forward_iterator : public __has_iterator_category_convertible_to<_Tp, std::forward_iterator_tag> {};
+
+		template <class _Tp>
+		struct __is_bidirectional_iterator : public __has_iterator_category_convertible_to<_Tp, std::bidirectional_iterator_tag> {};
+
+		template <class _Tp>
+		struct __is_random_access_iterator : public __has_iterator_category_convertible_to<_Tp, std::random_access_iterator_tag> {};
+
+		template <class _Tp>
+		struct __is_exactly_input_iterator
+			: public std::integral_constant<bool,
+			__has_iterator_category_convertible_to<_Tp, std::input_iterator_tag>::value &&
+			!__has_iterator_category_convertible_to<_Tp, std::forward_iterator_tag>::value> {};
 		using value_type = char; // quake uses char for all stsrings, not sure if we want to dick with utf8 yet
 		template<typename _CHART, bool IS_CONST = true>
 		struct char_info {
@@ -106,8 +184,10 @@ namespace quake {
 		using const_reverse_iterator = typename _char_info::const_reverse_iterator;
 		using reverse_iterator = typename _char_info::reverse_iterator;
 		static constexpr size_type npos = _char_info::npos;
-		static constexpr inline size_t _str_length(const char* p, size_t s) { return p[s] == '\0' ? s : _str_length(p, s + 1); }
-		static constexpr inline size_t str_length(const char* p) { return _str_length(p, 0); }
+		//static constexpr inline size_t _str_length(const char* p, size_t s) { return p[s] == '\0' ? s : _str_length(p, s + 1); }
+		static constexpr inline size_t str_length(const char* p) { size_t s = 0; while (p[s]) s++; return s; }
+
+		//static inline size_t str_length(const char* p) { return traits_type::length(p); }
 		// const string to lower https://gist.github.com/texus/8d867996e7a073e1498e8c18d920086c/b9e33044c834dfc0a2f34ade344467145870f841
 		static constexpr value_type char_tolower(value_type c) {
 			return traits_type::to_int_type(c) >= traits_type::to_int_type('A') || traits_type::to_int_type(c) >= traits_type::to_int_type('Z') ?
@@ -135,6 +215,225 @@ namespace quake {
 		size_type str_hash(const_pointer first, const_pointer last)noexcept;
 		int str_compare(const_pointer __str1, size_type __n1, const_pointer __str2, size_type __n2)noexcept;
 		int str_case_compare(const_pointer __str1, size_type __n1, const_pointer __str2, size_type __n2)noexcept;
+		// fuck it, copyed form lib c
+
+		// __str_find
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find(const _CharT *__p, _SizeT __sz,
+				_CharT __c, _SizeT __pos) _NOEXCEPT
+		{
+			if (__pos >= __sz)
+				return __npos;
+			const _CharT* __r = _Traits::find(__p + __pos, __sz - __pos, __c);
+			if (__r == 0)
+				return __npos;
+			return static_cast<_SizeT>(__r - __p);
+		}
+
+		template <class _CharT, class _Traits>
+		inline constexpr const _CharT *
+			__search_substring(const _CharT *__first1, const _CharT *__last1,
+				const _CharT *__first2, const _CharT *__last2) {
+			// Take advantage of knowing source and pattern lengths.
+			// Stop short when source is smaller than pattern.
+			const ptrdiff_t __len2 = __last2 - __first2;
+			if (__len2 == 0)
+				return __first1;
+
+			ptrdiff_t __len1 = __last1 - __first1;
+			if (__len1 < __len2)
+				return __last1;
+
+			// First element of __first2 is loop invariant.
+			_CharT __f2 = *__first2;
+			while (true) {
+				__len1 = __last1 - __first1;
+				// Check whether __first1 still has at least __len2 bytes.
+				if (__len1 < __len2)
+					return __last1;
+
+				// Find __f2 the first byte matching in __first1.
+				__first1 = _Traits::find(__first1, __len1 - __len2 + 1, __f2);
+				if (__first1 == 0)
+					return __last1;
+
+				// It is faster to compare from the first byte of __first1 even if we
+				// already know that it matches the first byte of __first2: this is because
+				// __first2 is most likely aligned, as it is user's "pattern" string, and
+				// __first1 + 1 is most likely not aligned, as the match is in the middle of
+				// the string.
+				if (_Traits::compare(__first1, __first2, __len2) == 0)
+					return __first1;
+
+				++__first1;
+			}
+		}
+
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr 
+			__str_find(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			if (__pos > __sz)
+				return __npos;
+
+			if (__n == 0) // There is nothing to search, just return __pos.
+				return __pos;
+
+			const _CharT *__r = __search_substring<_CharT, _Traits>(
+				__p + __pos, __p + __sz, __s, __s + __n);
+
+			if (__r == __p + __sz)
+				return __npos;
+			return static_cast<_SizeT>(__r - __p);
+		}
+
+
+		// __str_rfind
+
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_rfind(const _CharT *__p, _SizeT __sz,
+				_CharT __c, _SizeT __pos) _NOEXCEPT
+		{
+			if (__sz < 1)
+				return __npos;
+			if (__pos < __sz)
+				++__pos;
+			else
+				__pos = __sz;
+			for (const _CharT* __ps = __p + __pos; __ps != __p;)
+			{
+				if (_Traits::eq(*--__ps, __c))
+					return static_cast<_SizeT>(__ps - __p);
+			}
+			return __npos;
+		}
+
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_rfind(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			__pos = _VSTD::min(__pos, __sz);
+			if (__n < __sz - __pos)
+				__pos += __n;
+			else
+				__pos = __sz;
+			const _CharT* __r = _VSTD::__find_end(
+				__p, __p + __pos, __s, __s + __n, _Traits::eq,
+				random_access_iterator_tag(), random_access_iterator_tag());
+			if (__n > 0 && __r == __p + __pos)
+				return __npos;
+			return static_cast<_SizeT>(__r - __p);
+		}
+
+		// __str_find_first_of
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_first_of(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			if (__pos >= __sz || __n == 0)
+				return __npos;
+			const _CharT* __r = _VSTD::__find_first_of_ce
+			(__p + __pos, __p + __sz, __s, __s + __n, _Traits::eq);
+			if (__r == __p + __sz)
+				return __npos;
+			return static_cast<_SizeT>(__r - __p);
+		}
+
+
+		// __str_find_last_of
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_last_of(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			if (__n != 0)
+			{
+				if (__pos < __sz)
+					++__pos;
+				else
+					__pos = __sz;
+				for (const _CharT* __ps = __p + __pos; __ps != __p;)
+				{
+					const _CharT* __r = _Traits::find(__s, __n, *--__ps);
+					if (__r)
+						return static_cast<_SizeT>(__ps - __p);
+				}
+			}
+			return __npos;
+		}
+
+
+		// __str_find_first_not_of
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_first_not_of(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			if (__pos < __sz)
+			{
+				const _CharT* __pe = __p + __sz;
+				for (const _CharT* __ps = __p + __pos; __ps != __pe; ++__ps)
+					if (_Traits::find(__s, __n, *__ps) == 0)
+						return static_cast<_SizeT>(__ps - __p);
+			}
+			return __npos;
+		}
+
+
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_first_not_of(const _CharT *__p, _SizeT __sz,
+				_CharT __c, _SizeT __pos) _NOEXCEPT
+		{
+			if (__pos < __sz)
+			{
+				const _CharT* __pe = __p + __sz;
+				for (const _CharT* __ps = __p + __pos; __ps != __pe; ++__ps)
+					if (!_Traits::eq(*__ps, __c))
+						return static_cast<_SizeT>(__ps - __p);
+			}
+			return __npos;
+		}
+
+
+		// __str_find_last_not_of
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_last_not_of(const _CharT *__p, _SizeT __sz,
+				const _CharT* __s, _SizeT __pos, _SizeT __n) _NOEXCEPT
+		{
+			if (__pos < __sz)
+				++__pos;
+			else
+				__pos = __sz;
+			for (const _CharT* __ps = __p + __pos; __ps != __p;)
+				if (_Traits::find(__s, __n, *--__ps) == 0)
+					return static_cast<_SizeT>(__ps - __p);
+			return __npos;
+		}
+
+
+		template<class _CharT, class _SizeT, class _Traits, _SizeT __npos>
+		inline _SizeT constexpr
+			__str_find_last_not_of(const _CharT *__p, _SizeT __sz,
+				_CharT __c, _SizeT __pos) _NOEXCEPT
+		{
+			if (__pos < __sz)
+				++__pos;
+			else
+				__pos = __sz;
+			for (const _CharT* __ps = __p + __pos; __ps != __p;)
+				if (!_Traits::eq(*--__ps, __c))
+					return static_cast<_SizeT>(__ps - __p);
+			return __npos;
+		}
+
+
 		size_type str_find(const_pointer __str1, size_type __n1, size_type __pos, value_type c)noexcept;
 		size_type str_find(const_pointer __str1, size_type __n1, size_type __pos, const_pointer __str2, size_type __n2)noexcept;
 		size_type str_rfind(const_pointer __str1, size_type __n1, size_type __pos, value_type c) noexcept;
@@ -540,13 +839,12 @@ namespace quake {
 		constexpr inline const_reverse_iterator rend() const { return  reverse_iterator(end() ()); }
 
 		constexpr inline const_reference front() const { return *data(); }
-		constexpr inline const_reference back() const { return  *(data() + size()); }
+		constexpr inline const_reference back() const { return  *(data() + size()-1); }
 
 		constexpr inline const_reference at(size_type pos) const { assert(pos < size()); return *(data() + pos); }
 		constexpr inline const_reference operator[](size_type pos) const { assert(pos < size()); return *(data() + pos); }
 
 		size_type copy(value_type* __str, size_type __n, size_type __pos = 0) const {
-			assert(__pos);
 			const size_type __rlen = std::min(__n, this->size() - __pos);
 			for (auto __begin = this->data() + __pos,
 				__end = __begin + __rlen; __begin != __end;)
@@ -572,56 +870,201 @@ namespace quake {
 		template<typename T>
 		constexpr int compare(const string_helper<T>& __str) const { return compare(0U, size(), __str.data(), __str.size()); }
 		constexpr int compare(const_pointer __str) const { return compare(0U, size(), __str, traits_type::length(__str)); }
-
-
-		constexpr size_type find(value_type c, size_type pos = 0) const noexcept { return detail::str_find(data(), size(), pos, c); }
-		constexpr  inline size_type find(const_pointer p, size_type pos, size_type n) const { return detail::str_find(data(), size(), pos, p, n); }
-
-
-		constexpr size_type find(const_pointer __str, size_type __pos = 0) const noexcept { return this->find(__str, __pos, detail::str_length(__str)); }
-		template<typename T> constexpr size_type find(string_helper<T> __str, size_type __pos = 0) const noexcept { return this->find(__str.data(), __pos, __str.size()); }
-		constexpr size_type rfind(value_type c, size_type pos = npos) const noexcept { return detail::str_rfind(data(), size(), pos, c); }
-		inline size_type	rfind(const_pointer p, size_type pos, size_type n) const { return detail::str_rfind(data(), size(), pos,p, n); }
-		template<typename T> constexpr size_type rfind(string_helper<T> __str, size_type __pos = npos) const noexcept { return this->rfind(__str.data(), __pos, __str.size()); }
-		constexpr size_type rfind(const_pointer __str, size_type __pos = npos) const noexcept { return this->rfind(__str, __pos, detail::str_length(__str)); }
-
-		constexpr size_type find_first_of(const_pointer __str, size_type __pos, size_type __n) const noexcept {
-			return detail::find_first_of(data(), size(),__pos, __str, __n);
+		// find
+		template<typename U> constexpr inline
+			
+			size_type find(const string_helper<U>& __s, size_type __pos = 0) const noexcept
+		{
+			assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find(): received nullptr");
+			return detail::__str_find<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
 		}
 
-		template<typename T> constexpr size_type find_first_of(string_helper<T> __str, size_type __pos = 0) const noexcept { return this->find_first_of(__str.data(), __pos, __str.size()); }
-		constexpr size_type find_first_of(value_type __c, size_type __pos = 0) const noexcept { return this->find(__c, __pos); }
-		constexpr size_type find_first_of(const_pointer __str, size_type __pos = 0) const noexcept { return this->find_first_of(__str, __pos, detail::str_length(__str)); }
-
-		constexpr size_type  find_last_of(const_pointer __str, size_type __pos, size_type __n) const noexcept {
-			return detail::find_last_of(data(), size(), __pos, __str, __n);
+		constexpr inline
+			size_type find(value_type __c, size_type __pos = 0) const _NOEXCEPT
+		{
+			return detail::__str_find<value_type, size_type, traits_type, npos>
+				(data(), size(), __c, __pos);
 		}
 
-		template<typename T> constexpr size_type find_last_of(string_helper<T> __str, size_type __pos = npos) const noexcept { return this->find_last_of(__str.data(), __pos, __str.size()); }
-		constexpr size_type find_last_of(value_type __c, size_type __pos = npos) const noexcept { return this->rfind(__c, __pos); }
-		constexpr size_type find_last_of(const_pointer __str, size_type __pos = npos) const noexcept { return this->find_last_of(__str, __pos, detail::str_length(__str)); }
-
-		constexpr size_type find_first_not_of(const_pointer __str, size_type __pos, size_type __n) const noexcept {
-			return detail::find_first_not_of(data(), size(), __pos, __str, __n);
-		}
-		constexpr size_type find_first_not_of(value_type __c, size_type __pos) const noexcept {
-			return detail::find_first_not_of(data(),__pos, size(),__pos, &c, 1); // should optimize this
+		constexpr inline
+			size_type find(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::find(): received nullptr");
+			return detail::__str_find<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
 		}
 
-		template<typename T> constexpr size_type find_first_not_of(string_helper<T> __str, size_type __pos = 0) const noexcept { return this->find_first_not_of(__str.data(), __pos, __str.size()); }
-		constexpr size_type find_first_not_of(const_pointer __str, size_type __pos = 0) const noexcept { return this->find_first_not_of(__str, __pos, string_info::str_length(__str)); }
-
-
-		constexpr size_type find_last_not_of(const_pointer __str, size_type __pos, size_type __n) const noexcept {
-			return detail::find_last_not_of(data(), size(), __pos, __str, __n);
-		}
-		constexpr size_type find_last_not_of(value_type __c, size_type __pos= npos) const noexcept {
-			return detail::find_last_not_of(data(), __pos, size(), __pos, &c, 1); // should optimize this
+		constexpr inline
+			size_type find(const value_type* __s, size_type __pos = 0) const
+		{
+			assert(__s != nullptr, "string_view::find(): received nullptr");
+			return detail::__str_find<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
 		}
 
-		template<typename T> constexpr size_type find_last_not_of(string_helper<T> __str, size_type __pos = npos) const noexcept { return this->find_last_not_of(__str.data(), __pos, __str.size()); }
-		constexpr size_type find_last_not_of(const_pointer __str, size_type __pos = npos) const noexcept { return this->find_last_not_of(__str, __pos, string_info::str_length(__str)); }
+		// rfind
+		template<typename U>constexpr inline
+			
+			size_type rfind(const string_helper<U>& __s, size_type __pos = npos) const noexcept
+		{
+				assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find(): received nullptr");
+			return detail::__str_rfind<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
+		}
 
+		constexpr inline
+			size_type rfind(value_type __c, size_type __pos = npos) const noexcept
+		{
+			return detail::__str_rfind<value_type, size_type, traits_type, npos>
+				(data(), size(), __c, __pos);
+		}
+
+		constexpr inline
+			size_type rfind(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::rfind(): received nullptr");
+			return detail::__str_rfind<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
+		}
+
+		constexpr inline
+			size_type rfind(const value_type* __s, size_type __pos = npos) const
+		{
+			assert(__s != nullptr, "string_view::rfind(): received nullptr");
+			return detail::__str_rfind<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
+		}
+
+		// find_first_of
+		template<typename U>constexpr inline
+			
+			size_type find_first_of(const string_helper<U>& __s, size_type __pos = 0) const noexcept
+		{
+				assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find_first_of(): received nullptr");
+			return detail::__str_find_first_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
+		}
+
+		constexpr inline
+			size_type find_first_of(value_type __c, size_type __pos = 0) const noexcept
+		{
+			return find(__c, __pos);
+		}
+
+		constexpr inline
+			size_type find_first_of(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::find_first_of(): received nullptr");
+			return detail::__str_find_first_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
+		}
+
+		constexpr inline
+			size_type find_first_of(const value_type* __s, size_type __pos = 0) const
+		{
+			assert(__s != nullptr, "string_view::find_first_of(): received nullptr");
+			returndetail::__str_find_first_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
+		}
+
+		// find_last_of
+		template<typename U>constexpr inline
+			
+			size_type find_last_of(const string_helper<U>& __s, size_type __pos = npos) const noexcept
+		{
+				assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find_last_of(): received nullptr");
+			return detail::__str_find_last_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
+		}
+
+		constexpr inline
+			size_type find_last_of(value_type __c, size_type __pos = npos) const _NOEXCEPT
+		{
+			return rfind(__c, __pos);
+		}
+
+		constexpr inline
+			size_type find_last_of(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::find_last_of(): received nullptr");
+			return detail::__str_find_last_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
+		}
+
+		constexpr inline
+			size_type find_last_of(const value_type* __s, size_type __pos = npos) const
+		{
+			assert(__s != nullptr, "string_view::find_last_of(): received nullptr");
+			return detail::__str_find_last_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
+		}
+
+		// find_first_not_of
+		template<typename U> constexpr inline
+		
+			size_type find_first_not_of(const string_helper<U>& __s, size_type __pos = 0) const noexcept
+		{
+				assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find_first_not_of(): received nullptr");
+			return detail::__str_find_first_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
+		}
+
+		constexpr inline
+			size_type find_first_not_of(value_type __c, size_type __pos = 0) const _NOEXCEPT
+		{
+			return detail::__str_find_first_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __c, __pos);
+		}
+
+		constexpr inline
+			size_type find_first_not_of(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::find_first_not_of(): received nullptr");
+			return detail::__str_find_first_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
+		}
+
+		constexpr inline
+			size_type find_first_not_of(const value_type* __s, size_type __pos = 0) const
+		{
+			assert(__s != nullptr, "string_view::find_first_not_of(): received nullptr");
+			return detail::__str_find_first_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
+		}
+
+		// find_last_not_of
+		template<typename U>constexpr inline
+			
+			size_type find_last_not_of(const string_helper<U>& __s, size_type __pos = npos) const noexcept
+		{
+				assert(__s.size() == 0 || __s.data() != nullptr, "string_view::find_last_not_of(): received nullptr");
+			return detail::__str_find_last_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s.data(), __pos, __s.size());
+		}
+
+		constexpr inline
+			size_type find_last_not_of(value_type __c, size_type __pos = npos) const _NOEXCEPT
+		{
+			return detail::__str_find_last_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __c, __pos);
+		}
+
+		constexpr inline
+			size_type find_last_not_of(const value_type* __s, size_type __pos, size_type __n) const
+		{
+			assert(__n == 0 || __s != nullptr, "string_view::find_last_not_of(): received nullptr");
+			return detail::__str_find_last_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, __n);
+		}
+
+		constexpr inline
+			size_type find_last_not_of(const value_type* __s, size_type __pos = npos) const
+		{
+			assert(__s != nullptr, "string_view::find_last_not_of(): received nullptr");
+			return detail::__str_find_last_not_of<value_type, size_type, traits_type, npos>
+				(data(), size(), __s, __pos, traits_type::length(__s));
+		}
 		constexpr bool is_number() const { return data() != nullptr && size() > 0 && (util::is_char_number(data()[0]) || ((data()[0] == '+' || data()[0] == '-') && is_char_number(data()[1]))); }
 
 		const_iterator to_number(float& v) const {
@@ -700,22 +1143,30 @@ namespace quake {
 		inline reverse_iterator rend() { return  reverse_iterator(end() ()); }
 
 		inline reference front()  { return *data(); }
-		inline reference back()  { return  *(data() + size()); }
+		inline reference back()  { return  *(data() + size()-1); }
 
 		inline reference at(size_type pos) { assert(pos < size()); return *(data() + pos); }
 		inline reference operator[](size_type pos)  { assert(pos < size()); return *(data() + pos); }
 
 		inline const char* c_str() const { return data(); }
 		inline void reserve(size_type s) {
-			if (capacity() < (s + 1))
-				static_cast<_TOP*>(this)->_reserve(s + 1);
+			if (capacity() >= (s + 1)) return;
+			static_cast<_TOP*>(this)->_reserve(s + 1);
 		}
 		inline void resize(size_type s) {
-			reserve(s);
+			reserve(s); // always make sure we have space for the 0
 			static_cast<_TOP*>(this)->_resize(s);
-			*end() = '\0'; // reserve always make sure we have space for this
+			data()[s] = '\0'; // reserve always make sure we have space for this
 		}
-		void clear() { resize(0U); }
+		inline void resize(size_type s, value_type c) {
+			auto old = size();
+			resize(s);
+			if (s > old) std::fill_n(begin() + old, c, s - old);
+		}
+
+		void clear() { 
+			resize(0U); 
+		}
 		// all assigns
 		inline base_type& assign(const_pointer p1, size_t s1) {
 			resize(s1);
@@ -765,9 +1216,16 @@ namespace quake {
 		}
 		// all appeneds
 		inline base_type& append(const_pointer p1, size_t s1) {
-			auto at = end();
+			auto old = size();
+			auto d = data();
+			reserve(s1 + size());
+
+			::memcpy(data() + size(), p1, s1);
 			resize(s1 + size());
-			::memcpy(at, p1, s1);
+			//strncat(data(), p1, s1);
+			//auto at = data() + size();
+			//
+			//::memcpy(at, p1, s1);
 			return top();
 		}
 		inline base_type& append(size_type count, value_type c) {
@@ -849,7 +1307,7 @@ namespace quake {
 		base_type& erase(size_type index = 0, size_type count = npos) {
 			count = std::min(size(), count - index);
 			auto it = erase_hole(begin() + index, count);
-			return *this;
+			return top();
 		}
 		iterator erase(const_iterator position) {
 			auto it = erase_hole(position, 1);
@@ -863,7 +1321,6 @@ namespace quake {
 		void push_back(value_type ch) {
 			resize(size() + 1);
 			back() = ch;
-			
 		}
 		void pop_back() {
 			if (size() > 0) resize(size() - 1);
@@ -917,7 +1374,7 @@ namespace quake {
 				va_copy(apc, va);
 				n = vsnprintf(data(), capacity(), fmt, apc);
 				va_end(apc);
-				assert(n > 0);
+				assert(n >= 0);
 				if (size_t(n) < capacity()) break;
 				reserve(n + 1);
 			} while (true);
@@ -1075,24 +1532,28 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 		// is below to much?
 		constexpr string_view(const_pointer p, size_t s) : _data(p == nullptr || s == 0U ? "" : p), _size(p == nullptr || s == 0U ? 0 : s) {}
 		constexpr string_view(const_pointer p) : string_view(p, detail::str_length(p)) {}
-		constexpr string_view(const_iterator p1, const_iterator p2) : string_view(p1, std::distance(p1,p2)) {}
+		constexpr string_view(const_iterator p1, const_iterator p2) : string_view(p1, std::distance(p1, p2)) {  }
 		template<typename U>
 		constexpr string_view(const string_helper<U>& p) : string_view(p.data(),p.size()) {}
 
 		constexpr const_pointer data() const { return _data; }
 		constexpr size_type size() const { return _size; }
+
 		constexpr inline string_view substr(size_type pos = 0, size_type count = npos) const {
-			assert(pos < size());
-			return string_view(data() + pos, std::min(count, size() - pos));
+			return pos > size()
+				? (std::out_of_range("string_view::substr"), string_view())
+				: string_view(data() + pos, std::min(count, size() - pos));
 		}
+
+		
 		constexpr void remove_prefix(size_type n)  {
-			assert(n < size());
+			assert(n <= size());
 			_size -= n;
 			_data += n;
 		}
 		//template<typename U = base_type>
 		constexpr void remove_suffix(size_type n)  {
-			assert(n < size());
+			assert(n <= size());
 			_size -= n;
 		}
 	private:
@@ -1150,7 +1611,13 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 		constexpr zstring(const_pointer str) : _data(const_cast<char*>(str)), _size(detail::str_length(str)), _capacity(0U) { }
 		template<typename U>
 		constexpr zstring(const string_helper<U>& p) : _data(const_cast<char*>(p.data())), _size(p.size()), _capacity(0U) {}
+		constexpr zstring(const zstring& copy) : _data(copy._data), _size(copy._size), _capacity(0U) {}
+		constexpr zstring(zstring&& move) : _data(move._data), _size(move._size), _capacity(move._capacity) { move._capacity = 0U; }
+		constexpr zstring& operator=(const zstring& copy) { _data = copy._data; _size = copy._size; _capacity = 0U; return *this; }
+		constexpr zstring& operator=(zstring&& move) { _data = move._data; _size = move._size; _capacity = move._capacity; move._capacity = 0U; return *this; }
 
+
+		~zstring();
 		inline constexpr const_pointer data() const { return _data; }
 		pointer data() { 
 			if (_capacity == 0U && _data)  // we turn it into live data in this case
@@ -1158,7 +1625,7 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 			return _data; 
 		}
 		inline constexpr size_type size() const { return _size; }
-		inline inline constexpr size_type capacity() const { return _capacity; }
+		inline constexpr size_type capacity() const { return _capacity; }
 		const char* c_str() const { return _data; }
 
 	};
@@ -1223,16 +1690,21 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 	// static vector
 	// mainly for debug, but we can also use it for hulk
 	// cannot be resized
-	template <typename T>
+	template <typename _TOP, typename T>
 	class array_view {
+	protected:
+
+		const _TOP& top() const { return *static_cast<const _TOP*>(this); }
 	public:
+		using base_type = _TOP;
 		using value_type = T;
 		using  size_type = size_t;
 		using diffrence_type = ptrdiff_t;
-		using pointer = value_type*;
-		using const_pointer = const pointer;
-		using reference = value_type&;
-		using const_reference = const pointer;
+		using const_pointer = const value_type*;
+		using pointer = const_pointer;
+		using const_reference = const value_type&;
+		using reference = const_reference;
+
 		using iterator = pointer;
 		using const_iterator = const_pointer;
 		using reverse_iterator = std::reverse_iterator<iterator>;
@@ -1250,54 +1722,45 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 		inline array		operator* (initlist_t v) const { array result; for (size_type i = 0; i < N; ++i) result[i] = _v[i] * v.begin()[i]; return result; }
 		inline array		operator/ (initlist_t v) const { array result; for (size_type i = 0; i < N; ++i) result[i] = _v[i] / v.begin()[i]; return result; }
 #endif
-		inline void manage(void * ptr, size_t element_count) {
-			_data = reinterpret_cast<pointer>(ptr);
-			_size = element_count;
-		}
-		inline					array_view() : _data(nullptr), _size(0U) {}
-		inline					array_view(void* data, size_t element_count) : _data(reinterpret_cast<pointer>(data)), _size(element_count) {}
+		inline constexpr const_pointer data() const { return top().data(); }
+		inline constexpr size_type size() const { return top().size(); }
 
-		inline					array_view(const array_view& copy) : _data(copy._data), _size(copy._size) {} // not sure if this is a good idea
-		inline					array_view(array_view&& move) : _data(move._data), _size(move._size) { move._data = nullptr; move._size = 0U; } 
-
-		inline iterator		begin(void) { return _data; }
-		inline iterator		end(void) { return begin() + _size; }
-		inline reference		at(size_type i) { return _data[i]; }
-		inline reference		operator[] (size_type i) { return _data[i]; }
-		inline constexpr const_iterator	begin(void) const { return _data; }
-		inline constexpr const_iterator	end(void) const { return begin() + _size; }
-
-		inline constexpr size_type		size(void) const { return _size; }
-		inline constexpr size_type		max_size(void) const { return _size(); }
+		inline constexpr const_iterator	begin(void) const { return data(); }
+		inline constexpr const_iterator	end(void) const { return begin() + size(); }
 		inline constexpr bool		empty(void) const { return size() == 0; }
-		inline constexpr const_reference	at(size_type i) const { return _data[i]; }
-		inline constexpr const_reference	operator[] (size_type i) const { return _data[i]; }
-		inline void			fill(const_reference v) { std::fill(begin(), end(), v); }
-		inline void			swap(array_view& v) {
-			if (std::addressof(v) != this) { std::swap(_data, v._data); std::swap(_size, v._size); }
-		}
+		inline constexpr const_reference	at(size_type i) const { assert(i < size()); return data()[i]; }
+		inline constexpr const_reference	operator[] (size_type i) const { assert(i < size());  return data()[i]; }
+
 		inline size_type indexof(const_iterator it) const {
 			return (it >= begin() && it < end()) ? std::distance(begin(),it): npos;
 		}
-	protected:
-		T*	_data;
-		size_type _size;
 	};
-	template <typename T>
-	class array_buidler : public array_view<T> {
+	// this is like view, except we can assign data
+	// however, we cannot expand the array
+	template <typename _TOP, typename T>
+	class array_link : public array_view<_TOP,T> {
 	public:
-		using base_type = array_view<T>;
-		inline array_buidler() : base_type(), _capacity(0U) {}
-		inline array_buidler(void* data, size_type capacity, size_type element_count) : base_type(data, element_count), _capacity(capacity) {}
-		inline array_buidler(const array_buidler& copy) : base_type(copy), _capacity(copy._capacity) {} // not sure if this is a good idea
-		inline array_buidler(const base_type& copy) : base_type(copy), _capacity(copy.size()) {}
-		inline array_buidler(array_buidler&& move) : base_type(move), _capacity(move._capacity) { }
+		_TOP & top() { return *static_cast<_TOP*>(this); }
+	public:
+		using pointer = value_type *;
+		using reference = value_type &;
+		using iterator = pointer;
+		using reverse_iterator = std::reverse_iterator<iterator>;
 
-		inline size_type capacity() const { return _capacity; }
-		inline void manage(void * ptr, size_type element_count) {
-			_capacity = element_count;
-			base_type::manage(ptr, element_count);
-		}
+		inline  pointer data()  { return top().data(); }
+
+		inline iterator	begin(void)  { return data(); }
+		inline iterator	end(void)  { return begin() + size(); }
+		inline reference	at(size_type i)  { assert(i < size()); return data()[i]; }
+		inline reference	operator[] (size_type i)  { assert(i < size());  return data()[i]; }
+	};
+
+	template <typename _TOP, typename T>
+	class array_buidler : public array_link<_TOP,T> {
+	public:
+
+		inline constexpr  size_type capacity() const { return top().capacity(); }
+
 		inline void resize_uninitialized(size_type i) {
 			assert(i < capacity());
 			_size = i;
@@ -1323,11 +1786,26 @@ inline type name (const string_helper<U>& str, size_t* idx = nullptr) \
 		}
 		void pop_back() { if (size() != 0) { std::destroy_at(end()); --_size; } }
 
-	public:
-		size_type _capacity;
 	};
 
+	template<typename T>
+	class fixed_managed_array : public array_link<fixed_managed_array<T>,T> {
+	public:
 
+		inline constexpr const_pointer data() const { return _data; }
+		inline constexpr pointer data()  { return _data; }
+		inline constexpr  size_type size() const { return _size; }
+
+		fixed_managed_array() : _data(nullptr), _size(0U) {}
+		fixed_managed_array(void * ptr, size_t element_count) : _data(reinterpret_cast<pointer>(ptr)), _size(element_count) {}
+		inline void manage(void * ptr, size_type element_count) {
+			_size = element_count;
+			_data = reinterpret_cast<pointer>(ptr);
+		}
+	public:
+		pointer _data;
+		size_type _size;
+	};
 	template <typename T, size_t _CAPACITY>
 	class stack_array   {
 	public:

@@ -1359,20 +1359,18 @@ void M_Menu_Keys_f (void)
 void M_FindKeysForCommand (const char *command, int *twokeys)
 {
 	int		count;
-	int		j;
-	int		l;
-	char	*b;
+
 
 	twokeys[0] = twokeys[1] = -1;
-	l = strlen(command);
+	size_t l = strlen(command);
 	count = 0;
 
-	for (j=0 ; j<256 ; j++)
+	for (size_t j =0 ; j<256 ; j++)
 	{
-		b = keybindings[j];
-		if (!b)
+		auto& b = keybindings[j];
+		if (b.empty())
 			continue;
-		if (!strncmp (b, command, l) )
+		if (b[0] == command[0])
 		{
 			twokeys[count] = j;
 			count++;
@@ -1384,18 +1382,14 @@ void M_FindKeysForCommand (const char *command, int *twokeys)
 
 void M_UnbindCommand (const char *command)
 {
-	int		j;
-	int		l;
-	char	*b;
+	size_t l = strlen(command);
 
-	l = strlen(command);
-
-	for (j=0 ; j<256 ; j++)
+	for (size_t j=0 ; j<256 ; j++)
 	{
-		b = keybindings[j];
-		if (!b)
+		auto& b = keybindings[j];
+		if (b.empty())
 			continue;
-		if (!strncmp (b, command, l) )
+		if (b[0] == command[0])
 			Key_SetBinding (j, "");
 	}
 }

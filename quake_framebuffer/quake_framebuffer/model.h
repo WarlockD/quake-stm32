@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "modelgen.h"
 #include "spritegn.h"
-
+#include "qvector.h"
 /*
 
 d*_t structures are on-disk representations
@@ -299,7 +299,7 @@ typedef enum {mod_brush, mod_sprite, mod_alias} modtype_t;
 
 typedef struct model_s
 {
-	char		name[MAX_QPATH];
+	quake::stack_string<MAX_QPATH>		name;
 	qboolean	needload;		// bmodels and sprites don't cache normally
 
 	modtype_t	type;

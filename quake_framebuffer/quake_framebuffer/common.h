@@ -37,14 +37,71 @@ typedef bool qboolean;
 
 //============================================================================
 
-typedef struct sizebuf_s
+struct sizebuf_t
 {
 	qboolean	allowoverflow;	// if false, do a Sys_Error
 	qboolean	overflowed;		// set to true if the buffer size failed
-	byte	*data;
+	byte * data;
 	int		maxsize;
 	int		cursize;
-} sizebuf_t;
+	void push_back(byte c) { *get_space(1) = c; }
+	void alloc(size_t s);
+	void free();
+	void manage(void* d, size_t s) { data = reinterpret_cast<byte*>(d); maxsize = s; }
+	void write(const void* data, size_t length);
+	void write(const char* str);
+
+
+	size_t size() const { return cursize; }
+	void clear() { cursize = 0; }
+
+private:
+	byte * get_space(size_t s);
+	
+} ;
+
+
+template <typename T, typename Container = vector<T> >
+class queue {
+public:
+	typedef T			value_type;
+	typedef Container		container_type;
+	typedef typename container_type::size_type size_type;
+	typedef typename container_type::difference_type difference_type;
+	typedef value_type&		reference;
+	typedef const value_type&	const_reference;
+public:
+	inline			queue(void) : _storage(), _front(0) { }
+	explicit inline		queue(const container_type& s) : _storage(s), _front(0) { }
+	explicit inline		queue(const queue& s) : _storage(s._storage), _front(0) { }
+	inline size_type		size(void) const { return _storage.size() - _front; }
+	inline bool			empty(void) const { return !size(); }
+	inline reference		front(void) { return _storage[_front]; }
+	inline const_reference	front(void) const { return _storage[_front]; }
+	inline reference		back(void) { return _storage.back(); }
+	inline const_reference	back(void) const { return _storage.back(); }
+	inline void			push(const_reference v) { _storage.push_back(v); }
+	void			pop(void) {
+		if (++_front > _storage.size() / 2) {
+			_storage.erase(_storage.begin(), _front);
+			_front = 0;
+		}
+	}
+	inline void			swap(queue& v) { _storage.swap(v); swap(_front, v._front); }
+	inline bool			operator== (const queue& s) const { return _storage == s._storage && _front == s._front; }
+	inline bool			operator< (const queue& s) const { return size() < s.size(); }
+#if HAVE_CPP11
+	inline			queue(queue&& v) : _storage(move(v._storage)), _front(v._front) { v._front = 0; }
+	inline			queue(container_type&& s) : _storage(move(s)), _front(0) {}
+	inline queue&		operator= (queue&& v) { swap(v); return *this; }
+	template <typename... Args>
+	inline void			emplace(Args&&... args) { _storage.emplace_back(forward<Args>(args)...); }
+#endif
+private:
+	container_type		_storage;	///< Where the data actually is.
+	size_type			_front;	///< Index of the element returned by next pop.
+};
+
 
 void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
@@ -148,13 +205,9 @@ void MSG_WriteLong(sizebuf_t *sb, T c) {
 
 void MSG_WriteFloat (sizebuf_t *sb, float f);
 void MSG_WriteString (sizebuf_t *sb, const char *s);
+void MSG_WriteString(sizebuf_t *sb, const char *s, size_t length);
 template<typename U>
-void MSG_WriteString(sizebuf_t *sb, const quake::string_helper<U>& s) {
-	if (!s.empty()) {
-		SZ_Write(sb, s.data(), s.size());
-	}
-	SZ_Write(sb, "", 1);
-}
+inline void MSG_WriteString(sizebuf_t *sb, const quake::string_helper<U>& s) { MSG_WriteString(sb, s.data(),s.size()); }
 void MSG_WriteCoord (sizebuf_t *sb, float f);
 void MSG_WriteAngle (sizebuf_t *sb, float f);
 
@@ -245,7 +298,7 @@ int Q_sprintf(char(&buffer)[N], const char* fmt, ...) {
 extern	quake::string_view		com_token;
 extern	qboolean	com_eof;
 
-quake::string_view COM_Parse (const quake::string_view& data);
+quake::string_view Old_COM_Parse (const quake::string_view& data);
 
 
 extern	int		com_argc;
@@ -296,12 +349,16 @@ FIXME: make this buffer size safe someday
 */
 // silly hack till streams work
 class va {
-	char _string[1024];
+	constexpr static size_t va_size = 1024;
+	char _string[va_size];
 	size_t _size;
 public:
 	va() : _string{ 0 }, _size{ 0 } {}
 	va(const char* fmt, ...);
+	template<typename U>
+	va(const quake::string_helper<U>& s) : _size(s.size()) { assert(s.size() < va_size   - 1); ::memcpy(_string,s.data(),s.size()); _string[s.size()] = '\0'; }
 	operator const char*() const { return _string; }
+	const char* c_str() const { return _string; }
 	operator quake::string_view() const { return quake::string_view(_string, _size); }
 	size_t size() const { return _size; }
 	va& operator+=(const char* s) { strcat_s(_string, s); return *this; }
@@ -327,6 +384,25 @@ byte *COM_LoadStackFile (const char * path, void *buffer, int bufsize);
 byte *COM_LoadTempFile (const char * path);
 byte *COM_LoadHunkFile (const char * path);
 void COM_LoadCacheFile (const char * path, struct cache_user_s *cu);
+
+
+
+// parser
+class COM_Parser {
+public:
+	COM_Parser() : _data(""), _state(0) {}
+	COM_Parser(const quake::string_view & data) : _data(data), _pos(0), _state(0) {}
+	bool Next(quake::string_view& token, bool test_eol = false);
+	operator const quake::string_view&() const { return _data; }
+	size_t pos() const { return _pos; }
+	quake::string_view remaining() const { return _data.substr(_pos); }
+protected:
+	int _state;
+	size_t _pos;
+	quake::string_view _data;
+};
+
+
 
 
 extern	struct cvar_s	registered;

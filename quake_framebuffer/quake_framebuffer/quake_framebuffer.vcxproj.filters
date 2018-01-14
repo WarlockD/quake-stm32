@@ -16,6 +16,9 @@
     <Filter Include="quake">
       <UniqueIdentifier>{7cc5796c-8e56-40f7-a606-f732f7ba8e4e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="glad">
+      <UniqueIdentifier>{0efe111b-04c2-40a8-bb41-78faf50329ac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cd_null.cpp">

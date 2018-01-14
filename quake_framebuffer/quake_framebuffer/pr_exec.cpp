@@ -388,9 +388,10 @@ while (1)
 	s++;	// next statement
 
 	st = &pr_statements[s];
-	a = (eval_t *)&pr_globals[st->a];
-	b = (eval_t *)&pr_globals[st->b];
-	c = (eval_t *)&pr_globals[st->c];
+	// we can have some negitive values on if statments
+	if(st->a >= 0) a = (eval_t *)&pr_globals[st->a];
+	if(st->b >= 0) b = (eval_t *)&pr_globals[st->b];
+	if(st->c >= 0) c = (eval_t *)&pr_globals[st->c];
 	
 	if (!--runaway)
 		PR_RunError ("runaway loop error");

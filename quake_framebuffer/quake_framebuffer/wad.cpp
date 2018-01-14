@@ -93,7 +93,9 @@ void W_LoadWadFile (const char *filename)
 	{
 		lump_p->filepos = LittleLong(lump_p->filepos);
 		lump_p->size = LittleLong(lump_p->size);
-		W_CleanupName (lump_p->name, lump_p->name);
+
+		std::transform(std::begin(lump_p->name), std::end(lump_p->name), std::begin(lump_p->name), ::tolower);
+
 		if (lump_p->type == TYP_QPIC)
 			SwapPic ( (qpic_t *)(wad_base + lump_p->filepos));
 	}
@@ -111,7 +113,9 @@ lumpinfo_t	*W_GetLumpinfo (const quake::string_view& name)
 	lumpinfo_t	*lump_p;
 	quake::stack_string<16> clean;
 	
-	W_CleanupName (name, clean);
+
+	std::transform(name.begin(), name.end(), std::back_inserter(clean), ::tolower);
+
 	
 	for (lump_p=wad_lumps, i=0 ; i<wad_numlumps ; i++,lump_p++)
 	{

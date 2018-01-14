@@ -10,9 +10,40 @@
       </ArrayItems>
     </Expand>
   </Type>
+
+  <Type Name="sizebuf_t" Inheritable="true">
+    <DisplayString >{data,[cursize]}</DisplayString>
+    <Expand>
+      <Item Name="[allowoverflow]" ExcludeView="simple">allowoverflow</Item>
+      <Item Name="[overflowed]" ExcludeView="simple">overflowed</Item>
+      <Item Name="[maxsize]" ExcludeView="simple">maxsize</Item>
+      <Item Name="[cursize]" ExcludeView="simple">cursize</Item>
+      <ArrayItems>
+        <Size>cursize</Size>
+        <ValuePointer>data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+    <!-- [ size={_size}] {_data,[_size]s8}</DisplayString> -->
+  </Type>
+
+
+
+
+
+  
   <Type Name="quake::string_view" Inheritable="true">
+    <Intrinsic Name="size" Expression="_size" />
+    <Intrinsic Name="data" Expression="_data" />
     <DisplayString Condition="_size == 0">empty</DisplayString>
-    <DisplayString Condition="_size > 0">[ size={_size}] {_data,[_size]s8}</DisplayString>
+    <DisplayString Condition="_size > 0">{_data,[_size]}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>data()</ValuePointer>
+      </ArrayItems>
+    </Expand>
+    <!-- [ size={_size}] {_data,[_size]s8}</DisplayString> -->
   </Type>
   
 </AutoVisualizer>

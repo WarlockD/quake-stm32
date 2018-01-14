@@ -39,7 +39,7 @@ keydest_t	key_dest;
 
 int		key_count;			// incremented every key event
 
-char	*keybindings[256];
+quake::zstring keybindings[256];
 qboolean	consolekeys[256];	// if true, can't be rebound while in console
 qboolean	menubound[256];	// if true, can't be rebound while in menu
 int		keyshift[256];		// key to map to if shift held down in console
@@ -394,16 +394,7 @@ void Key_SetBinding (int keynum, const quake::string_view&binding)
 		return;
 
 // free old bindings
-	if (keybindings[keynum])
-	{
-		Z_Free (keybindings[keynum]);
-		keybindings[keynum] = NULL;
-	}
-			
-// allocate memory for new binding
-	new_ptr = (char*)Z_Malloc (binding.size()+1);
-	new_ptr[binding.copy(new_ptr, binding.size())] = '\0';
-	keybindings[keynum] = new_ptr;
+	keybindings[keynum].assign(binding);
 }
 
 /*
@@ -436,9 +427,9 @@ void Key_Unbindall_f (void)
 {
 	int		i;
 	
-	for (i=0 ; i<256 ; i++)
-		if (keybindings[i])
-			Key_SetBinding (i, "");
+	for (i = 0; i < 256; i++)
+		if (!keybindings[i].empty()) 
+			keybindings[i].clear();
 }
 
 
@@ -469,7 +460,7 @@ void Key_Bind_f (void)
 	if (c == 2)
 	{
 		cmd << '"' << Cmd_Argv(1) << '"';
-		if (keybindings[b])
+		if (!keybindings[b].empty())
 			cmd << '"' << keybindings[b] << '"' << '\n';
 		else
 			cmd <<" is not bound\n";
@@ -500,9 +491,8 @@ void Key_WriteBindings (FILE *f)
 	int		i;
 
 	for (i=0 ; i<256 ; i++)
-		if (keybindings[i])
-			if (*keybindings[i])
-				fprintf (f, "bind \"%s\" \"%s\"\n", Key_KeynumToString(i), keybindings[i]);
+		if (!keybindings[i].empty())
+				fprintf (f, "bind \"%s\" \"%s\"\n", Key_KeynumToString(i), keybindings[i].c_str());
 }
 
 
@@ -591,7 +581,6 @@ Should NOT be called during an interrupt!
 */
 void Key_Event (int key, qboolean down)
 {
-	char	*kb;
 	quake::stack_string<1024> cmd;
 
 	keydown[key] = down;
@@ -615,7 +604,7 @@ void Key_Event (int key, qboolean down)
 			return;	// ignore most autorepeats
 		}
 			
-		if (key >= 200 && !keybindings[key])
+		if (key >= 200 && keybindings[key].empty())
 			Con_Printf ("%s is unbound, hit F4 to set.\n", Key_KeynumToString (key) );
 	}
 
@@ -656,18 +645,18 @@ void Key_Event (int key, qboolean down)
 //
 	if (!down)
 	{
-		kb = keybindings[key];
-		if (kb && kb[0] == '+')
+		auto& kb = keybindings[key];
+		if (!kb.empty() && kb[0] == '+')
 		{
-			cmd.assign_print( "-%s %i\n", kb+1, key);
+			cmd.assign_print( "-%s %i\n", kb.c_str() +1, key);
 			Cbuf_AddText (cmd);
 		}
 		if (keyshift[key] != key)
 		{
 			kb = keybindings[keyshift[key]];
-			if (kb && kb[0] == '+')
+			if (!kb.empty() && kb[0] == '+')
 			{
-				cmd.assign_print("-%s %i\n", kb+1, key);
+				cmd.assign_print("-%s %i\n", kb.c_str()+1, key);
 				Cbuf_AddText (cmd);
 			}
 		}
@@ -690,12 +679,12 @@ void Key_Event (int key, qboolean down)
 	|| (key_dest == key_console && !consolekeys[key])
 	|| (key_dest == key_game && ( !con_forcedup || !consolekeys[key] ) ) )
 	{
-		kb = keybindings[key];
-		if (kb)
+		auto& kb = keybindings[key];
+		if (!kb.empty())
 		{
 			if (kb[0] == '+')
 			{	// button commands add keynum as a parm
-				cmd.assign_print("%s %i\n", kb, key);
+				cmd.assign_print("%s %i\n", kb.c_str(), key);
 				Cbuf_AddText (cmd);
 			}
 			else

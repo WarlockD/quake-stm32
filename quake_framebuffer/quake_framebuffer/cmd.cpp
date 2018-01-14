@@ -458,25 +458,50 @@ Parses the given string into command line tokens.
 */
 void Cmd_TokenizeString(quake::string_view  text)
 {
-	int		i;
+	COM_Parser parser(text);
+	quake::string_view token;
+	cmd_argc = 0;
+	cmd_args = quake::string_view();
+
+	while (parser.Next(token, true)) {
+		if (token.empty()) break;
+		if (token[0] == '\n')  break;
+		if (cmd_argc == 0)
+			cmd_args = parser.remaining();
+		if (cmd_argc < MAX_ARGS)
+			cmd_argv[cmd_argc++] = token;
+
+	};
+	if (cmd_argc > 0 && cmd_argv[0] == "name") {
+		Sys_Printf("TOKEN (%s:%i) :", va(cmd_argv[0]).c_str(), cmd_argc);
+		for (int i = 1; i < cmd_argc; i++) Sys_Printf("(%s)", va(cmd_argv[i]).c_str());
+		Sys_Printf("\n");
+	}
+
+}
+
+void Old_Cmd_TokenizeString(quake::string_view  text)
+{
+	
 
 	// clear the args from the last string
 	//for (i = 0; i < cmd_argc; i++)
 	//	Z_Free(cmd_argv[i]);
-
+	
 	cmd_argc = 0;
 	cmd_args = quake::string_view();
 
 	while (1)
 	{
 		// skip whitespace up to a /n
-		while (!text.empty() && text.front() <= ' ' && text.front() != '\n')
-			text.remove_prefix(1); // works, optimize latter?
+		size_t		pos = 0;
+		while (pos < text.size() && text[pos] <= ' ' && text[pos] != '\n') pos++;
 
+		text.remove_prefix(pos); // works, optimize latter?
 
 		if (text.front() == '\n')
 		{	// a newline seperates commands in the buffer
-			text.remove_prefix(1); // works, optimize latter?
+			text.remove_prefix(1); 
 			break; // how is this diffrent than below
 		}
 
@@ -486,8 +511,8 @@ void Cmd_TokenizeString(quake::string_view  text)
 		if (cmd_argc == 1)
 			cmd_args = text;
 
-		text = COM_Parse(text);
-		if (text.empty())
+		//text = COM_Parse(text);
+		if (text.empty() && com_token.empty())
 			return;
 
 		if (cmd_argc < MAX_ARGS)

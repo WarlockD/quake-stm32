@@ -67,18 +67,14 @@ extern	lumpinfo_t	*wad_lumps;
 extern	byte		*wad_base;
 
 void	W_LoadWadFile (const char *filename);
-
+#if 0
 template<typename U1, typename U2>
-void W_CleanupName(const quake::string_helper<U1>& in, quake::string_builder<U2>& out)
-{
-	int		i;
-	int		c;
+void W_CleanupName(const quake::string_helper<U1>& in, quake::string_builder<U2>& out) {
 	assert(out.capacity() >= 16);
-	for (i = 0; i < 16; i++)
+	for (int i = 0; i < in.size(); i++)
 	{
-		c = in[i];
-		if (!c)
-			break;
+		int c = in[i];
+		if (!c) break;
 
 		if (c >= 'A' && c <= 'Z')
 			c += ('a' - 'A');
@@ -87,16 +83,12 @@ void W_CleanupName(const quake::string_helper<U1>& in, quake::string_builder<U2>
 }
 
 template<size_t U1, size_t U2>
-void W_CleanupName(const char (&in)[U1], char(&out)[U2])
-{
-	int		i;
-	int		c;
-	assert(U1 > 15 && U2 > 15);
-	for (i = 0; i < 16; i++)
+void W_CleanupName(const char (&in)[U1], char(&out)[U2]) {
+	assert(U2 >= U1);
+	for (size_t i = 0; i < U1; i++)
 	{
-		c = in[i];
-		if (!c)
-			break;
+		int c = in[i];
+		if (!c) break;
 
 		if (c >= 'A' && c <= 'Z')
 			c += ('a' - 'A');
@@ -104,6 +96,8 @@ void W_CleanupName(const char (&in)[U1], char(&out)[U2])
 	}
 	out[i] = '\0';
 }
+#endif
+
 lumpinfo_t	*W_GetLumpinfo (const quake::string_view& name);
 void	*W_GetLumpName (const quake::string_view& name);
 void	*W_GetLumpNum (int num);

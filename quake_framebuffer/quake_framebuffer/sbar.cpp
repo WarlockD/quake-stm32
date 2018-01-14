@@ -324,7 +324,7 @@ int Sbar_itoa (int num,  quake::string_builder<U>& buf)
 {
 	int		pow10;
 	int		dig;
-	auto start = buf.end();
+	auto start = buf.size();
 	if (num < 0)
 	{
 		buf.push_back('-');
@@ -342,7 +342,7 @@ int Sbar_itoa (int num,  quake::string_builder<U>& buf)
 		num -= dig*pow10;
 	} while (pow10 != 1);
 
-	return start -buf.begin();
+	return buf.size() - start;
 }
 
 

@@ -219,7 +219,7 @@ model_t *Mod_FindName (const quake::string_view& name)
 		}
 		else
 			mod_numknown++;
-		mod->name[name.copy(mod->name)] = '\0';
+		mod->name = name;
 		mod->needload = NL_NEEDS_LOADED;
 	}
 
@@ -278,7 +278,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // load the file
 //
-	buf = (unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
+	buf = (unsigned *)COM_LoadStackFile (mod->name.c_str(), stackbuf, sizeof(stackbuf));
 	if (!buf)
 	{
 		if (crash)
@@ -1208,10 +1208,10 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 		if (i < mod->numsubmodels-1)
 		{	// duplicate the basic information
 			name.clear();
-			name << (i + 1);
+			name << '*' << (i + 1);
 			loadmodel = Mod_FindName (name);
 			*loadmodel = *mod;
-			Q_strcpy (loadmodel->name, name);
+			loadmodel->name = name;
 			mod = loadmodel;
 		}
 	}

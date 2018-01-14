@@ -253,7 +253,7 @@ void CL_ParseServerInfo (void)
 	for (nummodels=1 ; ; nummodels++)
 	{
 		str = MSG_ReadString ();
-		if (!str[0])
+		if (str.empty())
 			break;
 		if (nummodels==MAX_MODELS)
 		{
@@ -269,7 +269,7 @@ void CL_ParseServerInfo (void)
 	for (numsounds=1 ; ; numsounds++)
 	{
 		str = MSG_ReadString ();
-		if (!str[0])
+		if (str.empty())
 			break;
 		if (numsounds==MAX_SOUNDS)
 		{
@@ -289,7 +289,7 @@ void CL_ParseServerInfo (void)
 		cl.model_precache[i] = Mod_ForName (model_precache[i], false);
 		if (cl.model_precache[i] == NULL)
 		{
-			Con_Printf("Model %s not found\n", model_precache[i]);
+			Con_Printf("Model %s not found\n", va(model_precache[i]).c_str());
 			return;
 		}
 		CL_KeepaliveMessage ();

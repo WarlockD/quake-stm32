@@ -609,7 +609,12 @@ void MSG_WriteString (sizebuf_t *sb, const char *s)
 	else
 		SZ_Write (sb, s, Q_strlen(s)+1);
 }
+void MSG_WriteString(sizebuf_t *sb, const char *s, size_t length) {
+	if (!s || length == 0) 
+		SZ_Write(sb, s, length);
 
+	MSG_WriteChar(sb, 0);	
+}
 void MSG_WriteCoord (sizebuf_t *sb, float f)
 {
 	MSG_WriteShort (sb, (int)(f*8));
@@ -738,7 +743,7 @@ quake::cstring MSG_ReadString (void)
 		l++;
 	} while (l < string.capacity());
 	
-	return string;
+	return string.c_str();
 }
 
 float MSG_ReadCoord (void)
@@ -755,6 +760,40 @@ float MSG_ReadAngle (void)
 
 //===========================================================================
 
+
+
+byte * sizebuf_t::get_space(size_t length) {
+	if (cursize + length > maxsize)
+	{
+		if (!allowoverflow)
+			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
+
+		if (length > maxsize)
+			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
+
+		overflowed = true;
+		Con_Printf("SZ_GetSpace: overflow");
+		clear();
+	}
+
+	byte * data = data + cursize;
+	cursize += length;
+
+	return data;
+}
+void sizebuf_t::alloc(size_t startsize) {
+	if (startsize < 256)
+		startsize = 256;
+	data = (byte*)Hunk_AllocName(startsize, "sizebuf");
+	maxsize = startsize;
+	cursize = 0;
+}
+void sizebuf_t::free() {
+	//      Z_Free (buf->data);
+	//      buf->data = NULL;
+	//      buf->maxsize = 0;
+	cursize = 0;
+}
 void SZ_Alloc (sizebuf_t *buf, int startsize)
 {
 	if (startsize < 256)
@@ -800,7 +839,16 @@ void *SZ_GetSpace (sizebuf_t *buf, int length)
 	
 	return data;
 }
-
+void sizebuf_t::write(const void* data, size_t length) {
+	::memcpy(get_space(length), data, length);
+}
+void sizebuf_t::write(const char* str) {
+	size_t len = ::strlen(str)+1;
+	if (data[cursize - 1])
+		::memcpy(get_space(len), data, len); // no trailing 0
+	else
+		::memcpy(get_space(len - 1) - 1, data, len); // write over trailing 0
+}
 void SZ_Write (sizebuf_t *buf, const void *data, int length)
 {
 	Q_memcpy (SZ_GetSpace(buf,length),data,length);         
@@ -869,16 +917,154 @@ COM_Parse
 Parse a token out of a string
 ==============
 */
-quake::string_view COM_Parse(const quake::string_view& text) {
+/*
+==============
+COM_Parse
+
+Parse a token out of a string
+==============
+*/
+enum class  Action {
+	Accept,		// accept the charater of the token
+	Goto,		// hard goto.  mainly for skipping charaters
+	Halt,		// finished with all the tokens
+	Restart,	// discard last accepts
+	Error
+};
+struct Entry { Action action; int next; int arg; };
+
+// state tables
+
+#define STATE_TABLE 0
+#define ACTION_TABLE 1
+#define LOOKUP_TABLE 2
+#define START 0
+#define RETURN -1
+#define GOTO(N)		{ Action::Goto, (N), 0 }
+#define ACCEPT(N) { Action::Accept, (N), 0  }
+#define RESTART(N) { Action::Restart, (N), 0  }
+#define HALT(N, C) { Action::Halt, N, ((int)(C))  }
+#define HALT0(C) HALT(0,C)
+#define ERROR(N, C) { Action::Error,  N, ((int)(C))  }
+#define ERROR0(C) ERROR(0,C)
+enum class Class {
+	Error = 0,
+	Symbol,
+	Eof,
+	NewLine,
+	Whitespace,
+	String,
+	Comment,
+	Discard
+};
+//http://hackingoff.com/compilers/scanner-generator
+static constexpr const Entry lex_table_accept_eol[][7] = {
+	//   S				"						/						eof					'\n'				    Other
+	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),			ACCEPT(7),		ACCEPT(6) },
+	// symbol state
+{ ACCEPT(1),	HALT(0,Class::Symbol),	ACCEPT(1),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+// string state
+{ ACCEPT(2),	GOTO(3),				ACCEPT(2), 			ERROR0('"'),			ACCEPT(2),		ACCEPT(2) },
+{ HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String) },
+// comment
+{ ACCEPT(1),	ERROR0('"'),			ACCEPT(5),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+{ ACCEPT(5),	ACCEPT(5),				ACCEPT(5),			RESTART(0),				RESTART(0),		ACCEPT(5), },
+// whitespace
+{ RESTART(0),	RESTART(0),				RESTART(0),			 	RESTART(0),			RESTART(0),				ACCEPT(6), },
+// new line
+{ HALT0(Class::NewLine),	HALT0(Class::NewLine),	  HALT0(Class::NewLine),			HALT0(Class::NewLine),		HALT0(Class::NewLine),	HALT0(Class::NewLine) },
+};
+static constexpr const Entry lex_table_ignore_eol[][7] = {
+	//   S				"						/						eof					'\n'				    Other
+	{ ACCEPT(1),	GOTO(2),				ACCEPT(4),			HALT0(Class::Eof),			ACCEPT(7),				ACCEPT(6) },
+	// symbol state
+{ ACCEPT(1),	HALT(0,Class::Symbol),	ACCEPT(1),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+// string state
+{ ACCEPT(2),	GOTO(3),				ACCEPT(2), 			ERROR0('"'),			ACCEPT(2),		ACCEPT(2) },
+{ HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String), HALT0(Class::String) },
+// comment
+{ ACCEPT(1),	ERROR0('"'),			ACCEPT(5),			HALT0(Class::Symbol),	HALT0(Class::Symbol),	HALT0(Class::Symbol) },
+{ ACCEPT(5),	ACCEPT(5),				ACCEPT(5),			RESTART(0),				RESTART(0),		ACCEPT(5), },
+// whitespace
+{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				ACCEPT(6), },
+// new line
+{ RESTART(0),	RESTART(0),				RESTART(0),			RESTART(0),			RESTART(0),				RESTART(0), },
+};
+static quake::string_view eol_token("\n");
+
+
+// switched to more state based
+bool COM_Parser::Next(quake::string_view& token, bool test_eol) {
+	token = quake::string_view();
+	while (_pos >= _data.size()) return false;
+	size_t start = _pos;
+	size_t len = 0;
+	int current_read;
+	bool buffered = false;
+	const auto& lex_table = test_eol ? lex_table_accept_eol : lex_table_ignore_eol;
+	while (1) {
+		//    @label_codes = {"a"=>0, "\""=>1, "/"=>2, "0"=>3, "c"=>4, "b"=>5, :other=>6}
+		// I could built a 256 charater table for this, but seriously, for this few tokens?
+		int ch = _pos < _data.size() ? _data[_pos] : -1;
+
+		switch (ch) { // get the charater class
+		case '"': current_read = 1; break;
+		case '/': current_read = 2; break;
+		case '\0':
+		case -1: current_read = 3; break;
+		case '\n': case ';': current_read = 4; break;
+		default:
+			current_read = ch > 32 ? 0 : 5;
+			break;
+		}
+		const Entry& action = lex_table[_state][current_read];
+		_state = action.next;
+
+		switch (action.action) {
+		case Action::Accept:
+			if (len++ == 0)
+				start = _pos;
+		case Action::Goto:
+			++_pos;
+			break;
+		case Action::Restart:
+			len = 0;
+			break;
+		case Action::Halt:
+			switch ((Class)action.arg) {
+			case Class::Eof:
+				return false;
+			case Class::NewLine:
+				token = eol_token;
+				break;
+			default:
+			//	assert(_pos > start && len > 0); // pops on an empty string
+				assert(_pos > start); // we should only return stuff if we have a token
+				token = len > 0 ? _data.substr(start, len) : quake::string_view(); // incase of ""
+				break;
+
+			}
+			return true;
+		default:
+			assert(0);
+			break; // error ugh
+
+		}
+	};
+	return false; // compiler meh
+}
+
+
+
+
+quake::string_view Old_COM_Parse(const quake::string_view& text) {
 	if (text.empty()) return quake::string_view();
 	com_token = quake::string_view();
 	size_t pos = 0;
 	//size_t len = 0;
 	int c;
 	// skip // comments and whitespace
-	while (true) {
-		if (pos == text.size())
-			return quake::string_view();;                    // end of file;
+	while (pos < text.size()) {
 		c = text[pos];
 		if (c == '/' && text[pos + 1] == '/') {
 			while (pos < text.size() && text[pos] != '\n') pos++;
@@ -887,16 +1073,19 @@ quake::string_view COM_Parse(const quake::string_view& text) {
 		if (c > ' ') break;
 		pos++;
 	};
+	if (pos == text.size())
+		return quake::string_view();;                    // end of file;
 
 	// handle quoted strings specially
 	if (c == '\"') {
-		++pos;
+		size_t qutoe = ++pos;
 		while (true) {
 			c = text[pos++];
 			if (c == '\"' || pos == text.size())
 			{
-				com_token = text.substr(0, pos);
-				return text.substr(pos);
+				com_token = text.substr(qutoe, pos- qutoe-1);
+				auto ret = text.substr(pos);
+				return ret;
 			}
 			//	len++;
 		}
@@ -910,12 +1099,12 @@ quake::string_view COM_Parse(const quake::string_view& text) {
 	}
 
 	// parse a regular word
-	do {
-		++pos;
+	while(pos < text.size()) {
 		c = text[pos];
-		if (c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':')
+		if (c == '{' || c == '}' || c == ')' || c == '(' || c == '\'' || c == ':' || c <= ' ')
 			break;
-	} while (c > 32);
+		++pos;
+	} ;
 
 	com_token = text.substr(0, pos);
 	return text.substr(pos);

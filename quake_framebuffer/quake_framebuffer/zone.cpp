@@ -290,7 +290,7 @@ typedef struct
 {
 	int		sentinal;
 	size_t		size;		// including sizeof(hunk_t), -1 = not allocated
-	quake::stack_string<8+1> name;
+	char name[8];
 } hunk_t;
 
 byte	*hunk_base;
@@ -442,7 +442,8 @@ void *Hunk_AllocName (int size, const quake::string_view& name)
 	
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	h->name = name;
+	::memcpy(h->name, name.data(), std::min(sizeof(h->name), name.size()));
+
 	
 	return (void *)(h+1);
 }
@@ -533,7 +534,7 @@ void *Hunk_HighAllocName (size_t size, const quake::string_view& name)
 	memset (h, 0, size);
 	h->size = size;
 	h->sentinal = HUNK_SENTINAL;
-	h->name = name;
+	::memcpy(h->name, name.data(), std::min(sizeof(h->name), name.size()));
 
 	return (void *)(h+1);
 }

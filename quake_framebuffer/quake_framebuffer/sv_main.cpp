@@ -1157,7 +1157,7 @@ void SV_SpawnServer (const char *server)
 	ent = EDICT_NUM(0);
 	Q_memset (&ent->v, 0, progs->entityfields * 4);
 	ent->free = false;
-	ent->v.model = sv.worldmodel->name - pr_strings;
+	ent->v.model = sv.worldmodel->name.c_str() - pr_strings;
 	ent->v.modelindex = 1;		// world model
 	ent->v.solid = SOLID_BSP;
 	ent->v.movetype = MOVETYPE_PUSH;

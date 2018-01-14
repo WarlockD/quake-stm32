@@ -114,16 +114,25 @@ namespace quake {
 			return { end, std::error_code() };
 		}
 	}
+	zstring::~zstring() {
+		if (_capacity) {
+			Z_Free(_data);
+			_capacity = 0U;
+		}
+	}
 
 	void zstring::_reserve(size_t s) {
 		if (s <= _capacity) return;
 		pointer newBlock = nullptr;
-		if (_capacity == 0U && _data && _size) { // if we have exsiting const data
-			string_view sv = *this; // save it
-			_capacity = std::min(s, _size + 1);
-			_size = 0; // clear the size
-			_data = (pointer)Z_Malloc(std::min(s, _size +1)); // alloc fresh data
-			assign(sv); // then assign it with the old const data
+		if (_capacity == 0U) { // if we have exsiting const data
+			_capacity = std::max(_size, s);
+			pointer old = _size == 0U ? nullptr : _data;
+			_data = (pointer)Z_Malloc(_capacity); // alloc fresh data
+			if (_size) {
+				string_view sv = *this; // save it
+				_size = 0;
+				assign(sv); // then assign it with the old const data
+			}
 		}
 		else {
 			// otherwise just reallocate
