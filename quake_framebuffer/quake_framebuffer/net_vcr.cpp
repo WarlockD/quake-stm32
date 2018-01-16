@@ -88,9 +88,11 @@ int VCR_GetMessage (qsocket_t *sock)
 		VCR_ReadNext ();
 		return ret;
 	}
-
-	Sys_FileRead(vcrFile, &net_message.cursize, sizeof(int));
-	Sys_FileRead(vcrFile, net_message.data, net_message.cursize);
+	net_message.clear();
+	int file_size;
+	Sys_FileRead(vcrFile, &file_size, sizeof(int));
+	net_message.resize(file_size);
+	Sys_FileRead(vcrFile, net_message.data(), file_size);
 
 	VCR_ReadNext ();
 

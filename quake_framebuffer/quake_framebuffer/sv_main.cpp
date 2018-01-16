@@ -81,7 +81,7 @@ void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count)
 {
 	int		i, v;
 
-	if (sv.datagram.cursize > MAX_DATAGRAM-16)
+	if (sv.datagram.size() > MAX_DATAGRAM-16)
 		return;	
 	MSG_WriteByte (&sv.datagram, svc_particle);
 	MSG_WriteCoord (&sv.datagram, org[0]);
@@ -132,7 +132,7 @@ void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
 	if (channel < 0 || channel > 7)
 		Sys_Error ("SV_StartSound: channel = %i", channel);
 
-	if (sv.datagram.cursize > MAX_DATAGRAM-16)
+	if (sv.datagram.size() > MAX_DATAGRAM-16)
 		return;	
 
 // find precache number for sound
@@ -269,9 +269,8 @@ void SV_ConnectClient (int clientnum)
 	client->active = true;
 	client->spawned = false;
 	client->edict = ent;
-	client->message.data = client->msgbuf;
-	client->message.maxsize = sizeof(client->msgbuf);
-	client->message.allowoverflow = true;		// we can catch it
+	client->message = sizebuf_t(client->msgbuf, true);// we can catch it
+
 
 #ifdef IDGODS
 	client->privileged = IsID(&client->netconnection->addr);
@@ -462,7 +461,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 				continue;		// not visible
 		}
 
-		if (msg->maxsize - msg->cursize < 16)
+		if (msg->capacity() - msg->size() < 16)
 		{
 			Con_Printf ("packet overflow\n");
 			return;
@@ -720,11 +719,8 @@ SV_SendClientDatagram
 qboolean SV_SendClientDatagram (client_t *client)
 {
 	byte		buf[MAX_DATAGRAM];
-	sizebuf_t	msg;
+	sizebuf_t	msg(buf);
 	
-	msg.data = buf;
-	msg.maxsize = sizeof(buf);
-	msg.cursize = 0;
 
 	MSG_WriteByte (&msg, svc_time);
 	MSG_WriteFloat (&msg, static_cast<float>(sv.time));
@@ -735,8 +731,9 @@ qboolean SV_SendClientDatagram (client_t *client)
 	SV_WriteEntitiesToClient (client->edict, &msg);
 
 // copy the server datagram if there is space
-	if (msg.cursize + sv.datagram.cursize < msg.maxsize)
-		SZ_Write (&msg, sv.datagram.data, sv.datagram.cursize);
+	if (msg.size() + sv.datagram.size() < msg.capacity())
+		msg.write(sv.datagram); // no clear?
+	//	SZ_Write (&msg, sv.datagram.data, sv.datagram.cursize);
 
 // send the datagram
 	if (NET_SendUnreliableMessage (client->netconnection, &msg) == -1)
@@ -780,7 +777,7 @@ void SV_UpdateToReliableMessages (void)
 	{
 		if (!client->active)
 			continue;
-		SZ_Write (&client->message, sv.reliable_datagram.data, sv.reliable_datagram.cursize);
+		client->message.write(sv.reliable_datagram); 
 	}
 
 	SZ_Clear (&sv.reliable_datagram);
@@ -797,12 +794,9 @@ message buffer
 */
 void SV_SendNop (client_t *client)
 {
-	sizebuf_t	msg;
-	byte		buf[4];
 	
-	msg.data = buf;
-	msg.maxsize = sizeof(buf);
-	msg.cursize = 0;
+	byte		buf[4];
+	sizebuf_t	msg(buf);
 
 	MSG_WriteChar (&msg, svc_nop);
 
@@ -852,14 +846,14 @@ void SV_SendClientMessages (void)
 		// check for an overflowed message.  Should only happen
 		// on a very fucked up connection that backs up a lot, then
 		// changes level
-		if (host_client->message.overflowed)
+		if (host_client->message.overflowed())
 		{
 			SV_DropClient (true);
-			host_client->message.overflowed = false;
+			host_client->message.reset_overflowed();
 			continue;
 		}
 			
-		if (host_client->message.cursize || host_client->dropasap)
+		if (host_client->message.size() || host_client->dropasap)
 		{
 			if (!NET_CanSendMessage (host_client->netconnection))
 			{
@@ -985,11 +979,7 @@ Tell all the clients that the server is changing levels
 void SV_SendReconnect (void)
 {
 	byte	data[128];
-	sizebuf_t	msg;
-
-	msg.data = data;
-	msg.cursize = 0;
-	msg.maxsize = sizeof(data);
+	sizebuf_t	msg(data);
 
 	MSG_WriteChar (&msg, svc_stufftext);
 	MSG_WriteString (&msg, "reconnect\n");
@@ -1100,17 +1090,10 @@ void SV_SpawnServer (const char *server)
 	
 	sv.edicts = (decltype(sv.edicts))Hunk_AllocName (sv.max_edicts*pr_edict_size, "edicts");
 
-	sv.datagram.maxsize = sizeof(sv.datagram_buf);
-	sv.datagram.cursize = 0;
-	sv.datagram.data = sv.datagram_buf;
-	
-	sv.reliable_datagram.maxsize = sizeof(sv.reliable_datagram_buf);
-	sv.reliable_datagram.cursize = 0;
-	sv.reliable_datagram.data = sv.reliable_datagram_buf;
-	
-	sv.signon.maxsize = sizeof(sv.signon_buf);
-	sv.signon.cursize = 0;
-	sv.signon.data = sv.signon_buf;
+	sv.datagram = sizebuf_t(sv.datagram_buf);
+	sv.reliable_datagram = sizebuf_t(sv.reliable_datagram_buf);
+	sv.signon = sizebuf_t(sv.signon_buf);
+
 	
 // leave slots at start for clients only
 	sv.num_edicts = svs.maxclients+1;

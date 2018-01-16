@@ -155,13 +155,14 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 {
 	byte *buffer;
 	int  *bufferLength;
+	size_t data_size = data->size();
 
 	if (!sock->driverdata)
 		return -1;
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
-	if ((*bufferLength + data->cursize + 4) > NET_MAXMESSAGE)
+	if ((*bufferLength + data->size() + 4) > NET_MAXMESSAGE)
 		Sys_Error("Loop_SendMessage: overflow\n");
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
@@ -170,15 +171,16 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 	*buffer++ = 1;
 
 	// length
-	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
+	*buffer++ = data_size & 0xff;
+	*buffer++ = data_size >> 8;
 
 	// align
 	buffer++;
 
 	// message
-	Q_memcpy(buffer, data->data, data->cursize);
-	*bufferLength = IntAlign(*bufferLength + data->cursize + 4);
+
+	data->write(buffer, data_size);
+	*bufferLength = IntAlign(*bufferLength + data_size + 4);
 
 	sock->canSend = false;
 	return 1;
@@ -189,13 +191,14 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 {
 	byte *buffer;
 	int  *bufferLength;
+	size_t data_size = data->size();
 
 	if (!sock->driverdata)
 		return -1;
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
-	if ((*bufferLength + data->cursize + sizeof(byte) + sizeof(short)) > NET_MAXMESSAGE)
+	if ((*bufferLength + data_size + sizeof(byte) + sizeof(short)) > NET_MAXMESSAGE)
 		return 0;
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
@@ -204,15 +207,16 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 	*buffer++ = 2;
 
 	// length
-	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
+	*buffer++ = data_size & 0xff;
+	*buffer++ = data_size >> 8;
 
 	// align
 	buffer++;
 
 	// message
-	Q_memcpy(buffer, data->data, data->cursize);
-	*bufferLength = IntAlign(*bufferLength + data->cursize + 4);
+
+	data->write(buffer, data_size);
+	*bufferLength = IntAlign(*bufferLength + data_size + 4);
 	return 1;
 }
 

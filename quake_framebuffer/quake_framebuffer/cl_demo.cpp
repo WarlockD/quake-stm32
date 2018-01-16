@@ -69,14 +69,15 @@ void CL_WriteDemoMessage (void)
 	int		i;
 	float	f;
 
-	len = LittleLong (net_message.cursize);
+	len = LittleLong (net_message.size());
 	fwrite (&len, 4, 1, cls.demofile);
 	for (i=0 ; i<3 ; i++)
 	{
 		f = LittleFloat (cl.viewangles[i]);
 		fwrite (&f, 4, 1, cls.demofile);
 	}
-	fwrite (net_message.data, net_message.cursize, 1, cls.demofile);
+	 
+	fwrite (net_message.data(),net_message.size(), 1, cls.demofile);
 	fflush (cls.demofile);
 }
 
@@ -114,7 +115,10 @@ int CL_GetMessage (void)
 		}
 		
 	// get the next message
-		fread (&net_message.cursize, 4, 1, cls.demofile);
+		int message_size;
+		fread (&message_size, 4, 1, cls.demofile);
+		net_message.resize(LittleLong(message_size));
+
 		VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
 		for (i=0 ; i<3 ; i++)
 		{
@@ -122,10 +126,9 @@ int CL_GetMessage (void)
 			cl.mviewangles[0][i] = LittleFloat (f);
 		}
 		
-		net_message.cursize = LittleLong (net_message.cursize);
-		if (net_message.cursize > MAX_MSGLEN)
+		if (net_message.size() > MAX_MSGLEN)
 			Sys_Error ("Demo message > MAX_MSGLEN");
-		r = fread (net_message.data, net_message.cursize, 1, cls.demofile);
+		r = fread (net_message.data(), net_message.size(), 1, cls.demofile);
 		if (r != 1)
 		{
 			CL_StopPlayback ();
@@ -143,7 +146,7 @@ int CL_GetMessage (void)
 			return r;
 	
 	// discard nop keepalive message
-		if (net_message.cursize == 1 && net_message.data[0] == svc_nop)
+		if (net_message.size() == 1 && net_message[0] == svc_nop)
 			Con_Printf ("<-- server to client keepalive\n");
 		else
 			break;

@@ -769,6 +769,10 @@ void R_ScanEdges (void)
 		R_DrawCulledPolys ();
 	else
 		D_DrawSurfaces ();
+
+
+	// do a force update here to see if we are overwriting the screen for some reason
+
 }
 
 

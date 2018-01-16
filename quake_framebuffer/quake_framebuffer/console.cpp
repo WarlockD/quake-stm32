@@ -192,6 +192,7 @@ void Con_CheckResize (void)
 
 		for (i=0 ; i<numlines ; i++)
 		{
+
 			for (j=0 ; j<numchars ; j++)
 			{
 				con_text[(con_totallines - 1 - i) * con_linewidth + j] =

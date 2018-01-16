@@ -36,89 +36,163 @@ typedef uint8_t 		byte;
 typedef bool qboolean;
 
 //============================================================================
-
+// https://stackoverflow.com/questions/21245256/implement-circular-buffer-to-write-read-arbitrary-amount-of-data-in-a-single-cal
 struct sizebuf_t
 {
-	qboolean	allowoverflow;	// if false, do a Sys_Error
-	qboolean	overflowed;		// set to true if the buffer size failed
-	byte * data;
-	int		maxsize;
-	int		cursize;
-	void push_back(byte c) { *get_space(1) = c; }
-	void alloc(size_t s);
-	void free();
-	void manage(void* d, size_t s) { data = reinterpret_cast<byte*>(d); maxsize = s; }
-	void write(const void* data, size_t length);
-	void write(const char* str);
+	using size_type = size_t;
+	using difference_type = ptrdiff_t;
+	using pointer = byte*;
+	using refrence = byte&;
+	using const_pointer = const byte * ;
+	using const_refrence = const byte & ;
+	using iterator = pointer;
+	using const_iterator = const_pointer;
 
-
-	size_t size() const { return cursize; }
-	void clear() { cursize = 0; }
-
-private:
-	byte * get_space(size_t s);
+	sizebuf_t(bool allowoverflow = false, bool overflowed = false);
+	sizebuf_t(void* data, size_type size, bool allowoverflow = false, bool overflowed = false);
+	template<typename T, size_t N>
+	sizebuf_t(T(&data)[N], bool allowoverflow = false, bool overflowed = false) : sizebuf_t(data,N,allowoverflow,overflowed) {}
+	size_t capacity() const { return _capacity; }
+	size_t size() const { return _size; }
 	
-} ;
+	void clear() { _readcount=_size = 0U; }
+	void reset_read() { _readcount = 0; }
+	void manage(void* d, size_t s) { _data = reinterpret_cast<byte*>(d); _capacity = s; clear(); }
 
-
-template <typename T, typename Container = vector<T> >
-class queue {
-public:
-	typedef T			value_type;
-	typedef Container		container_type;
-	typedef typename container_type::size_type size_type;
-	typedef typename container_type::difference_type difference_type;
-	typedef value_type&		reference;
-	typedef const value_type&	const_reference;
-public:
-	inline			queue(void) : _storage(), _front(0) { }
-	explicit inline		queue(const container_type& s) : _storage(s), _front(0) { }
-	explicit inline		queue(const queue& s) : _storage(s._storage), _front(0) { }
-	inline size_type		size(void) const { return _storage.size() - _front; }
-	inline bool			empty(void) const { return !size(); }
-	inline reference		front(void) { return _storage[_front]; }
-	inline const_reference	front(void) const { return _storage[_front]; }
-	inline reference		back(void) { return _storage.back(); }
-	inline const_reference	back(void) const { return _storage.back(); }
-	inline void			push(const_reference v) { _storage.push_back(v); }
-	void			pop(void) {
-		if (++_front > _storage.size() / 2) {
-			_storage.erase(_storage.begin(), _front);
-			_front = 0;
-		}
+	void push_back(byte c) { assert(_size + 1 < _capacity); _data[_size++] = c; }
+	void pop_back() { assert(_size); --_size; }
+	void insert(const void* data, size_t size, size_t pos = 0);
+	size_t read_count() const { return _readcount; }
+	template<typename ITR>
+	inline iterator	insert(const_iterator ip, ITR i1, ITR i2) {
+		assert(i1 <= i2);
+		iterator d = insert_hole(ip, std::distance(i1, i2));
+		std::uninitialized_copy(i1, i2, d);
+		return d;
 	}
-	inline void			swap(queue& v) { _storage.swap(v); swap(_front, v._front); }
-	inline bool			operator== (const queue& s) const { return _storage == s._storage && _front == s._front; }
-	inline bool			operator< (const queue& s) const { return size() < s.size(); }
-#if HAVE_CPP11
-	inline			queue(queue&& v) : _storage(move(v._storage)), _front(v._front) { v._front = 0; }
-	inline			queue(container_type&& s) : _storage(move(s)), _front(0) {}
-	inline queue&		operator= (queue&& v) { swap(v); return *this; }
-	template <typename... Args>
-	inline void			emplace(Args&&... args) { _storage.emplace_back(forward<Args>(args)...); }
+	/// Removes \p count elements at offset \p ep.
+	iterator erase(const_iterator ep, size_type n)
+	{
+		iterator d = const_cast<iterator>(ep);
+#ifdef _DEBUG
+		// only used to check string after an erase
+		std::memset(d, 0, n);
 #endif
+		return iterator(erase_hole(iterator(d), n));
+	}
+
+	/// Removes elements from \p ep1 to \p ep2.
+	iterator erase(const_iterator ep1, const_iterator ep2)
+	{
+		assert(ep1 <= ep2);
+		return erase(ep1, std::distance(ep1, ep2));
+	}
+
+
+	iterator erase(size_t pos = 0, size_t count = 0);
+	size_t write(const void* data, size_t length);
+	size_t write(const sizebuf_t& buf);
+	size_t read(void* data, size_t length);
+	size_t read(sizebuf_t& buf);
+	int get() {
+		if (_readcount >= size()) return -1; 
+		return _data[_readcount++];
+	}
+	int peek() {
+		if (_readcount >= size()) return -1;
+		return _data[_readcount];
+	}
+	template<typename T>
+	typename std::enable_if<std::is_arithmetic<T>::value,bool>::type
+		read_value(T& v) {
+		return read(std::addressof(v), sizeof(T)) == sizeof(T);
+	}
+	template<typename T>
+	typename std::enable_if<std::is_arithmetic<T>::value, bool>::type
+		write_value(const T& v) {
+		return write(std::addressof(v), sizeof(T)) == sizeof(T);
+	}
+	bool empty(void) const { return size() == 0; }  //if head and tail are equal, we are empty
+
+	void resize(size_t s) { assert(s < capacity()); _size = s; }
+	pointer data() { return _data; }
+	const_pointer data() const { return _data; }
+	refrence front() { return _data[0]; }
+	refrence back() { return _data[_size]; }
+	const_refrence front()const { return _data[0]; }
+	const_refrence back()const { return _data[_size]; }
+	iterator begin() { return data(); }
+	iterator end() { return data() + size(); }
+	const_iterator begin() const { return data(); }
+	const_iterator end() const { return data()+size(); }
+	byte& at(size_t i) { assert(i < size()); return _data[i]; }
+	const byte& at(size_t i) const{ assert(i < size()); return _data[i]; }
+	byte& operator[](size_t i) { assert(i < size()); return _data[i]; }
+	const byte& operator[](size_t i) const { assert(i < size()); return _data[i]; }
+
+	qboolean	allowoverflow() const { return 	_allowoverflow; }// if false, do a Sys_Error
+	qboolean	overflowed() const { return 	_overflowed; }		// set to true if the buffer size failed
+	void reset_overflowed() { _overflowed = false; }
+
+	void swap(sizebuf_t& other) {
+		if (std::addressof(other) != this) {
+			std::swap(_allowoverflow, other._allowoverflow);
+			std::swap(_overflowed, other._overflowed);
+			std::swap(_data, other._data);
+			std::swap(_capacity, other._capacity);
+			std::swap(_size, other._size);
+		}
+	};
 private:
-	container_type		_storage;	///< Where the data actually is.
-	size_type			_front;	///< Index of the element returned by next pop.
+	inline iterator	iat(size_type i) { assert(i <= size()); return begin() + i; }
+	inline const_iterator	iat(size_type i) const { assert(i <= size()); return begin() + i; }
+	/// Shifts the data in the linked block from \p start to \p start + \p n.
+	/// The contents of the uncovered bytes is undefined.
+	inline void _insert(const_iterator cstart, size_type n)
+	{
+		assert(data() || !n);
+		assert(begin() || !n);
+		assert(cstart >= begin() && cstart + n <= end());
+		iterator start = const_cast<iterator>(cstart);
+		std::rotate(start, end() - n, end());
+	}
+
+	/// Shifts the data in the linked block from \p start + \p n to \p start.
+	/// The contents of the uncovered bytes is undefined.
+	inline void _erase(const_iterator cstart, size_type n)
+	{
+		assert(data() || !n);
+		assert(begin() || !n);
+		assert(cstart >= begin() && cstart + n <= end());
+		iterator start = const_cast<iterator>(cstart);
+		std::rotate(start, start + n, end());
+	}
+	/// Shifts the data in the linked block from \p start to \p start + \p n.
+	iterator insert_hole(const_iterator start, size_type n);
+	iterator erase_hole(const_iterator start, size_type n);
+	qboolean	_allowoverflow;	// if false, do a Sys_Error
+	qboolean	_overflowed;		// set to true if the buffer size failed
+	byte * _data;
+	size_t _capacity;
+	size_t  _size;
+	size_t _readcount;
+
 };
+
+
 
 
 void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
 void SZ_Clear (sizebuf_t *buf);
-void *SZ_GetSpace (sizebuf_t *buf, int length);
+//void *SZ_GetSpace (sizebuf_t *buf, int length);
 void SZ_Write (sizebuf_t *buf, const void *data, int length);
 void SZ_Print (sizebuf_t *buf, const char *data);	// strcats onto the sizebuf
 
 template<typename U>
 static inline void SZ_Print(sizebuf_t *buf, const quake::string_helper<U>& data) {
+	buf->write(data.data(), data.size());
 	size_t len = data.size() + 1;
-
-	// byte * cast to keep VC++ happy
-	if (buf->data[buf->cursize - 1])
-		Q_memcpy((byte *)SZ_GetSpace(buf, len), data.data(), len); // no trailing 0
-	else
-		Q_memcpy((byte *)SZ_GetSpace(buf, len - 1) - 1, data.data(), len); // write over trailing 0
 }
 
 //============================================================================
@@ -211,7 +285,7 @@ inline void MSG_WriteString(sizebuf_t *sb, const quake::string_helper<U>& s) { M
 void MSG_WriteCoord (sizebuf_t *sb, float f);
 void MSG_WriteAngle (sizebuf_t *sb, float f);
 
-extern	int			msg_readcount;
+//extern	int			msg_readcount;
 extern	qboolean	msg_badread;		// set if a read goes beyond end of message
 
 void MSG_BeginReading (void);

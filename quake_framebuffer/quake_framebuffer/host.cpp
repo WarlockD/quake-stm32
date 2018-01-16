@@ -70,7 +70,7 @@ cvar_t	noexit = {"noexit","0",false,true};
 #ifdef QUAKE2
 cvar_t	developer = {"developer","1"};	// should be 0 for release!
 #else
-cvar_t	developer = {"developer","0"};
+cvar_t	developer = {"developer","1"};
 #endif
 
 cvar_t	skill = {"skill","1"};						// 0 - 3
@@ -120,7 +120,7 @@ Host_Error
 This shuts down both the client and server
 ================
 */
-void Host_Error (char *error, ...)
+void Host_Error (const char *error, ...)
 {
 	va_list		argptr;
 	quake::stack_string<1024> string;
@@ -409,8 +409,9 @@ void Host_ShutdownServer(qboolean crash)
 {
 	int		i;
 	int		count;
-	sizebuf_t	buf;
+	
 	byte message[4];
+	sizebuf_t	buf(message);
 	double	start;
 
 	if (!sv.active)
@@ -429,12 +430,12 @@ void Host_ShutdownServer(qboolean crash)
 		count = 0;
 		for (i=0, host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)
 		{
-			if (host_client->active && host_client->message.cursize)
+			if (host_client->active && host_client->message.size())
 			{
 				if (NET_CanSendMessage (host_client->netconnection))
 				{
 					NET_SendMessage(host_client->netconnection, &host_client->message);
-					SZ_Clear (&host_client->message);
+					host_client->message.clear();
 				}
 				else
 				{
@@ -449,9 +450,7 @@ void Host_ShutdownServer(qboolean crash)
 	while (count);
 
 // make sure all the clients know we're disconnecting
-	buf.data = (byte*)message;
-	buf.maxsize = 4;
-	buf.cursize = 0;
+
 	MSG_WriteByte(&buf, svc_disconnect);
 	count = NET_SendToAll(&buf, 5);
 	if (count)

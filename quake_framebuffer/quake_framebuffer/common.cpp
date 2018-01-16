@@ -538,57 +538,42 @@ Handles byte ordering and avoids alignment errors
 
 void MSG_WriteChar (sizebuf_t *sb, int c)
 {
-	byte    *buf;
-	
 #ifdef PARANOID
 	if (c < -128 || c > 127)
 		Sys_Error ("MSG_WriteChar: range error");
 #endif
+	sb->push_back(c);
 
-	buf = (byte*)SZ_GetSpace (sb, 1);
-	buf[0] = c;
 }
 
 void MSG_WriteByte (sizebuf_t *sb, int c)
 {
-	byte    *buf;
-	
 #ifdef PARANOID
 	if (c < 0 || c > 255)
 		Sys_Error ("MSG_WriteByte: range error");
 #endif
 
-	buf = (byte*)SZ_GetSpace (sb, 1);
-	buf[0] = c;
+	sb->push_back(c);
 }
 
 void MSG_WriteShort (sizebuf_t *sb, int c)
 {
-	byte    *buf;
-	
 #ifdef PARANOID
 	if (c < ((short)0x8000) || c > (short)0x7fff)
 		Sys_Error ("MSG_WriteShort: range error");
 #endif
-
-	buf = (byte*)SZ_GetSpace (sb, 2);
-	buf[0] = c&0xff;
-	buf[1] = c>>8;
+	short v = static_cast<short>(c);
+	sb->write_value(v);
 }
 
 void MSG_WriteLong (sizebuf_t *sb, int c)
 {
-	byte    *buf;
-	
-	buf = (byte*)SZ_GetSpace (sb, 4);
-	buf[0] = c&0xff;
-	buf[1] = (c>>8)&0xff;
-	buf[2] = (c>>16)&0xff;
-	buf[3] = c>>24;
+	sb->write_value(c);
 }
 
 void MSG_WriteFloat (sizebuf_t *sb, float f)
 {
+#if 0
 	union
 	{
 		float   f;
@@ -600,20 +585,19 @@ void MSG_WriteFloat (sizebuf_t *sb, float f)
 	dat.l = LittleLong (dat.l);
 	
 	SZ_Write (sb, &dat.l, 4);
+#endif
+//	sb->write(&f, 4);
+	sb->write_value(f);
 }
 
-void MSG_WriteString (sizebuf_t *sb, const char *s)
-{
-	if (!s)
-		SZ_Write (sb, "", 1);
-	else
-		SZ_Write (sb, s, Q_strlen(s)+1);
-}
+
 void MSG_WriteString(sizebuf_t *sb, const char *s, size_t length) {
-	if (!s || length == 0) 
+	if (s && length != 0) 
 		SZ_Write(sb, s, length);
-
-	MSG_WriteChar(sb, 0);	
+	sb->push_back('\0');
+}
+void MSG_WriteString(sizebuf_t *sb, const char *s) {
+	MSG_WriteString(sb, s, ::strlen(s));
 }
 void MSG_WriteCoord (sizebuf_t *sb, float f)
 {
@@ -628,88 +612,45 @@ void MSG_WriteAngle (sizebuf_t *sb, float f)
 //
 // reading functions
 //
-int                     msg_readcount;
+int             msg_readcount;
 qboolean        msg_badread;
 
 void MSG_BeginReading (void)
 {
-	msg_readcount = 0;
+	net_message.reset_read();
 	msg_badread = false;
 }
 
 // returns -1 and sets msg_badread if no more characters are available
 int MSG_ReadChar (void)
 {
-	int     c;
-	
-	if (msg_readcount+1 > net_message.cursize)
-	{
-		msg_badread = true;
-		return -1;
-	}
-		
-	c = (signed char)net_message.data[msg_readcount];
-	msg_readcount++;
-	
-	return c;
+	int b = net_message.get();
+	return b > -1 ? (char)b : -1;
 }
 
 int MSG_ReadByte (void)
 {
-	int     c;
-	
-	if (msg_readcount+1 > net_message.cursize)
-	{
-		msg_badread = true;
-		return -1;
-	}
-		
-	c = (unsigned char)net_message.data[msg_readcount];
-	msg_readcount++;
-	
-	return c;
+	int b = net_message.get();
+	return b > -1 ? (byte)b : -1;
 }
 
 int MSG_ReadShort (void)
 {
-	int     c;
-	
-	if (msg_readcount+2 > net_message.cursize)
-	{
-		msg_badread = true;
-		return -1;
-	}
-		
-	c = (short)(net_message.data[msg_readcount]
-	+ (net_message.data[msg_readcount+1]<<8));
-	
-	msg_readcount += 2;
-	
-	return c;
+	short v;
+	return net_message.read_value(v) ? v : -1;
 }
 
 int MSG_ReadLong (void)
 {
-	int     c;
-	
-	if (msg_readcount+4 > net_message.cursize)
-	{
-		msg_badread = true;
-		return -1;
-	}
-		
-	c = net_message.data[msg_readcount]
-	+ (net_message.data[msg_readcount+1]<<8)
-	+ (net_message.data[msg_readcount+2]<<16)
-	+ (net_message.data[msg_readcount+3]<<24);
-	
-	msg_readcount += 4;
-	
-	return c;
+	int     v;
+	return net_message.read_value(v) ? v : -1;
 }
 
 float MSG_ReadFloat (void)
 {
+	float     v;
+	return net_message.read_value(v) ? v : -1;
+#if 0
 	union
 	{
 		byte    b[4];
@@ -725,7 +666,8 @@ float MSG_ReadFloat (void)
 	
 	dat.l = LittleLong (dat.l);
 
-	return dat.f;   
+	return dat.f;  
+#endif
 }
 
 quake::cstring MSG_ReadString (void)
@@ -759,48 +701,81 @@ float MSG_ReadAngle (void)
 
 
 //===========================================================================
+sizebuf_t::sizebuf_t(bool allowoverflow , bool overflowed ) : _allowoverflow(allowoverflow), _overflowed(overflowed), _data(nullptr), _capacity(0U), _size(0U) , _readcount(0U) {}
+sizebuf_t::sizebuf_t(void* data, size_type size, bool allowoverflow , bool overflowed ) : _allowoverflow(allowoverflow), _overflowed(overflowed), _data(reinterpret_cast<byte*>(data)), _capacity(size), _size(0U), _readcount(0U) {}
 
+sizebuf_t::iterator sizebuf_t::erase(size_t pos, size_t count) {
+	return erase_hole(begin() + pos, count);
+}
 
-
-byte * sizebuf_t::get_space(size_t length) {
-	if (cursize + length > maxsize)
+void sizebuf_t::insert(const void* data, size_t size, size_t pos ) {
+	::memcpy(insert_hole(begin()+pos,size), data, size);
+}
+/// Shifts the data in the linked block from \p start to \p start + \p n.
+sizebuf_t::iterator sizebuf_t::insert_hole(const_iterator start, size_type n) {
+	if (size() + n > capacity())
 	{
-		if (!allowoverflow)
+		if (!_allowoverflow)
 			Sys_Error("SZ_GetSpace: overflow without allowoverflow set");
 
-		if (length > maxsize)
-			Sys_Error("SZ_GetSpace: %i is > full buffer size", length);
+		if (n > capacity())
+			Sys_Error("SZ_GetSpace: %i is > full buffer size", n);
 
-		overflowed = true;
+		_overflowed = true;
 		Con_Printf("SZ_GetSpace: overflow");
 		clear();
 	}
+	const size_type ip = start - begin();
+	_size += n;
+	_readcount = 0; // read is invalidated on inserts and erases
+	_insert(iat(ip), n);
+	return iat(ip);
+}
 
-	byte * data = data + cursize;
-	cursize += length;
+/// Shifts the data in the linked block from \p start + \p n to \p start.
+sizebuf_t::iterator sizebuf_t::erase_hole(const_iterator start, size_type n) {
+	const size_type ep = start - begin();
+	assert(ep + n <= size());
+	iterator iep = iat(ep);
+	_erase(iep, n);
+	_size -= n;
+	_readcount = 0; // read is invalidated on inserts
+	return iep;
+}
 
-	return data;
+
+size_t sizebuf_t::read(void* data, size_t bytes) {
+	const size_t bytes_read = std::min(bytes, _capacity - _readcount);
+	::memcpy(data, _data+ _readcount, bytes_read);
+	_readcount += bytes_read;
+	return bytes_read;
 }
-void sizebuf_t::alloc(size_t startsize) {
-	if (startsize < 256)
-		startsize = 256;
-	data = (byte*)Hunk_AllocName(startsize, "sizebuf");
-	maxsize = startsize;
-	cursize = 0;
+
+size_t sizebuf_t::read(sizebuf_t& buf) {
+	if (buf.empty()) return 0;
+	const size_t bytes_read = std::min(size(), _capacity - _readcount);
+	size_t r = buf.write(data()+ _readcount, bytes_read);
+	_readcount += bytes_read;
+	return r;
 }
-void sizebuf_t::free() {
-	//      Z_Free (buf->data);
-	//      buf->data = NULL;
-	//      buf->maxsize = 0;
-	cursize = 0;
+size_t sizebuf_t::write(const sizebuf_t& buf) {
+
+	::memcpy(insert_hole(end(),buf.size()), buf.data(), buf.size());
+	return buf.size();
 }
+
+
+size_t sizebuf_t::write(const void* data, size_t bytes) {
+	::memcpy(insert_hole(end(), bytes), data, bytes);
+	return bytes;
+}
+
+
 void SZ_Alloc (sizebuf_t *buf, int startsize)
 {
 	if (startsize < 256)
 		startsize = 256;
-	buf->data = (byte*)Hunk_AllocName (startsize, "sizebuf");
-	buf->maxsize = startsize;
-	buf->cursize = 0;
+	buf->manage((byte*)Hunk_AllocName(startsize, "sizebuf"), startsize);
 }
 
 
@@ -809,16 +784,18 @@ void SZ_Free (sizebuf_t *buf)
 //      Z_Free (buf->data);
 //      buf->data = NULL;
 //      buf->maxsize = 0;
-	buf->cursize = 0;
+	buf->clear();
 }
 
 void SZ_Clear (sizebuf_t *buf)
 {
-	buf->cursize = 0;
+	buf->clear();
 }
 
 void *SZ_GetSpace (sizebuf_t *buf, int length)
 {
+	assert(0);
+#if 0
 	void    *data;
 	
 	if (buf->cursize + length > buf->maxsize)
@@ -838,33 +815,19 @@ void *SZ_GetSpace (sizebuf_t *buf, int length)
 	buf->cursize += length;
 	
 	return data;
+#endif
+	return nullptr;
 }
-void sizebuf_t::write(const void* data, size_t length) {
-	::memcpy(get_space(length), data, length);
-}
-void sizebuf_t::write(const char* str) {
-	size_t len = ::strlen(str)+1;
-	if (data[cursize - 1])
-		::memcpy(get_space(len), data, len); // no trailing 0
-	else
-		::memcpy(get_space(len - 1) - 1, data, len); // write over trailing 0
-}
+
 void SZ_Write (sizebuf_t *buf, const void *data, int length)
 {
-	Q_memcpy (SZ_GetSpace(buf,length),data,length);         
+	buf->write(data, length);
+	//Q_memcpy (SZ_GetSpace(buf,length),data,length);         
 }
 
-void SZ_Print (sizebuf_t *buf, const char *data)
-{
-	int             len;
-	
-	len = Q_strlen(data)+1;
-
-// byte * cast to keep VC++ happy
-	if (buf->data[buf->cursize-1])
-		Q_memcpy ((byte *)SZ_GetSpace(buf, len),data,len); // no trailing 0
-	else
-		Q_memcpy ((byte *)SZ_GetSpace(buf, len-1)-1,data,len); // write over trailing 0
+void SZ_Print (sizebuf_t *buf, const char *data) {
+	if (buf->back() == '\0') buf->pop_back(); // remove trailing zero
+	buf->write(data, Q_strlen(data) + 1); // write the string and the zero termination
 }
 
 

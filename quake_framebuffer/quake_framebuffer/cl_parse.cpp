@@ -148,17 +148,17 @@ void CL_KeepaliveMessage (void)
 	float	time;
 	static float lastmsg;
 	int		ret;
-	sizebuf_t	old;
-	byte		olddata[8192];
 	
+	byte		olddata[8192];
+	sizebuf_t	old(olddata);
+
 	if (sv.active)
 		return;		// no need if server is local
 	if (cls.demoplayback)
 		return;
 
 // read messages from server, should just be nops
-	old = net_message;
-	memcpy (olddata, net_message.data, net_message.cursize);
+	net_message.swap(old);
 	
 	do
 	{
@@ -178,9 +178,7 @@ void CL_KeepaliveMessage (void)
 			break;
 		}
 	} while (ret);
-
-	net_message = old;
-	memcpy (net_message.data, olddata, net_message.cursize);
+	net_message.swap(old);
 
 // check time
 	time = Sys_FloatTime ();
@@ -709,7 +707,7 @@ void CL_ParseStaticSound (void)
 }
 
 
-#define SHOWNET(x) if(cl_shownet.value==2)Con_Printf ("%3i:%s\n", msg_readcount-1, x);
+#define SHOWNET(x) if(cl_shownet.value==2)Con_Printf ("%3i:%s\n", net_message.read_count()-1, x);
 
 /*
 =====================
@@ -725,7 +723,7 @@ void CL_ParseServerMessage (void)
 // if recording demos, copy the message out
 //
 	if (cl_shownet.value == 1)
-		Con_Printf ("%i ",net_message.cursize);
+		Con_Printf ("%i ",net_message.size());
 	else if (cl_shownet.value == 2)
 		Con_Printf ("------------------\n");
 	

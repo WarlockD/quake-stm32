@@ -607,20 +607,16 @@ SCR_ScreenShot_f
 void SCR_ScreenShot_f (void) 
 { 
 	int     i; 
-	quake::stack_string<80> pcxname; 
 	quake::stack_string<MAX_OSPATH> checkname;
 
 // 
 // find a file name to save it to 
 // 
-	pcxname = "quake00.pcx";
 		
 	for (i=0 ; i<=99 ; i++) 
 	{ 
-		pcxname[5] = i/10 + '0'; 
-		pcxname[6] = i%10 + '0'; 
 		checkname.clear();
-		checkname << com_gamedir << '/' << pcxname;
+		checkname << com_gamedir << "/quake" << (int)(i / 10) << (int)(i % 10) << ".pcx";
 		if (Sys_FileTime(checkname.c_str()) == -1)
 			break;	// file doesn't exist
 	} 
@@ -636,13 +632,13 @@ void SCR_ScreenShot_f (void)
 	D_EnableBackBufferAccess ();	// enable direct drawing of console to back
 									//  buffer
 
-	WritePCXfile (pcxname.c_str(), vid.buffer, vid.width, vid.height, vid.rowbytes,
+	WritePCXfile (checkname.c_str(), vid.buffer, vid.width, vid.height, vid.rowbytes,
 				  host_basepal);
 
 	D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
 									//  for linear writes all the time
 
-	Con_Printf ("Wrote %s\n", pcxname);
+	Con_Printf ("Wrote %s\n", checkname.c_str());
 } 
 
 

@@ -160,12 +160,12 @@ void Key_Console (int key)
 {
 	if (key == K_ENTER)
 	{
-		Cbuf_AddText (key_lines[edit_line].substr(1));	// skip the >
+		if(key_lines[edit_line].size() > 1)  Cbuf_AddText (key_lines[edit_line].substr(1));	// skip the >
 		Cbuf_AddText ("\n");
 		Con_Printf ("%s\n",key_lines[edit_line].c_str());
 		edit_line = (edit_line + 1) & 31;
 		history_line = edit_line;
-		key_lines[edit_line][0] = ']';
+		key_lines[edit_line] = "]";
 		key_linepos = 1;
 		if (cls.state == ca_disconnected)
 			SCR_UpdateScreen ();	// force an update, because the command
@@ -175,7 +175,7 @@ void Key_Console (int key)
 
 	if (key == K_TAB)
 	{	// command completion
-		quake::cstring cmd = Cmd_CompleteCommand (key_lines[edit_line].substr(1));
+		quake::cstring cmd = Cmd_CompleteCommand (key_lines[edit_line].size() > 1 ? key_lines[edit_line].substr(1) : quake::string_view());
 		if (cmd.empty())
 			cmd = Cvar_CompleteVariable (key_lines[edit_line].substr(1));
 		if (!cmd.empty()) {
@@ -275,8 +275,6 @@ qboolean team_message = false;
 
 void Key_Message (int key)
 {
-	static int chat_bufferlen = 0;
-
 	if (key == K_ENTER)
 	{
 		if (team_message)
@@ -287,16 +285,14 @@ void Key_Message (int key)
 		Cbuf_AddText("\"\n");
 
 		key_dest = key_game;
-		chat_bufferlen = 0;
-		chat_buffer[0] = 0;
+		chat_buffer.clear();
 		return;
 	}
 
 	if (key == K_ESCAPE)
 	{
 		key_dest = key_game;
-		chat_bufferlen = 0;
-		chat_buffer[0] = 0;
+		chat_buffer.clear();
 		return;
 	}
 
@@ -305,19 +301,16 @@ void Key_Message (int key)
 
 	if (key == K_BACKSPACE)
 	{
-		if (chat_bufferlen)
+		if (!chat_buffer.empty())
 		{
-			chat_bufferlen--;
-			chat_buffer[chat_bufferlen] = 0;
+			chat_buffer.pop_back();
 		}
 		return;
 	}
 
-	if (chat_bufferlen == 31)
+	if (chat_buffer.size() == 31)
 		return; // all full
-
-	chat_buffer[chat_bufferlen++] = key;
-	chat_buffer[chat_bufferlen] = 0;
+	chat_buffer.push_back(key);
 }
 
 //============================================================================

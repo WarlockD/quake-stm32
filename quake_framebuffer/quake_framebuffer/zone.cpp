@@ -340,7 +340,6 @@ void Hunk_Print (qboolean all)
 	int		totalblocks;
 	quake::stack_string<9> name;
 
-	name[8] = 0;
 	count = 0;
 	sum = 0;
 	totalblocks = 0;
@@ -388,7 +387,7 @@ void Hunk_Print (qboolean all)
 	//
 	// print the single block
 	//
-		name = h->name;
+		name.assign(h->name, std::min(::strlen(h->name), sizeof(h->name)));
 		if (all)
 			Con_Printf ("%8p :%8i %8s\n",h, h->size, name.c_str());
 			

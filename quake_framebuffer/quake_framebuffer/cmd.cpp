@@ -78,14 +78,12 @@ Adds command text at the end of the buffer
 */
 void Cbuf_AddText (const quake::string_view& text)
 {
-	if (cmd_text.cursize + text.size() >= cmd_text.maxsize)
+	if (cmd_text.size() + text.size() >= cmd_text.capacity())
 	{
 		Con_Printf ("Cbuf_AddText: overflow\n");
 		return;
 	}
-
-	SZ_Write(&cmd_text, text.data(), text.size());
-	cmd_text.data[cmd_text.cursize] = '\0';
+	cmd_text.write(text.data(), text.size());
 }
 
 
@@ -101,6 +99,8 @@ FIXME: actually change the command buffer to do less copying
 */
 void Cbuf_InsertText (const quake::string_view& text)
 {
+	cmd_text.insert(cmd_text.begin(), text.begin(), text.end());
+#if 0
 	char	*temp = nullptr;
 // copy off any commands still remaining in the exec buffer
 	int templen = cmd_text.cursize;
@@ -123,6 +123,7 @@ void Cbuf_InsertText (const quake::string_view& text)
 		//Z_Free (temp);
 	}
 	cmd_text.data[cmd_text.cursize] = '\0';
+#endif
 }
 
 /*
@@ -130,21 +131,38 @@ void Cbuf_InsertText (const quake::string_view& text)
 Cbuf_Execute
 ============
 */
-void Cbuf_Execute (void)
+void Cbuf_Execute(void)
 {
 	int		i;
 	char	*text;
 	quake::stack_string<1024> line;
 	int		quotes;
-	quake::zstring lines;
-	lines.assign((char *)cmd_text.data, cmd_text.cursize);
-	cmd_text.cursize = 0;
+	int c;
 
-	
-	COM_Parser parser(lines);
-	while (Cmd_TokenizeString(parser)) {
-		Cmd_ExecuteArgs(src_command);
-		Cmd_TokenizeString(parser);
+	while (!cmd_text.empty()) { //Cmd_TokenizeString(parser)) {
+		auto start = cmd_text.begin();
+		// skip comments
+		while (start != cmd_text.end() && (*start <= ' ' || *start == '/')) {
+			start++;
+			if (start != cmd_text.end() && *start == '/') {
+				do {
+					start++;
+				} while (start != cmd_text.end() && *start != '\n');
+			}
+			continue;
+		}
+		
+		if (start == cmd_text.end())  break; // all whitespace
+		auto end = start;
+		line.clear();
+		while (end != cmd_text.end()) {
+			c = *end++;
+			line.push_back(c);
+			if (c == '\n') break;
+		}
+		cmd_text.erase(start, end);
+		//while (!line.empty() && line.back() <= ' ')
+		Cmd_ExecuteString(line, src_command);
 		if (cmd_wait)
 		{	// skip out while text still remains in buffer, leaving it
 			// for next frame
@@ -152,47 +170,48 @@ void Cbuf_Execute (void)
 			break;
 		}
 	}
+	// all done?
 #if 0
-		Cmd_ExecuteString(line, src_command);
+	Cmd_ExecuteString(line, src_command);
 
-		if (cmd_wait)
-		{	// skip out while text still remains in buffer, leaving it
-			// for next frame
-			cmd_wait = false;
+	if (cmd_wait)
+	{	// skip out while text still remains in buffer, leaving it
+		// for next frame
+		cmd_wait = false;
+		break;
+	}
+
+	quotes = 0;
+	for (i = 0; i < cmd_text.cursize; i++)
+	{
+		if (text[i] == '"')
+			quotes++;
+		if (!(quotes & 1) && text[i] == ';')
+			break;	// don't break if inside a quoted string
+		if (text[i] == '\n')
 			break;
-		}
+	}
 
-		quotes = 0;
-		for (i=0 ; i< cmd_text.cursize ; i++)
-		{
-			if (text[i] == '"')
-				quotes++;
-			if ( !(quotes&1) &&  text[i] == ';')
-				break;	// don't break if inside a quoted string
-			if (text[i] == '\n')
-				break;
-		}
-			
-				
-		line.assign(text, i);
 
-		// delete the text from the command buffer and move remaining commands down
-		// this is necessary because commands (exec, alias) can insert data at the
-		// beginning of the text buffer
+	line.assign(text, i);
 
-		if (i == cmd_text.cursize)
-			cmd_text.cursize = 0;
-		else
-		{
-			i++;
-			cmd_text.cursize -= i;
-			::memmove(text, text+i, cmd_text.cursize);
-		}
+	// delete the text from the command buffer and move remaining commands down
+	// this is necessary because commands (exec, alias) can insert data at the
+	// beginning of the text buffer
 
-// execute the command line
-		Cmd_ExecuteString (line, src_command);
-		
-	
+	if (i == cmd_text.cursize)
+		cmd_text.cursize = 0;
+	else
+	{
+		i++;
+		cmd_text.cursize -= i;
+		::memmove(text, text + i, cmd_text.cursize);
+	}
+
+	// execute the command line
+	Cmd_ExecuteString(line, src_command);
+
+
 	}
 #endif
 }
@@ -482,8 +501,7 @@ bool Cmd_TokenizeString(COM_Parser& parser) {
 	
 	while (true) {
 		if (!parser.Next(token, true)) return false;
-		if (token.empty()) return false;
-		if (token[0] == '\n')  break;
+		if (!token.empty() && token[0] == '\n')  break;
 		if (cmd_argc == 0)
 			cmd_args = parser.remaining();
 		if (cmd_argc < MAX_ARGS)

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 cvar_t	cl_name = {"_cl_name", "player", true};
 cvar_t	cl_color = {"_cl_color", "0", true};
 
-cvar_t	cl_shownet = {"cl_shownet","0"};	// can be 0, 1, or 2
+cvar_t	cl_shownet = {"cl_shownet","1"};	// can be 0, 1, or 2
 cvar_t	cl_nolerp = {"cl_nolerp","0"};
 
 cvar_t	lookspring = {"lookspring","0", true};
@@ -694,7 +694,7 @@ void CL_SendCmd (void)
 	}
 	
 // send the reliable message
-	if (!cls.message.cursize)
+	if (!cls.message.size())
 		return;		// no message at all
 	
 	if (!NET_CanSendMessage (cls.netcon))
