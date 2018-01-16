@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 typedef int	func_t;
 typedef int	string_t;
 
-enum etype_t  {ev_void, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_function, ev_pointer} ;
+enum   etype_t {ev_void, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_function, ev_pointer} ;
 
 
 #define	OFS_NULL		0
@@ -126,12 +126,14 @@ typedef struct statement_s
 
 typedef struct
 {
+#if 0
 	union {
 		unsigned short	itype;		// if DEF_SAVEGLOBGAL bit is set
 									// the variable needs to be saved in savegames
 		etype_t type;
 	};
-
+#endif
+	unsigned short	 type;
 
 	unsigned short	ofs;
 	int			s_name;

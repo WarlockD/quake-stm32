@@ -386,7 +386,7 @@ char *PR_GlobalString (int ofs)
 		sprintf (line,"%i(???)", ofs);
 	else
 	{
-		s = PR_ValueString (def->type, (eval_t*)val);
+		s = PR_ValueString ((etype_t)def->type, (eval_t*)val);
 		Q_sprintf (line,"%i(%s)%s", ofs, pr_strings + def->s_name, s);
 	}
 	
@@ -465,7 +465,7 @@ void ED_Print (edict_t *ed)
 		while (l++ < 15)
 			Con_Printf (" ");
 
-		Con_Printf ("%s\n", PR_ValueString(d->type, (eval_t *)v));		
+		Con_Printf ("%s\n", PR_ValueString((etype_t)d->type, (eval_t *)v));
 	}
 }
 
@@ -510,7 +510,7 @@ void ED_Write (FILE *f, edict_t *ed)
 			continue;
 	
 		fprintf (f,"\"%s\" ",name);
-		fprintf (f,"\"%s\"\n", PR_UglyValueString(d->type, (eval_t *)v));		
+		fprintf (f,"\"%s\"\n", PR_UglyValueString((etype_t)d->type, (eval_t *)v));
 	}
 
 	fprintf (f, "}\n");
@@ -1035,7 +1035,7 @@ void PR_LoadProgs (void)
 
 	for (i=0 ; i<progs->numglobaldefs ; i++)
 	{
-		pr_globaldefs[i].type = static_cast<etype_t>(LittleShort (static_cast<short>(pr_globaldefs[i].type)));
+		pr_globaldefs[i].type = LittleShort(pr_globaldefs[i].type);
 		pr_globaldefs[i].ofs = LittleShort (pr_globaldefs[i].ofs);
 		pr_globaldefs[i].s_name = LittleLong (pr_globaldefs[i].s_name);
 	}
