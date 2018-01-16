@@ -34,6 +34,7 @@ typedef uint8_t 		byte;
 
 typedef bool qboolean;
 
+#include "qvector.h"
 //============================================================================
 
 typedef struct sizebuf_s

@@ -225,6 +225,9 @@
     <ClCompile Include="global.cpp">
       <Filter>quake</Filter>
     </ClCompile>
+    <ClCompile Include="qvector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="quake.gif">
@@ -426,6 +429,9 @@
     </ClInclude>
     <ClInclude Include="globals.h">
       <Filter>quake</Filter>
+    </ClInclude>
+    <ClInclude Include="qvector.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

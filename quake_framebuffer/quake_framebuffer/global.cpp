@@ -1,3 +1,4 @@
+#include "quakedef.h"
 #include "globals.h"
 
 
