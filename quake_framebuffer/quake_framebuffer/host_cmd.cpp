@@ -60,7 +60,7 @@ void Host_Status_f (void)
 	int			minutes;
 	int			hours = 0;
 	int			j;
-	void		(*print) (char *fmt, ...);
+	void		(*print) (const char *fmt, ...);
 	
 	if (cmd_source == src_command)
 	{
@@ -1010,8 +1010,9 @@ void Host_Say(qboolean teamonly)
 	client_t *client;
 	client_t *save;
 	int		j;
-	char	*p;
+
 	char	text[64];
+	char    args[128];
 	qboolean	fromServer = false;
 
 	if (cmd_source == src_command)
@@ -1032,8 +1033,9 @@ void Host_Say(qboolean teamonly)
 		return;
 
 	save = host_client;
+	Q_strcpy(args, Cmd_Args());
+	char	*p = args;
 
-	p = Cmd_Args();
 // remove quotes if present
 	if (*p == '"')
 	{
@@ -1086,7 +1088,8 @@ void Host_Tell_f(void)
 	client_t *client;
 	client_t *save;
 	int		j;
-	char	*p;
+	
+	char    args[256];
 	char	text[64];
 
 	if (cmd_source == src_command)
@@ -1101,7 +1104,9 @@ void Host_Tell_f(void)
 	Q_strcpy(text, host_client->name);
 	Q_strcat(text, ": ");
 
-	p = Cmd_Args();
+
+	Q_strcpy(args, Cmd_Args());
+	char	*p = args;
 
 // remove quotes if present
 	if (*p == '"')
@@ -1115,8 +1120,8 @@ void Host_Tell_f(void)
 	if (Q_strlen(p) > j)
 		p[j] = 0;
 
-	strcat (text, p);
-	strcat (text, "\n");
+	Q_strcat (text, p);
+	Q_strcat(text, "\n");
 
 	save = host_client;
 	for (j = 0, client = svs.clients; j < svs.maxclients; j++, client++)
@@ -1515,7 +1520,7 @@ Host_Give_f
 */
 void Host_Give_f (void)
 {
-	char	*t;
+	const char	*t;
 	int		v, w;
 	eval_t	*val;
 

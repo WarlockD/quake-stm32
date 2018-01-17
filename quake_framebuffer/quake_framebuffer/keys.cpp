@@ -158,7 +158,7 @@ Interactive line editing and console scrollback
 */
 void Key_Console (int key)
 {
-	char	*cmd;
+	const char	*cmd;
 	
 	if (key == K_ENTER)
 	{
@@ -364,7 +364,7 @@ given keynum.
 FIXME: handle quote special (general escape sequence?)
 ===================
 */
-char *Key_KeynumToString (int keynum)
+const char *Key_KeynumToString (int keynum)
 {
 	keyname_t	*kn;	
 	static	char	tinystr[2];

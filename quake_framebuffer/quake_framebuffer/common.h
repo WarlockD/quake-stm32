@@ -50,8 +50,8 @@ void SZ_Alloc (sizebuf_t *buf, int startsize);
 void SZ_Free (sizebuf_t *buf);
 void SZ_Clear (sizebuf_t *buf);
 void *SZ_GetSpace (sizebuf_t *buf, int length);
-void SZ_Write (sizebuf_t *buf, void *data, int length);
-void SZ_Print (sizebuf_t *buf, char *data);	// strcats onto the sizebuf
+void SZ_Write (sizebuf_t *buf, const void *data, int length);
+void SZ_Print (sizebuf_t *buf, const char *data);	// strcats onto the sizebuf
 
 //============================================================================
 
@@ -136,7 +136,7 @@ void MSG_WriteLong(sizebuf_t *sb, T c) {
 
 
 void MSG_WriteFloat (sizebuf_t *sb, float f);
-void MSG_WriteString (sizebuf_t *sb, char *s);
+void MSG_WriteString (sizebuf_t *sb, const char *s);
 void MSG_WriteCoord (sizebuf_t *sb, float f);
 void MSG_WriteAngle (sizebuf_t *sb, float f);
 
@@ -149,7 +149,7 @@ int MSG_ReadByte (void);
 int MSG_ReadShort (void);
 int MSG_ReadLong (void);
 float MSG_ReadFloat (void);
-char *MSG_ReadString (void);
+const char *MSG_ReadString (void);
 
 float MSG_ReadCoord (void);
 float MSG_ReadAngle (void);
@@ -167,6 +167,8 @@ void Q_strncpy(char *dest, const char * src, size_t count);
 void Q_strcpy(char *dest, const char * src);
 template<size_t N>
 int Q_strcpy(char(&dest)[N], const char * src) { Q_strncpy(dest, src, N);}
+template<size_t N>
+int Q_strcat(char(&dest)[N], const char * src) { ::strcat_s(dest, src); }
 
 char *Q_strrchr (char *s, char c);
 const char *Q_strrchr(const char *s, char c);
@@ -185,8 +187,8 @@ int Q_vsnprintf(char* buffer, size_t buffer_size, const char* fmt, va_list va);
 template<size_t N>
 int Q_vsprintf(char(&buffer)[N], const char* fmt, va_list va) { return Q_vsnprintf(buffer, N, fmt, va); }
 
-int Q_sprintf(char* buffer, const char* fmt, ...);
-int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...);
+int Q_sprintf( char* buffer, const char* fmt, ...);
+int Q_snprintf( char* buffer, size_t buffer_size, const char* fmt, ...);
 
 template<size_t N>
 int Q_sprintf(char(&buffer)[N], const char* fmt, ...) { 

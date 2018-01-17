@@ -115,7 +115,7 @@ Larger attenuations will drop off.  (max 4 attenuation)
 
 ==================
 */  
-void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
+void SV_StartSound (edict_t *entity, int channel, const char *sample, int volume,
     float attenuation)
 {       
     int         sound_num;
@@ -1044,7 +1044,7 @@ extern float		scr_centertime_off;
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
 #else
-void SV_SpawnServer (char *server)
+void SV_SpawnServer (const char *server)
 #endif
 {
 	edict_t		*ent;

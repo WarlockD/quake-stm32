@@ -214,14 +214,14 @@ int Q_vsnprintf(char* buffer, size_t buffer_size, const char* fmt, va_list va) {
 	return vsnprintf(buffer, buffer_size,  fmt, va);
 }
 
-int Q_sprintf(char* buffer, const char* fmt, ...) {
+int Q_sprintf( char* buffer, const char* fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	int ret=  Q_vsprintf(buffer, fmt, va);
 	va_end(va);
 	return ret;
 }
-int Q_snprintf(char* buffer, size_t buffer_size, const char* fmt, ...) {
+int Q_snprintf( char* buffer, size_t buffer_size, const char* fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	int ret = Q_vsnprintf(buffer, buffer_size, fmt, va);
@@ -602,7 +602,7 @@ void MSG_WriteFloat (sizebuf_t *sb, float f)
 	SZ_Write (sb, &dat.l, 4);
 }
 
-void MSG_WriteString (sizebuf_t *sb, char *s)
+void MSG_WriteString (sizebuf_t *sb, const char *s)
 {
 	if (!s)
 		SZ_Write (sb, "", 1);
@@ -723,7 +723,7 @@ float MSG_ReadFloat (void)
 	return dat.f;   
 }
 
-char *MSG_ReadString (void)
+const char *MSG_ReadString (void)
 {
 	static char     string[2048];
 	int             l,c;
@@ -803,12 +803,12 @@ void *SZ_GetSpace (sizebuf_t *buf, int length)
 	return data;
 }
 
-void SZ_Write (sizebuf_t *buf, void *data, int length)
+void SZ_Write (sizebuf_t *buf, const void *data, int length)
 {
 	Q_memcpy (SZ_GetSpace(buf,length),data,length);         
 }
 
-void SZ_Print (sizebuf_t *buf, char *data)
+void SZ_Print (sizebuf_t *buf, const char *data)
 {
 	int             len;
 	

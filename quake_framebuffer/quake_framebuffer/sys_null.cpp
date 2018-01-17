@@ -137,7 +137,7 @@ int     Sys_FileTime (const char * path)
 	return static_cast<int>(s.st_mtime);
 }
 
-void Sys_mkdir (char *path)
+void Sys_mkdir (const char *path)
 {
 	_mkdir(path);
 }
@@ -175,7 +175,7 @@ void Sys_DebugLog(const char *file, const char *fmt, ...)
 	}
 };
 
-void Sys_Printf(char *fmt, ...)
+void Sys_Printf(const char *fmt, ...)
 {
 	va_list		argptr;
 	char		text[2048];
@@ -229,7 +229,7 @@ void Sys_Init(void)
 	//timeBeginPeriod(1);
 }
 
-void Sys_Error(char *error, ...)
+void Sys_Error(const char *error, ...)
 {
 	va_list     argptr;
 	char        string[1024];

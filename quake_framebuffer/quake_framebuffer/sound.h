@@ -100,8 +100,8 @@ void S_ClearBuffer (void);
 void S_Update (vec3_t origin, vec3_t v_forward, vec3_t v_right, vec3_t v_up);
 void S_ExtraUpdate (void);
 
-sfx_t *S_PrecacheSound (char *sample);
-void S_TouchSound (char *sample);
+sfx_t *S_PrecacheSound (const char *sample);
+void S_TouchSound (const char *sample);
 void S_ClearPrecache (void);
 void S_BeginPrecaching (void);
 void S_EndPrecaching (void);
@@ -163,10 +163,10 @@ extern qboolean	snd_initialized;
 
 extern int		snd_blocked;
 
-void S_LocalSound (char *s);
+void S_LocalSound (const char *s);
 sfxcache_t *S_LoadSound (sfx_t *s);
 
-wavinfo_t GetWavinfo (char *name, byte *wav, int wavlength);
+wavinfo_t GetWavinfo (const char *name, byte *wav, int wavlength);
 
 void SND_InitScaletable (void);
 void SNDDMA_Submit(void);
